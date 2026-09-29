@@ -24,7 +24,7 @@ public sealed class Whirlwind : CardModel, ICardChoiceBaseValueProvider, ICardDa
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        int hitCount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue);
+        int hitCount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue);
         await DamageCmd.Attack(_damage).WithHitCount(hitCount)
             .FromCard(this, cardPlay).TargetingAllOpponents(CombatState!).Execute();
     }

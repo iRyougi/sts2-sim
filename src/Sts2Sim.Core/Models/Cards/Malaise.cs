@@ -17,7 +17,7 @@ public sealed class Malaise : CardModel
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
-        int amount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue) + (IsUpgraded ? 1 : 0);
+        int amount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue) + (IsUpgraded ? 1 : 0);
         await PowerCmd.Apply<StrengthPower>(CombatState!, cardPlay.Target, -amount, Owner.Creature, this);
         await PowerCmd.Apply<WeakPower>(CombatState!, cardPlay.Target, amount, Owner.Creature, this);
     }

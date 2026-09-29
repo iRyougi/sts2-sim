@@ -5,23 +5,19 @@ using Sts2Sim.Core.Models.Relics;
 namespace Sts2Sim.Core.Content;
 
 /// <summary>
-/// Decision-time exclusions for content whose cross-character behavior still has unresolved fidelity gaps.
+/// Decision-time exclusions for cross-character effects that still need end-to-end parity evidence.
+/// All five playable character card pools are registered. <c>Kaleidoscope</c> uses the other four:
+/// the #296 replay found identical Niche ledgers in 57/57 archived runs, but different card reward
+/// candidates in 53/57 (#303). <c>Splash</c> also uses other-character pools and was not retested in #296;
+/// its separate free-play deviation #97 remains. Both stay excluded from default decisions until
+/// their player-facing effects are verified.
 ///
-/// The authoritative game has exactly four such mechanisms (confirmed via a full-text search of
-/// <c>CharacterCardPools</c> across the entire decompiled source, 2026-08-29): <c>PrismaticGem</c>
-/// (relic), <c>ColorfulPhilosophers</c> (event), <c>Splash</c> (card), <c>Kaleidoscope</c> (relic).
-/// <c>PrismaticGem</c> now uses the native reward-pool union. <c>Splash</c> and
-/// <c>Kaleidoscope</c> retain decision-time exclusions pending their separate fidelity audits.
+/// <c>PrismaticGem</c> now uses the native reward-pool union (#226/#292);
+/// <c>ColorfulPhilosophers</c> exists and has its own #202 scope. This registry contains only the
+/// two types below; their status does not imply the other two are fully verified.
 ///
-/// This registry is deliberately kept separate from the core game-rule layer (card pool generation,
-/// <c>IsAllowedAtNeow</c>, RNG consumption) — excluding content there would shrink candidate pools
-/// *before* the RNG draw that picks from them, which shifts the RNG-to-outcome mapping for every draw
-/// from that pool, not just the excluded ones, breaking Plan07's sim-real bit-exact parity far more
-/// broadly than intended. Instead, this list is consulted purely at decision time (see
-/// <see cref="Runs.IRunDecisionSource"/>'s default reward/event heuristics) — the underlying simulator
-/// still generates and offers this content exactly like the real game (preserving RNG fidelity); the
-/// decision layer just declines to pick it.
-///
+/// Exclusions are consulted at decision time. Candidate generation and RNG draws remain intact,
+/// so this policy cannot silently change the simulator's random stream.
 /// </summary>
 public static class CrossCharacterContentExclusions
 {

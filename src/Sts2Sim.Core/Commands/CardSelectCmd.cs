@@ -14,6 +14,26 @@ namespace Sts2Sim.Core.Commands;
 /// </summary>
 public static class CardSelectCmd
 {
+    private static readonly AsyncLocal<ICardSelectionDecisionSource?> ScopedSelector = new();
+
+    /// <summary>Overrides card choices only for the current asynchronous call chain. Automatic effects
+    /// such as WhisperingEarring use this instead of replacing the run or combat decision source.</summary>
+    internal static IDisposable PushSelector(ICardSelectionDecisionSource selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ICardSelectionDecisionSource? previous = ScopedSelector.Value;
+        ScopedSelector.Value = selector;
+        return new SelectorScope(previous);
+    }
+
+    private static ICardSelectionDecisionSource ResolveSelector(ICardSelectionDecisionSource ordinarySource) =>
+        ScopedSelector.Value ?? ordinarySource;
+
+    private sealed class SelectorScope(ICardSelectionDecisionSource? previous) : IDisposable
+    {
+        public void Dispose() => ScopedSelector.Value = previous;
+    }
+
     public static Task<IReadOnlyList<CardModel>> SelectCardsAsync(
         ICombatState combatState,
         Player player,
@@ -25,7 +45,7 @@ public static class CardSelectCmd
     {
         ArgumentNullException.ThrowIfNull(combatState);
         return SelectCardsAsync(
-            combatState.CardSelectionSource,
+            ResolveSelector(combatState.CardSelectionSource),
             player,
             candidates,
             minCount,
@@ -52,7 +72,7 @@ public static class CardSelectCmd
         }
 
         return SelectCardsAsync(
-            runState.CardSelectionSource,
+            ResolveSelector(runState.CardSelectionSource),
             player,
             candidates,
             minCount,
@@ -151,7 +171,8 @@ public static class CardSelectCmd
         var representatives = options.Select(bundle => bundle[0]).ToArray();
         var request = new CardSelectionRequest(player, representatives, 1, 1, source,
             Bundles: options);
-        IReadOnlyList<CardModel> selected = await player.RunState.CardSelectionSource.ChooseCardsAsync(request);
+        IReadOnlyList<CardModel> selected = await ResolveSelector(player.RunState.CardSelectionSource)
+            .ChooseCardsAsync(request);
         int index = selected.Count == 1
             ? Array.FindIndex(representatives, card => ReferenceEquals(card, selected[0])) : -1;
         if (index < 0)

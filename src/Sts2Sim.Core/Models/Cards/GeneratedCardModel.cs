@@ -130,14 +130,14 @@ public abstract class GeneratedCardModel : CardModel, ICardChoiceValueProvider, 
             hitCount = Sts2Sim.Core.Hooks.Hook.ModifyXValue(
                 CombatState!,
                 this,
-                cardPlay.Resources.EnergyValue);
+                cardPlay.Resources.EnergyXValue);
         }
         else if (Spec.IsXStarCost)
         {
             hitCount = Sts2Sim.Core.Hooks.Hook.ModifyXValue(
                 CombatState!,
                 this,
-                cardPlay.Resources.StarValue);
+                cardPlay.Resources.StarXValue);
         }
 
         if (damage > 0m && hitCount > 0)

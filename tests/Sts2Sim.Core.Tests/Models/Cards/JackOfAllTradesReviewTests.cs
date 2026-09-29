@@ -53,7 +53,7 @@ public sealed class JackOfAllTradesHandLimitTests : IDisposable
         Assert.Same(player, redirected.Owner);
         Assert.Same(player.PlayerCombatState.DiscardPile, redirected.Pile);
         Assert.Equal(2, counting.GeneratedCount);
-        Assert.Equal(5, player.Creature.Block);
+        Assert.Equal(10, player.Creature.Block);
     }
 
     private static TCard AddToHand<TCard>(Player player)

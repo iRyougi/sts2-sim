@@ -32,7 +32,7 @@ public sealed class Eradicate : CardModel, ICardChoiceBaseValueProvider, ICardDa
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
-        int hitCount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue);
+        int hitCount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue);
         await DamageCmd.Attack(Damage).WithHitCount(hitCount).FromCard(this, cardPlay)
             .Targeting(cardPlay.Target).Execute();
     }

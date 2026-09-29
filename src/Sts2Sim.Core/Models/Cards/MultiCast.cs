@@ -15,7 +15,7 @@ public sealed class MultiCast : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay play)
     {
-        int evokes = Hook.ModifyXValue(CombatState!, this, play.Resources.EnergyValue);
+        int evokes = Hook.ModifyXValue(CombatState!, this, play.Resources.EnergyXValue);
         if (IsUpgraded) evokes++;
         for (int i = 0; i < evokes; i++)
             await OrbCmd.EvokeNext(CombatState!, Owner, dequeue: i == evokes - 1);

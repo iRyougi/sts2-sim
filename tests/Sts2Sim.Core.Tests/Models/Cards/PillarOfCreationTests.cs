@@ -28,6 +28,7 @@ public sealed class PillarOfCreationTests : IDisposable
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(WanderingGrunt), typeof(SovereignBlade), typeof(DivineRight),
             typeof(PillarOfCreation), typeof(PillarOfCreationPower), typeof(FastenPower),
+            typeof(BundleOfJoy), typeof(Fasten), typeof(Automation), typeof(SecretTechnique),
             typeof(GeneratedSnapshotMutationPower), typeof(GeneratedSnapshotCountingCard),
         });
     }
@@ -66,19 +67,21 @@ public sealed class PillarOfCreationTests : IDisposable
     }
 
     [Fact]
-    public async Task Generate_SecondOwnerCardInTurn_DoesNotGainMoreBlock()
+    public async Task BundleOfJoy_GeneratedCardsEachTriggerPillar()
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync("pillar-second");
+        (Player player, CombatRoom room) = await CreateCombatAsync("pillar-bundle-of-joy");
         await ApplyPillarAsync(room.Engine.State, player, 5m);
+        BundleOfJoy card = AddToHand<BundleOfJoy>(player);
+        int colorlessBefore = player.PlayerCombatState!.Hand.Cards.Count(c => c.IsColorless);
 
-        await GenerateAsync<StrikeRegent>(room.Engine.State, player, PileType.Hand);
-        await GenerateAsync<DefendRegent>(room.Engine.State, player, PileType.Discard);
+        await card.PlayAsync(target: null);
 
-        Assert.Equal(5, player.Creature.Block);
+        Assert.Equal(colorlessBefore + 3, player.PlayerCombatState.Hand.Cards.Count(c => c.IsColorless));
+        Assert.Equal(15, player.Creature.Block);
     }
 
     [Fact]
-    public async Task Generate_NextOwnerPlayerTurn_ResetsGate()
+    public async Task Generate_OnFollowingPlayerTurn_StillGainsBlock()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("pillar-reset");
         await ApplyPillarAsync(room.Engine.State, player, 5m);

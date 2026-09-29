@@ -484,6 +484,20 @@ public sealed class HiveEventTests : IDisposable
         Assert.Equal("OPTION_POOL_3_LOCKED", orobas.CurrentOptions[2].Key);
         Assert.Equal(4, orobas.Rng.Counter);
 
+        foreach (CharacterModel character in ModelDb.All<CharacterModel>().Where(c => c.IsPlayable))
+        {
+            var roleRun = new RunState($"orobas-starter-{character.Id.Entry}", new Overgrowth());
+            Player rolePlayer = Player.CreateForNewRun(character, roleRun);
+            roleRun.AddPlayer(rolePlayer);
+            foreach (RelicModel starterRelic in rolePlayer.Relics.ToList())
+            {
+                rolePlayer.RemoveRelicInternal(starterRelic);
+            }
+            var roleOrobas = Begin<Orobas>(roleRun, rolePlayer);
+            Assert.True(roleOrobas.CurrentOptions[2].Key == nameof(ArchaicTooth),
+                $"{character.Id.Entry}: Orobas did not offer ArchaicTooth for its native starter card.");
+        }
+
         (run, player) = CreateRun("pael-gated-pools");
         foreach (CardModel card in player.Deck.Cards.ToList())
         {

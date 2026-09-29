@@ -33,7 +33,7 @@ There are two RNG modes, and they are deliberately separate APIs:
 
 The following can be met in a single-player run but are missing or incomplete:
 
-- **Some ancient relics have no effect**: ToyBox, GoldenCompass, NutritiousSoup, Driftwood, TouchOfOrobas, SeaGlass, PrismaticGem. Ancients offer them with the original odds, but picking one does nothing or only part of what it should.
+- **Some ancient relics have no effect**: ToyBox, GoldenCompass, NutritiousSoup, Driftwood, TouchOfOrobas, SeaGlass. Ancients offer them with the original odds, but picking one does nothing or only part of what it should.
 - **Upgraded starter relics** are not ported: BlackBlood, RingOfTheDrake, InfusedCore, DivineDestiny, PhylacteryUnbound (granted by TouchOfOrobas).
 - **Enchantment** TezcatarasEmber is not ported.
 - **Afflictions** Ringing and Entangled have no model of their own; the matching powers track them instead, and card state can differ from the game.

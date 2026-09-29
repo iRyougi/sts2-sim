@@ -12,7 +12,7 @@ public sealed class IntimidatingHelmet : RelicModel
     public override Task BeforeCardPlayed(CardPlay cardPlay)
     {
         if (cardPlay.Player != Owner ||
-            cardPlay.Resources.EnergySpent < 2)
+            cardPlay.Resources.EnergyValue < 2)
         {
             return Task.CompletedTask;
         }

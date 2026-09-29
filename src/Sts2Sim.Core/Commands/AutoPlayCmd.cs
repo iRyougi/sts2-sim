@@ -25,6 +25,64 @@ public static class AutoPlayCmd
         Creature? fixedTarget = null) =>
         FromCardsWithResults(combatState, player, cards, fixedTarget, spendResources: true);
 
+    /// <summary>Autoplays one card after Whispering Earring has spent its resources in hand.</summary>
+    internal static Task<IReadOnlyList<CardPlay>> FromPrepaidCard(
+        ICombatState combatState,
+        Player player,
+        CardModel card,
+        Creature? fixedTarget,
+        PrepaidXCapture xCapture)
+    {
+        if (!ReferenceEquals(card.Owner, player) || !ReferenceEquals(card.CombatState, combatState))
+            throw new InvalidOperationException("The prepaid card must belong to the supplied player and combat.");
+
+        if (combatState is CombatState { Engine: { } engine })
+            return engine.ExecuteCardActionBoundaryAsync(
+                () => FromPrepaidCardCore(combatState, player, card, fixedTarget, xCapture));
+
+        return FromPrepaidCardCore(combatState, player, card, fixedTarget, xCapture);
+    }
+
+    private static async Task<IReadOnlyList<CardPlay>> FromPrepaidCardCore(
+        ICombatState combatState,
+        Player player,
+        CardModel card,
+        Creature? fixedTarget,
+        PrepaidXCapture xCapture)
+    {
+        // CardCmd.AutoPlay checks this after SpendResources; an ended combat keeps the card in hand.
+        if (combatState.IsOverOrEnding() || player.Creature.IsDead)
+            return [];
+
+        if (card.HasKeyword(CardKeyword.Unplayable) || !Hook.ShouldPlay(combatState, card, isAutoPlay: true))
+        {
+            await MovePrepaidCardToResultPileWithoutPlaying(combatState, card);
+            return [];
+        }
+
+        Creature? target = fixedTarget;
+        if (target is null && card.TargetType is TargetType.AnyEnemy or TargetType.AnyAlly)
+        {
+            IReadOnlyList<Creature> candidates =
+                CombatTargetCandidates.ForCard(combatState, card.Owner, card.TargetType);
+            target = combatState.RunState.Rng.CombatTargets.NextItem(candidates);
+        }
+        if (target is null && card.TargetType is TargetType.AnyEnemy or TargetType.AnyAlly)
+        {
+            await MovePrepaidCardToResultPileWithoutPlaying(combatState, card);
+            return [];
+        }
+
+        CardPlay? play = await card.AutoPlayPrevalidatedWithResultAsync(target, xCapture);
+        return play is null ? [] : [play];
+    }
+
+    private static async Task MovePrepaidCardToResultPileWithoutPlaying(ICombatState combatState, CardModel card)
+    {
+        CardPileCmd.Add(card, PileType.Play);
+        await card.MoveToResultPileWithoutPlaying(combatState);
+    }
+
     /// <summary>Autoplays the specified cards and returns their resolved plays.</summary>
     public static async Task<IReadOnlyList<CardPlay>> FromCardsWithResults(
         ICombatState combatState,

@@ -16,7 +16,7 @@ public sealed class Tempest : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        int count = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue)
+        int count = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue)
             + (IsUpgraded ? 1 : 0);
         for (int i = 0; i < count; i++)
             await OrbCmd.Channel<LightningOrb>(CombatState!, Owner);

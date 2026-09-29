@@ -92,7 +92,7 @@ public sealed class JackOfAllTradesTests : IDisposable
     }
 
     [Fact]
-    public async Task Play_TriggersPillarOfCreationOnlyForTheFirstGeneratedCard_WhenUpgraded()
+    public async Task Play_TriggersPillarOfCreationForEachGeneratedCard_WhenUpgraded()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("jack-pillar");
         await PowerCmd.Apply<PillarOfCreationPower>(room.Engine.State, player.Creature, 5m, player.Creature, null);
@@ -103,7 +103,7 @@ public sealed class JackOfAllTradesTests : IDisposable
         await jack.PlayAsync(target: null);
 
         Assert.Equal(handCountBefore + 1, player.PlayerCombatState!.Hand.Cards.Count);
-        Assert.Equal(5, player.Creature.Block);
+        Assert.Equal(10, player.Creature.Block);
     }
 
     private static async Task<(string[] generated, int generationCounter, int selectionCounter)> PlayAndCaptureAsync(string seed)

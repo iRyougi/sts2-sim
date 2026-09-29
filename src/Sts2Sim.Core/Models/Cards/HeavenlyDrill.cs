@@ -19,7 +19,7 @@ public sealed class HeavenlyDrill : GeneratedCardModel
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
-        int x = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue);
+        int x = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue);
         int hitCount = x >= 4 ? x * 2 : x;
         decimal damage = IsUpgraded ? 10m : 8m;
         await DamageCmd.Attack(damage)

@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Hooks;
 
 namespace Sts2Sim.Core.Models.Cards;
 
@@ -21,7 +22,8 @@ public sealed class Skewer : CardModel, ICardDamageVariableProvider
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
-        await DamageCmd.Attack(_damage).WithHitCount(cardPlay.Resources.EnergyValue)
+        int hitCount = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue);
+        await DamageCmd.Attack(_damage).WithHitCount(hitCount)
             .FromCard(this, cardPlay).Targeting(cardPlay.Target).Execute();
     }
     protected override void OnUpgrade() => _damage += 3m;

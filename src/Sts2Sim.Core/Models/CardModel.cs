@@ -749,6 +749,41 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         return (energyToSpend, starsToSpend);
     }
 
+    /// <summary>Native Whispering Earring spends while the card is still in hand, before free autoplay.</summary>
+    internal async Task<PrepaidXCapture> PrepayResourcesForAutoplayAsync()
+    {
+        AssertMutable();
+        if (Pile?.Type != PileType.Hand)
+            throw new InvalidOperationException("Prepaid autoplay requires a card in hand.");
+        ICombatState combatState = CombatState ?? throw new InvalidOperationException("Card has no combat state.");
+        PlayerCombatState playerState = Owner.PlayerCombatState!;
+
+        int resolvedEnergyCost = ResolveEnergyCost(out _);
+        int energyToSpend = IsXEnergyCost
+            ? playerState.Energy
+            : Math.Max(0, Math.Min(resolvedEnergyCost, playerState.Energy));
+        // Native SpendResources resolves both amounts before either spending hook runs.
+        int resolvedStarCost = ResolveStarCost(out bool starHookModified);
+        bool hasTemporaryStarFree = TemporaryStarCostOverrideThisTurn.HasValue ||
+            TemporaryFreeThisTurn || TemporaryFreeUntilPlayed || TemporaryFreeThisCombat;
+        int starsToSpend = IsXStarCost && !hasTemporaryStarFree && !starHookModified
+            ? playerState.Stars
+            : Math.Max(0, Math.Min(resolvedStarCost, playerState.Stars));
+        if (energyToSpend > 0 && combatState is CombatState concreteState && concreteState.IsLiveCombat())
+            concreteState.SemanticHistory.RecordEnergySpent(concreteState, Owner, energyToSpend);
+        playerState.LoseEnergy(energyToSpend);
+        // Native SpendEnergy invokes this hook even for zero energy spent.
+        await Hook.AfterEnergySpent(combatState, this, energyToSpend);
+
+        playerState.LoseStars(starsToSpend);
+        if (starsToSpend > 0)
+            await Hook.AfterStarsSpent(combatState, starsToSpend, Owner);
+
+        return new PrepaidXCapture(
+            IsXEnergyCost ? energyToSpend : null,
+            IsXStarCost ? starsToSpend : null);
+    }
+
     /// <summary>决定出牌后卡牌去哪个牌堆。逐字移植默认实现（Power 卡直接离开战斗,其余进弃牌堆）。</summary>
     protected virtual CardLocation GetResultLocationForCardPlay()
     {
@@ -791,8 +826,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         PlayInternalAsync(target, isAutoPlay: true);
     internal Task<CardPlay?> AutoPlayPayingCostsWithResultAsync(Creature? target) =>
         PlayInternalAsync(target, isAutoPlay: true, spendResources: true);
-    internal Task<CardPlay?> AutoPlayPrevalidatedWithResultAsync(Creature? target) =>
-        PlayInternalAsync(target, isAutoPlay: true, shouldPlayPrevalidated: true);
+    internal Task<CardPlay?> AutoPlayPrevalidatedWithResultAsync(
+        Creature? target,
+        PrepaidXCapture? prepaidXCapture = null) =>
+        PlayInternalAsync(target, isAutoPlay: true, shouldPlayPrevalidated: true,
+            prepaidXCapture: prepaidXCapture);
 
 
     internal async Task MoveToResultPileWithoutPlaying(ICombatState combatState)
@@ -819,7 +857,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         Creature? target,
         bool isAutoPlay,
         bool shouldPlayPrevalidated = false,
-        bool spendResources = false)
+        bool spendResources = false,
+        PrepaidXCapture? prepaidXCapture = null)
     {
         AssertMutable();
         ICombatState combatState = CombatState ?? throw new InvalidOperationException("Card has no combat state.");
@@ -843,6 +882,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                 target,
                 isAutoPlay,
                 spendResources,
+                prepaidXCapture,
                 observer);
         }
         catch
@@ -858,6 +898,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         Creature? target,
         bool isAutoPlay,
         bool spendResources,
+        PrepaidXCapture? prepaidXCapture,
         ICombatObserver? observer)
     {
         Player originalOwner = Owner;
@@ -888,7 +929,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         {
             await Hook.AfterStarsSpent(combatState, starsSpent, Owner);
         }
-        var resources = new ResourceInfo(energySpent, energyValue, starsSpent, starValue);
+        var resources = new ResourceInfo(energySpent, energyValue, starsSpent, starValue)
+        {
+            CapturedEnergyXValue = prepaidXCapture?.Energy,
+            CapturedStarXValue = prepaidXCapture?.Stars,
+        };
         CardLocation resultLocation = Hook.ModifyCardPlayResultLocation(
             combatState,
             this,

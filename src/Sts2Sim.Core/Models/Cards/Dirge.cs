@@ -27,7 +27,7 @@ public sealed class Dirge : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        int xValue = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyValue);
+        int xValue = Hook.ModifyXValue(CombatState!, this, cardPlay.Resources.EnergyXValue);
         for (int index = 0; index < xValue; index++)
             await OstyCmd.Summon(Owner, Summon, this);
 
