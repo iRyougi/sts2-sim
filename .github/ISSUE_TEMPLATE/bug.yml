@@ -1,0 +1,24 @@
+name: Bug report
+description: A crash or other incorrect behaviour
+labels: ["bug"]
+body:
+  - type: input
+    id: sim-version
+    attributes:
+      label: Simulator version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exception and stack trace if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Seed, character, ascension and steps, or a minimal code snippet.
+    validations:
+      required: true

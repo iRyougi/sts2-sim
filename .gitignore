@@ -1,0 +1,5 @@
+bin/
+obj/
+TestResults/
+EXPORT_MANIFEST.json
+.sim_export_owned

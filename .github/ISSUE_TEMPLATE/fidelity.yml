@@ -1,0 +1,53 @@
+name: Fidelity report
+description: The simulator behaves differently from the game
+labels: ["fidelity"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Please do not paste large blocks of decompiled game code; cite the type and method name instead.
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+      description: The game version you compared against. The simulator's baseline is in the README.
+      placeholder: v0.111.0
+    validations:
+      required: true
+  - type: input
+    id: sim-version
+    attributes:
+      label: Simulator version or commit
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Seed, character, ascension
+      placeholder: "EXAMPLE1, Silent, A10"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Choices made up to the point of difference (floor, room, cards played, options picked).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the game did
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What the simulator did
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Relevant game code (optional)
+      description: Type and method names you compared against, and what they do.

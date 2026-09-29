@@ -1,0 +1,25 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sts2Sim.Core", "src\Sts2Sim.Core\Sts2Sim.Core.csproj", "{D74A09F8-8553-4088-8CB0-72D279CFCFD1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sts2Sim.Core.Tests", "tests\Sts2Sim.Core.Tests\Sts2Sim.Core.Tests.csproj", "{A836D507-7187-4FFB-8070-4A1F1974E2DC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D74A09F8-8553-4088-8CB0-72D279CFCFD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D74A09F8-8553-4088-8CB0-72D279CFCFD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D74A09F8-8553-4088-8CB0-72D279CFCFD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D74A09F8-8553-4088-8CB0-72D279CFCFD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A836D507-7187-4FFB-8070-4A1F1974E2DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A836D507-7187-4FFB-8070-4A1F1974E2DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A836D507-7187-4FFB-8070-4A1F1974E2DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A836D507-7187-4FFB-8070-4A1F1974E2DC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

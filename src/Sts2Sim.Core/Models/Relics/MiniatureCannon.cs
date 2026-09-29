@@ -1,0 +1,25 @@
+using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Relics;
+using Sts2Sim.Core.ValueProps;
+
+namespace Sts2Sim.Core.Models.Relics;
+
+public sealed class MiniatureCannon : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    public override decimal ModifyDamageAdditive(
+        Creature? target,
+        decimal amount,
+        ValueProp props,
+        Creature? dealer,
+        CardModel? cardSource,
+        CardPlay? cardPlay) =>
+        dealer == Owner.Creature &&
+        cardSource?.Owner == Owner &&
+        cardSource.IsUpgraded &&
+        props.IsPoweredAttack()
+            ? 3m
+            : 0m;
+}

@@ -1,0 +1,188 @@
+using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Models;
+
+namespace Sts2Sim.Core.Tests.Models.Cards;
+
+[Collection("ModelDb")]
+public sealed class PlanCardStructureTests : IDisposable
+{
+    public void Dispose() => ModelDb.ResetForTests();
+
+    [Fact]
+    public void PlanCards_HaveExpectedStructuralMetadata()
+    {
+        ModelDb.ResetForTests();
+        Type[] types = Expected.Select(item =>
+            typeof(CardModel).Assembly.GetType($"Sts2Sim.Core.Models.Cards.{item.Name}")
+            ?? throw new Xunit.Sdk.XunitException($"Missing card type: {item.Name}")).ToArray();
+        ModelDb.Init(types);
+        foreach (Expectation item in Expected)
+        {
+            Type type = typeof(CardModel).Assembly.GetType($"Sts2Sim.Core.Models.Cards.{item.Name}")!;
+            CardModel card = ModelDb.GetById<CardModel>(ModelDb.GetId(type));
+            Assert.Equal(item.Energy, card.EnergyCost);
+            int expectedStarCost = item.Stars == 0 && !card.CostsXStar ? -1 : item.Stars;
+            Assert.Equal(expectedStarCost, card.StarCost);
+            Assert.Equal(item.Type, card.Type);
+            Assert.Equal(item.Rarity, card.Rarity);
+            Assert.Equal(item.Target, card.TargetType);
+        }
+    }
+
+    private sealed record Expectation(string Name, int Energy, int Stars, CardType Type, CardRarity Rarity, TargetType Target);
+    private static readonly Expectation[] Expected =
+    {
+        new("AstralPulse", 0, 3, CardType.Attack, CardRarity.Common, TargetType.AllEnemies),
+        new("Begone", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("CelestialMight", 2, 0, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("CloakOfStars", 0, 1, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("CollisionCourse", 0, 0, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("CosmicIndifference", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("CrescentSpear", 1, 1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("CrushUnder", 1, 0, CardType.Attack, CardRarity.Common, TargetType.AllEnemies),
+        new("GatherLight", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("Glitterstream", 2, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("Glow", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("GuidingStar", 1, 1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("HiddenCache", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("KnowThyPlace", 0, 0, CardType.Skill, CardRarity.Common, TargetType.AnyEnemy),
+        new("Patter", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("PhotonCut", 1, 0, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("RefineBlade", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("SolarStrike", 1, 0, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("SpoilsOfBattle", 1, 0, CardType.Skill, CardRarity.Common, TargetType.Self),
+        new("WroughtInWar", 1, 0, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy),
+        new("Alignment", 0, 2, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("BlackHole", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Bulwark", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Charge", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("ChildOfTheStars", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Conqueror", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Constellation", 0, 2, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("Convergence", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Devastate", 1, 4, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Furnace", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("GammaBlast", 0, 3, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Glimmer", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Hegemony", 2, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("KinglyKick", 4, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("KinglyPunch", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("KnockoutBlow", 3, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Largesse", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("LunarBlast", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("ManifestAuthority", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Monologue", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Orbit", 2, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("PaleBlueDot", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Parry", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("ParticleWall", 0, 2, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("PillarOfCreation", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Plot", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AllAllies),
+        new("Prophesize", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Quasar", 0, 2, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Radiate", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AllEnemies),
+        new("Reflect", 1, 3, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Resonance", 1, 2, CardType.Skill, CardRarity.Uncommon, TargetType.AllEnemies),
+        new("RoyalGamble", 0, 5, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("ShiningStrike", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("SpectrumShift", 2, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Stardust", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.RandomEnemy),
+        new("SummonForth", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Supermassive", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Terraforming", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Arsenal", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("BeatIntoShape", 1, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("BigBang", 0, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Bombardment", 3, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("BundleOfJoy", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Comet", 0, 5, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("CrashLanding", 1, 0, CardType.Attack, CardRarity.Rare, TargetType.AllEnemies),
+        new("DecisionsDecisions", 0, 6, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("DyingStar", 1, 3, CardType.Attack, CardRarity.Rare, TargetType.AllEnemies),
+        new("ForegoneConclusion", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Genesis", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Guards", 2, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("HammerTime", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("HeavenlyDrill", 0, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("IAmInvincible", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("MakeItSo", 0, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("MonarchsGaze", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("NeutronAegis", 1, 5, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Royalties", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("SeekingEdge", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("SevenStars", 2, 7, CardType.Attack, CardRarity.Rare, TargetType.AllEnemies),
+        new("SwordSage", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("TheSmith", 1, 4, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Tutor", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.AnyAlly),
+        new("Tyranny", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("VoidForm", 3, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("MeteorShower", 0, 2, CardType.Attack, CardRarity.Ancient, TargetType.AllEnemies),
+        new("TheSealedThrone", 1, 3, CardType.Power, CardRarity.Ancient, TargetType.Self),
+        new("Automation", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("BelieveInYou", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("Catastrophe", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Coordinate", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("DarkShackles", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Discovery", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("DramaticEntrance", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AllEnemies),
+        new("Equilibrium", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Fasten", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Finesse", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Fisticuffs", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("FlashOfSteel", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("GangUp", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("HuddleUp", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AllAllies),
+        new("Impatience", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Intercept", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("JackOfAllTrades", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Lift", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AnyAlly),
+        new("MindBlast", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Omnislice", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Panache", 0, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("PanicButton", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("PrepTime", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Production", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Prolong", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Prowess", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("Purity", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("Restlessness", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("SeekerStrike", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Shockwave", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.AllEnemies),
+        new("Splash", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Stratagem", 1, 0, CardType.Power, CardRarity.Uncommon, TargetType.Self),
+        new("TagTeam", 2, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("TheBall", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("TheBomb", 2, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("ThinkingAhead", 0, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("ThrummingHatchet", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("UltimateDefend", 1, 0, CardType.Skill, CardRarity.Uncommon, TargetType.Self),
+        new("UltimateStrike", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Volley", 0, 0, CardType.Attack, CardRarity.Uncommon, TargetType.RandomEnemy),
+        new("Alchemize", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Anointed", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("BeaconOfHope", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("BeatDown", 3, 0, CardType.Skill, CardRarity.Rare, TargetType.RandomEnemy),
+        new("Bolas", 0, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("Calamity", 3, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Entropy", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("EternalArmor", 3, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("GoldAxe", 1, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("HandOfGreed", 2, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("HiddenGem", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Jackpot", 3, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("Knockdown", 3, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("MasterOfStrategy", 0, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("Mayhem", 2, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Mimic", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.AnyAlly),
+        new("Nostalgia", 1, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Rally", 2, 0, CardType.Skill, CardRarity.Rare, TargetType.AllAllies),
+        new("Rend", 1, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+        new("RollingBoulder", 3, 0, CardType.Power, CardRarity.Rare, TargetType.Self),
+        new("Salvo", 1, 0, CardType.Attack, CardRarity.Uncommon, TargetType.AnyEnemy),
+        new("Scrawl", 1, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("SecretTechnique", 0, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("SecretWeapon", 0, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("TheGambit", 0, 0, CardType.Skill, CardRarity.Rare, TargetType.Self),
+        new("HeirloomHammer", 2, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy),
+    };
+}
