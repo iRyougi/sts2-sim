@@ -68,6 +68,21 @@ public sealed class AttackCommand
         return this;
     }
 
+    /// <summary>原版 <c>AttackCommand.FromOsty</c>：由 Osty 发起、来源仍是这张卡的攻击。</summary>
+    public AttackCommand FromOsty(Creature osty, CardModel card, CardPlay? cardPlay)
+    {
+        if (osty.Monster is not Models.Monsters.Osty)
+        {
+            throw new ArgumentException("Creature is not Osty.", nameof(osty));
+        }
+
+        Attacker = osty;
+        ModelSource = card;
+        CardPlay = cardPlay;
+        _sourceType = SourceType.Card;
+        return this;
+    }
+
     public AttackCommand FromMonster(MonsterModel monster)
     {
         if (Attacker != null)
@@ -185,6 +200,11 @@ public sealed class AttackCommand
                 CardPlay);
             _results.Add(hitResults.ToList());
         }
+
+        // 原版在 AfterAttack 之前记录 CreatureAttackedEntry；玩法上只有 Osty 的攻击被读取。
+        if (Attacker?.Monster is Models.Monsters.Osty && Attacker.PetOwner is { } ostyOwner &&
+            combatState is CombatState concreteState)
+            concreteState.SemanticHistory.Record(concreteState, CombatSemanticHistory.ActorEvent.OstyAttack, ostyOwner);
 
         await Hook.AfterAttack(combatState, this);
         return this;

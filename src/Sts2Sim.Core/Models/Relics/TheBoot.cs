@@ -10,8 +10,8 @@ public sealed class TheBoot : RelicModel
 
     public override decimal ModifyHpLostAfterOstyLate(Creature target, decimal amount, ValueProp props,
         Creature? dealer, CardModel? cardSource) =>
-        // Inherited deviation #31: the owner's Osty is not represented.
-        dealer == Owner.Creature && target != Owner.Creature && props.IsPoweredAttack() && amount >= 1m && amount < 5m
+        (dealer == Owner.Creature || dealer == Owner.Osty) && target != Owner.Creature &&
+        props.IsPoweredAttack() && amount >= 1m && amount < 5m
             ? 5m
             : amount;
 }

@@ -13,6 +13,9 @@ internal static class CombatPrivateStateRegistry
         "VelvetChoker._cardsPlayedThisTurn", "DustyTome._ancientCard",
         "Girya._timesLifted", "LastingCandy._combatRewardsSeen",
         "Momentum._extraDamage",
+        "CacophonyPower._cardsLeft", "TheScythe._increasedDamage",
+        "Fetch._finishedRound", "Fetch._finishedSide", "Fetch._finishedTurnNumbers",
+        "OblivionPower._amountsForPlayedCards",
         "FishingRod.<CombatsSeen>k__BackingField", "LavaRock.<HasTriggered>k__BackingField",
         "FurCoat._actIndex", "FurCoat._markedCoordinates",
         "BrilliantScarf._cardsPlayed", "IronClub._cardsPlayed", "MusicBox._wasUsedThisTurn", "MusicBox._cardBeingPlayed", "ThrowingAxe._used",
@@ -155,6 +158,7 @@ internal static class CombatPrivateStateRegistry
         "StranglePower._amountsForPlayedCards", "AfterimagePower._amountsForPlayedCards",
         "SerpentFormPower._amountsForPlayedCards",
         "StormPower._amountsForPlayedCards", "SubroutinePower._amountsForPlayedCards",
+        "SoulboundPower._isAddingSoul",
     ];
 
     private static readonly HashSet<string> DerivedFields =

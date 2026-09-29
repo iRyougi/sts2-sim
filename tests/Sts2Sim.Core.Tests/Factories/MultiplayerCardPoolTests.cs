@@ -18,6 +18,7 @@ public sealed class MultiplayerCardPoolTests : IDisposable
         "HammerTime", "HuddleUp", "Intercept", "Knockdown", "Largesse", "Lift",
         "Midnight", "Mimic", "Outrage", "Plot", "Rally", "Sneaky", "TagTeam", "Tank", "TheBall", "Tutor",
         "EnergySurge", "Ignition", "Hibernate", "ImitationLearning", "OneForAll",
+        "Cacophony", "GlimpseBeyond", "LegionOfBone", "Soulbound", "Underworld",
     };
 
     public MultiplayerCardPoolTests()

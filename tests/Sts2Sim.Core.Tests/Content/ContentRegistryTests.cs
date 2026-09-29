@@ -24,12 +24,13 @@ public sealed class ContentRegistryTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
 
         CardModel[] cards = ModelDb.All<CardModel>().ToArray();
-        // Defect adds 91 pool cards and Fuel, a generated token.
-        Assert.Equal(502, cards.Length);
-        Assert.Equal(478, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
-        Assert.Equal(413, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        // Defect adds 91 pool cards and Fuel, a generated token; Necrobinder adds 91 pool cards plus the
+        // Soul and SweepingGaze tokens.
+        Assert.Equal(595, cards.Length);
+        Assert.Equal(569, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        Assert.Equal(504, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(65, cards.Count(card => card.IsColorless));
-        Assert.Equal(8, cards.Count(card => card.Rarity == CardRarity.Token));
+        Assert.Equal(10, cards.Count(card => card.Rarity == CardRarity.Token));
         Assert.Equal(16, cards.Count(card => card.Rarity == CardRarity.Status));
         Assert.IsType<Infection>(ModelDb.Card<Infection>());
         Assert.IsType<AscendersBane>(ModelDb.Card<AscendersBane>());
@@ -66,8 +67,9 @@ public sealed class ContentRegistryTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
 
         RelicModel[] relics = ModelDb.All<RelicModel>().ToArray();
-        // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, and Task 3a relics.
-        Assert.Equal(285, relics.Length);
+        // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, Task 3a
+        // relics, and the eight Necrobinder relics.
+        Assert.Equal(293, relics.Length);
         Assert.Equal(
             137,
             relics.Count(relic =>
@@ -199,10 +201,11 @@ public sealed class ContentRegistryTests : IDisposable
         // 基线 50，两侧各自新增后合并：
         // +3 偏离 #299 的猎手专属药水 PoisonPotion(C) / CunningPotion(U) / GhostInAJar(R)；
         // +1 暗港的 GlowwaterPotion(Event)。
-        Assert.Equal(61, potions.Length);
-        Assert.Equal(19, potions.Count(potion => potion.Rarity == PotionRarity.Common));
-        Assert.Equal(19, potions.Count(potion => potion.Rarity == PotionRarity.Uncommon));
-        Assert.Equal(19, potions.Count(potion => potion.Rarity == PotionRarity.Rare));
+        // +3 亡灵契约师专属药水 PotionOfDoom(C) / BoneBrew(U) / PotOfGhouls(R)。
+        Assert.Equal(64, potions.Length);
+        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Common));
+        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Uncommon));
+        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Rare));
         Assert.Equal(3, potions.Count(potion => potion.Rarity == PotionRarity.Event));
         Assert.IsType<GlowwaterPotion>(ModelDb.Potion<GlowwaterPotion>());
     }

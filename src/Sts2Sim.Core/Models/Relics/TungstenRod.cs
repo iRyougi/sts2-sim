@@ -9,7 +9,7 @@ public sealed class TungstenRod : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
 
-    public override decimal ModifyHpLost(
+    public override decimal ModifyHpLostAfterOsty(
         Creature target,
         decimal amount,
         ValueProp props,

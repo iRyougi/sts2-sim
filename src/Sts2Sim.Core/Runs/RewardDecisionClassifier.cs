@@ -75,6 +75,9 @@ public static class RewardDecisionClassifier
         PotionReward { IsOptionalMerchantChoice: true } potion => Choice(potion.CanTake
             ? [new RewardDecision.ResolveExtra(potion), new RewardDecision.ResolveExtra(potion, Skip: true)]
             : [new RewardDecision.ResolveExtra(potion, Skip: true)]),
+        // 原版删牌选择界面可取消（Cancelable），取消即不删。
+        CardRemovalReward removal => Choice(
+            [new RewardDecision.ResolveExtra(removal), new RewardDecision.ResolveExtra(removal, Skip: true)]),
         TakeableReward => Automatic(new RewardDecision.ResolveExtra(extraReward)),
         CardReward cardReward => ClassifyExtraCard(cardReward),
         _ => throw new InvalidOperationException(

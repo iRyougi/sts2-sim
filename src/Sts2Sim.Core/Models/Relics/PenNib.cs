@@ -36,7 +36,7 @@ public sealed class PenNib : RelicModel
         CardPlay? cardPlay) =>
         ReferenceEquals(cardPlay, _doubleDamagePlay) &&
         ReferenceEquals(cardSource, cardPlay?.Card) &&
-        dealer == Owner.Creature &&
+        (dealer == Owner.Creature || dealer == Owner.Osty) &&
         cardSource?.Owner == Owner &&
         props.IsPoweredAttack()
             ? 2m

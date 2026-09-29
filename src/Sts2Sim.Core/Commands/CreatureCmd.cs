@@ -11,9 +11,8 @@ using Sts2Sim.Core.ValueProps;
 namespace Sts2Sim.Core.Commands;
 
 /// <summary>
-/// 生物级伤害/格挡结算命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CreatureCmd</c>）；
-/// 偏离 #31：无 Osty 伤害重定向，<c>Hook.ModifyHpLost</c> 只调用一次
-/// （相当于游戏的 HpLossHookPhase.All）。
+/// 生物级伤害/格挡结算命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CreatureCmd</c>），
+/// 包括承伤的 BeforeOsty / AfterOsty 两阶段与 Osty 的未格挡伤害重定向。
 /// </summary>
 public static class CreatureCmd
 {
@@ -130,22 +129,22 @@ public static class CreatureCmd
         CardPlay? cardPlay)
     {
         List<Creature> targetList = targets.ToList();
-        var pending = new List<(DamageResult Result, bool BlockBroken, bool Prevented)>();
+        var pending = new List<(DamageResult Result, bool Prevented)>();
 
         // One hit applies damage to every target before any result hook or death changes listeners.
         foreach (Creature target in targetList)
         {
-            pending.Add(await DamageSingle(combatState, target, amount, props, dealer, cardSource, cardPlay));
+            pending.AddRange(await DamageSingle(combatState, target, amount, props, dealer, cardSource, cardPlay));
         }
 
         var killed = new List<DamageResult>();
-        foreach (var (result, blockBroken, prevented) in pending)
+        foreach (var (result, prevented) in pending)
         {
             if (prevented)
                 continue;
 
             Creature target = result.Receiver;
-            if (blockBroken)
+            if (result.WasBlockBroken)
                 await Hook.AfterBlockBroken(combatState, target, dealer);
             if (result.UnblockedDamage > 0)
                 await Hook.AfterCurrentHpChanged(combatState.RunState, combatState,
@@ -161,7 +160,7 @@ public static class CreatureCmd
             await ResolvePotentialDeath(combatState.RunState, combatState, result.Receiver, result);
 
         var results = new List<DamageResult>(pending.Count);
-        foreach (var (result, _, _) in pending)
+        foreach (var (result, _) in pending)
         {
             (combatState as CombatState)?.Observer?.DamageResolved(dealer, result);
             results.Add(result);
@@ -169,7 +168,11 @@ public static class CreatureCmd
         return results;
     }
 
-    private static async Task<(DamageResult Result, bool BlockBroken, bool Prevented)> DamageSingle(
+    /// <summary>原版 <c>CreatureCmd.Damage</c> 对单个目标的结算。未格挡伤害经 BeforeOsty 阶段后由
+    /// <see cref="Hook.ModifyUnblockedDamageTarget"/> 决定承受者（DieForYouPower 会把主人换成 Osty），再对承受者跑
+    /// AfterOsty 阶段；若换了承受者，Osty 的溢出伤害再对原目标跑一次 AfterOsty 并扣血。结果按原版顺序返回
+    /// （承受者在前），格挡量与破盾只记在原目标那一条上。</summary>
+    private static async Task<IReadOnlyList<(DamageResult Result, bool Prevented)>> DamageSingle(
         ICombatState combatState,
         Creature target,
         decimal amount,
@@ -181,37 +184,57 @@ public static class CreatureCmd
         if (!Hook.ShouldAllowHitting(combatState, target))
         {
             var prevented = new DamageResult(target, props);
-            return (prevented, false, true);
+            return [(prevented, true)];
         }
 
+        IRunState runState = combatState.RunState;
         decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay, out _);
         await Hook.BeforeDamageReceived(combatState, target, modifiedAmount, props, dealer, cardSource);
 
         Creature blockOwner = target.PetOwner?.Creature ?? target;
-        int blockBefore = blockOwner.Block;
         decimal blockedDamage = blockOwner.DamageBlockInternal(modifiedAmount, props);
-        bool blockBroken = blockBefore > 0 && blockOwner.Block == 0;
-        decimal unblockedRequested = Math.Max(modifiedAmount - blockedDamage, 0m);
-        decimal finalUnblocked = Hook.ModifyHpLost(
-            combatState,
-            target,
-            unblockedRequested,
-            props,
-            dealer,
-            cardSource,
-            out IEnumerable<AbstractModel> hpLossModifiers);
+        decimal unblocked = Hook.ModifyHpLost(runState, combatState, target,
+            Math.Max(modifiedAmount - blockedDamage, 0m), props, dealer, cardSource,
+            HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
+        await Hook.AfterModifyingHpLostBeforeOsty(runState, combatState, beforeOstyModifiers);
 
-        await Hook.AfterModifyingHpLostAfterOsty(combatState.RunState, combatState, hpLossModifiers);
+        Creature receiver = Hook.ModifyUnblockedDamageTarget(combatState, target, unblocked, props, dealer);
+        unblocked = Hook.ModifyHpLost(runState, combatState, receiver, unblocked, props, dealer, cardSource,
+            HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
+        await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, afterOstyModifiers);
+        DamageResult received = receiver.LoseHpInternal(unblocked, props);
+        // 原版两项都看原始目标：宠物被命中时格挡由主人承担，宠物自身格挡恒为 0；
+        // 完全格挡按承受者最终扣血（转给 Osty 时是 Osty 的扣血）判断。
+        bool blockBroken = target.Block <= 0 && blockedDamage > 0m;
+        bool fullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
+                            (blockedDamage > 0m || target.Block > 0) && (int)unblocked == 0;
 
-        DamageResult result = target.LoseHpInternal(finalUnblocked, props) with
+        var results = new List<(DamageResult Result, bool Prevented)>(2);
+        if (ReferenceEquals(receiver, target))
         {
-            BlockedDamage = (int)blockedDamage,
-            WasFullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
-                (blockedDamage > 0m || target.Block > 0) && (int)finalUnblocked == 0,
-        };
+            results.Add((received with
+            {
+                BlockedDamage = (int)blockedDamage, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
+            }, false));
+        }
+        else
+        {
+            results.Add((received, false));
+            decimal overflow = Hook.ModifyHpLost(runState, combatState, target, received.OverkillDamage, props,
+                dealer, cardSource, HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> overflowModifiers);
+            await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, overflowModifiers);
+            DamageResult original = overflow > 0m
+                ? target.LoseHpInternal(overflow, props)
+                : new DamageResult(target, props);
+            results.Add((original with
+            {
+                BlockedDamage = (int)blockedDamage, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
+            }, false));
+        }
 
-        (combatState as CombatState)?.DamageHistory.Record(result, target, dealer, cardSource, combatState);
-        return (result, blockBroken, false);
+        foreach (var (result, _) in results)
+            (combatState as CombatState)?.DamageHistory.Record(result, result.Receiver, dealer, cardSource, combatState);
+        return results;
     }
 
     /// <summary>Kills a combat creature directly without running the ordinary damage hook pipeline.</summary>
@@ -301,24 +324,21 @@ public static class CreatureCmd
         await Hook.BeforeDamageReceived(runState, null, target, modifiedAmount, props, null, null);
 
         decimal blockedDamage = target.DamageBlockInternal(modifiedAmount, props);
-        decimal unblockedRequested = Math.Max(modifiedAmount - blockedDamage, 0m);
-        decimal finalUnblocked = Hook.ModifyHpLost(
-            runState,
-            null,
-            target,
-            unblockedRequested,
-            props,
-            null,
-            null,
-            out IEnumerable<AbstractModel> hpLossModifiers);
+        // 战斗外没有重定向：原版两个阶段依次跑在同一个目标上。
+        decimal unblocked = Hook.ModifyHpLost(runState, null, target,
+            Math.Max(modifiedAmount - blockedDamage, 0m), props, null, null,
+            HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
+        await Hook.AfterModifyingHpLostBeforeOsty(runState, null, beforeOstyModifiers);
+        unblocked = Hook.ModifyHpLost(runState, null, target, unblocked, props, null, null,
+            HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
+        await Hook.AfterModifyingHpLostAfterOsty(runState, null, afterOstyModifiers);
 
-        await Hook.AfterModifyingHpLostAfterOsty(runState, null, hpLossModifiers);
-
-        DamageResult result = target.LoseHpInternal(finalUnblocked, props) with
+        DamageResult result = target.LoseHpInternal(unblocked, props) with
         {
             BlockedDamage = (int)blockedDamage,
+            WasBlockBroken = target.Block <= 0 && blockedDamage > 0m,
             WasFullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
-                (blockedDamage > 0m || target.Block > 0) && (int)finalUnblocked == 0,
+                              (blockedDamage > 0m || target.Block > 0) && (int)unblocked == 0,
         };
 
         if (result.UnblockedDamage > 0)
@@ -411,6 +431,11 @@ public static class CreatureCmd
                     ValueProp.Unblockable | ValueProp.Unpowered);
                 await ResolvePotentialDeath(runState, combatState, teammate, teammateDeath);
             }
+        }
+        else if (combatState is not null && target.Player is { IsOstyAlive: true } player)
+        {
+            // 原版：玩家死亡时连带击杀存活的 Osty。
+            await Kill(player.Osty!);
         }
 
         return result;
@@ -517,6 +542,16 @@ public static class CreatureCmd
         ArgumentNullException.ThrowIfNull(creature);
         creature.SetMaxHpInternal(amount);
         await SetCurrentHp(creature, amount);
+    }
+
+    /// <summary>原版 <c>CreatureCmd.SetMaxHp</c>：只改最大生命，返回变化量。原版降到 0 时会击杀；
+    /// 这里 <see cref="Creature.SetMaxHpInternal"/> 把下限夹在 1，那条分支不可达。</summary>
+    public static Task<decimal> SetMaxHp(Creature creature, decimal amount)
+    {
+        ArgumentNullException.ThrowIfNull(creature);
+        int oldMaxHp = creature.MaxHp;
+        creature.SetMaxHpInternal(amount);
+        return Task.FromResult<decimal>(creature.MaxHp - oldMaxHp);
     }
 
     /// <summary>Increases maximum HP and heals the actual gained amount.

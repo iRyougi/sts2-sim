@@ -38,10 +38,10 @@ public sealed class StranglePower : PowerModel
 
     protected override void DeepCloneFields()
     {
+        // 原版 InternalData 在 MutableClone 时重新初始化（Misery 复制出的实例不带出牌中的快照）；
+        // 战斗克隆由 RestoreCombatCloneReferencesFrom 按映射复制。
         base.DeepCloneFields();
-        _amountsForPlayedCards = new Dictionary<CardModel, int>(
-            _amountsForPlayedCards,
-            ReferenceEqualityComparer.Instance);
+        _amountsForPlayedCards = new Dictionary<CardModel, int>(ReferenceEqualityComparer.Instance);
     }
 
     internal override void RestoreCombatCloneReferencesFrom(

@@ -13,7 +13,7 @@ public sealed class SlipperyPower : PowerModel
 
     public override PowerStackType StackType => PowerStackType.Counter;
 
-    public override decimal ModifyHpLost(
+    public override decimal ModifyHpLostAfterOsty(
         Creature target,
         decimal amount,
         ValueProp props,

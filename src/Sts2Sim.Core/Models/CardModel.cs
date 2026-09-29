@@ -402,12 +402,16 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     private AfflictionModel? _affliction;
 
+    /// <summary>卡牌自身的关键字，不含苦难（如 Hexed 附加的虚无）。对应原版
+    /// <c>GetKeywordsWithSources(KeywordSources.Local)</c>；增删关键字都以它为基准，避免把苦难效果固化进卡牌。</summary>
+    internal IReadOnlyCollection<CardKeyword> LocalKeywords =>
+        (IReadOnlyCollection<CardKeyword>?)_keywordOverride ?? CanonicalKeywords;
+
     public IReadOnlyCollection<CardKeyword> Keywords
     {
         get
         {
-            IReadOnlyCollection<CardKeyword> keywords =
-                (IReadOnlyCollection<CardKeyword>?)_keywordOverride ?? CanonicalKeywords;
+            IReadOnlyCollection<CardKeyword> keywords = LocalKeywords;
             if (_affliction is null)
             {
                 return keywords;
@@ -511,7 +515,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         Dictionary<FieldInfo, object> lowerNumeric = lowerLevel.CaptureUpgradeNumericState();
         Dictionary<FieldInfo, object> currentNumeric = currentLevel.CaptureUpgradeNumericState();
 
-        var restoredKeywords = new HashSet<CardKeyword>(Keywords);
+        var restoredKeywords = new HashSet<CardKeyword>(LocalKeywords);
         restoredKeywords.ExceptWith(currentLevel.Keywords.Except(lowerLevel.Keywords));
         restoredKeywords.UnionWith(lowerLevel.Keywords.Except(currentLevel.Keywords));
         foreach ((FieldInfo field, object currentCanonicalValue) in currentNumeric)
@@ -610,7 +614,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     protected void AddKeyword(CardKeyword keyword)
     {
         AssertMutable();
-        _keywordOverride = new HashSet<CardKeyword>(Keywords) { keyword };
+        _keywordOverride = new HashSet<CardKeyword>(LocalKeywords) { keyword };
     }
 
     internal void AddKeywordInternal(CardKeyword keyword) => AddKeyword(keyword);
@@ -618,7 +622,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     protected void RemoveKeyword(CardKeyword keyword)
     {
         AssertMutable();
-        var updated = new HashSet<CardKeyword>(Keywords);
+        var updated = new HashSet<CardKeyword>(LocalKeywords);
         updated.Remove(keyword);
         _keywordOverride = updated;
     }
@@ -940,6 +944,10 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                     _affliction.InvokeExecutionFinished();
                 }
                 playerCombatState.RecordCardPlayed(this, isAutoPlay);
+                // 原版 CardPlayFinishedEntry.WasEthereal 取打出结束那一刻牌上的关键字。
+                if (HasKeyword(CardKeyword.Ethereal) && combatState is CombatState concreteCombat)
+                    concreteCombat.SemanticHistory.Record(concreteCombat,
+                        CombatSemanticHistory.ActorEvent.EtherealPlayFinished, Owner);
                 await Hook.AfterCardPlayed(combatState, cardPlay);
                 if (Owner.Creature.IsDead)
                 {

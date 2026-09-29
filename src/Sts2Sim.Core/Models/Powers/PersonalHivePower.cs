@@ -19,6 +19,12 @@ public sealed class PersonalHivePower : PowerModel
         Creature? dealer,
         CardModel? cardSource)
     {
+        // 原版：Osty 发起的攻击，Dazed 塞给它的主人。
+        if (dealer?.Monster is Models.Monsters.Osty)
+        {
+            dealer = dealer.PetOwner?.Creature;
+        }
+
         if (!ReferenceEquals(target, Owner) || dealer?.Player is null || !props.IsPoweredAttack())
         {
             return;

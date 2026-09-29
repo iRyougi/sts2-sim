@@ -26,13 +26,18 @@ public sealed class WeakPower : PowerModel
             return 1m;
         }
 
+        decimal multiplier = DamageMultiplier;
         if (target?.Player?.Relics.OfType<PaperKrane>().FirstOrDefault() is PaperKrane paperKrane)
         {
-            return paperKrane.ModifyWeakMultiplier(
-                target, DamageMultiplier, props, dealer, cardSource);
+            multiplier = paperKrane.ModifyWeakMultiplier(
+                target, multiplier, props, dealer, cardSource);
         }
 
-        return DamageMultiplier;
+        // 原版这里把攻击者同时作为 target 参数传入。
+        if (Owner.GetPower<DebilitatePower>() is { } debilitate)
+            multiplier = debilitate.ModifyWeakMultiplier(Owner, multiplier, props, dealer, cardSource);
+
+        return multiplier;
     }
 
     public override async Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)

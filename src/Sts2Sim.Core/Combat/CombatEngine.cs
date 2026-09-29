@@ -279,19 +279,39 @@ public sealed class CombatEngine
             return;
         }
 
+        // CombatManager 阶段一的末尾：逐个玩家 BeforeFlush，之后再检查一次胜负。
+        foreach (Player player in State.Players)
+        {
+            await Hook.BeforeFlush(State, player);
+        }
+
+        if (CheckWinCondition())
+        {
+            _observer?.PlayerTurnEnded(State);
+            return;
+        }
+
         // CombatManager 阶段二：弃掉剩下的手牌。虚无牌与回合末效果牌已在 DoTurnEndAsync 里离开手牌。
         foreach (Player player in State.Players)
         {
             // #102 closed: every combat listener can veto the owner's hand flush.
             bool retainWholeHand = !Hook.ShouldFlush(State, player);
+            var flushed = new List<CardModel>();
+            var retained = new List<CardModel>();
             foreach (CardModel card in player.PlayerCombatState!.Hand.Cards.ToList())
             {
                 if (!card.HasKeyword(CardKeyword.Retain) && !retainWholeHand)
                 {
+                    flushed.Add(card);
                     CardPileCmd.Add(card, PileType.Discard);
+                }
+                else
+                {
+                    retained.Add(card);
                 }
             }
 
+            await Hook.AfterFlush(State, player, flushed, retained);
             player.PlayerCombatState.EndOfTurnCleanup();
         }
 

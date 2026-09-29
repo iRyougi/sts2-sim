@@ -741,6 +741,12 @@ public static class Hook
             await model.AfterEnergyReset(player);
             model.InvokeExecutionFinished();
         }
+
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.AfterEnergyResetLate(player);
+            model.InvokeExecutionFinished();
+        }
     }
 
     public static bool ShouldPlayerResetEnergy(ICombatState combatState, Player player)
@@ -1112,6 +1118,51 @@ public static class Hook
             await model.AfterCardPlayed(cardPlay);
             model.InvokeExecutionFinished();
         }
+
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.AfterCardPlayedLate(cardPlay);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    /// <summary>原版遍历战斗侧监听者且不经过结束守卫（<c>combatState.IterateHookListeners()</c>，逐个生物依次是能力、
+    /// 遗物、药水、卡牌）。模拟器的无参 <c>IterateHookListeners()</c> 不含遗物和药水，BookRepairKnife 要靠含背包的版本。</summary>
+    public static async Task AfterDiedToDoom(ICombatState combatState, IReadOnlyList<Creature> creatures)
+    {
+        IEnumerable<AbstractModel> listeners = combatState is CombatState concrete
+            ? concrete.IterateHookListeners(includePlayerInventory: true)
+            : combatState.IterateHookListeners();
+        foreach (AbstractModel model in listeners)
+        {
+            await model.AfterDiedToDoom(creatures);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task BeforeFlush(ICombatState combatState, Player player)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.BeforeFlush(player);
+            model.InvokeExecutionFinished();
+        }
+
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.BeforeFlushLate(player);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task AfterFlush(ICombatState combatState, Player player,
+        IReadOnlyCollection<CardModel> flushedCards, IReadOnlyCollection<CardModel> retainedCards)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.AfterFlush(player, flushedCards, retainedCards);
+            model.InvokeExecutionFinished();
+        }
     }
 
     public static async Task AfterForge(
@@ -1440,24 +1491,8 @@ public static class Hook
         return Math.Max(0m, result);
     }
 
-    public static decimal ModifyHpLost(
-        ICombatState combatState,
-        Creature target,
-        decimal amount,
-        ValueProp props,
-        Creature? dealer,
-        CardModel? cardSource,
-        out IEnumerable<AbstractModel> modifiers) =>
-        ModifyHpLost(
-            combatState.RunState,
-            combatState,
-            target,
-            amount,
-            props,
-            dealer,
-            cardSource,
-            out modifiers);
-
+    /// <summary>原版 <c>Hook.ModifyHpLost</c>：按阶段依次跑 BeforeOsty、BeforeOstyLate、AfterOsty、AfterOstyLate
+    /// 四轮，每轮遍历全部监听者；整数部分被改变的监听者记入 <paramref name="modifiers"/>。</summary>
     public static decimal ModifyHpLost(
         IRunState runState,
         ICombatState? combatState,
@@ -1466,34 +1501,50 @@ public static class Hook
         ValueProp props,
         Creature? dealer,
         CardModel? cardSource,
+        HpLossHookPhase phases,
         out IEnumerable<AbstractModel> modifiers)
     {
         decimal result = amount;
         List<AbstractModel> changed = new();
 
-        foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+        void Round(Func<AbstractModel, decimal, decimal> modify)
         {
-            decimal before = result;
-            result = item.ModifyHpLost(target, result, props, dealer, cardSource);
-            if (decimal.Truncate(before) != decimal.Truncate(result))
+            foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
-                changed.Add(item);
+                decimal before = result;
+                result = modify(item, result);
+                if (decimal.Truncate(before) != decimal.Truncate(result))
+                {
+                    changed.Add(item);
+                }
             }
         }
 
-        // The Boot's late minimum must follow all ordinary reducers, including Intangible.
-        foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+        if (phases.HasFlag(HpLossHookPhase.BeforeOsty))
         {
-            decimal before = result;
-            result = item.ModifyHpLostAfterOstyLate(target, result, props, dealer, cardSource);
-            if (decimal.Truncate(before) != decimal.Truncate(result))
-            {
-                changed.Add(item);
-            }
+            Round((item, value) => item.ModifyHpLostBeforeOsty(target, value, props, dealer, cardSource));
+            Round((item, value) => item.ModifyHpLostBeforeOstyLate(target, value, props, dealer, cardSource));
+        }
+
+        if (phases.HasFlag(HpLossHookPhase.AfterOsty))
+        {
+            Round((item, value) => item.ModifyHpLostAfterOsty(target, value, props, dealer, cardSource));
+            Round((item, value) => item.ModifyHpLostAfterOstyLate(target, value, props, dealer, cardSource));
         }
 
         modifiers = changed;
         return result;
+    }
+
+    public static async Task AfterModifyingHpLostBeforeOsty(IRunState runState,
+        ICombatState? combatState, IEnumerable<AbstractModel> modifiers)
+    {
+        foreach (AbstractModel model in runState.IterateHookListeners(combatState))
+        {
+            if (!modifiers.Contains(model)) continue;
+            await model.AfterModifyingHpLostBeforeOsty();
+            model.InvokeExecutionFinished();
+        }
     }
 
     public static async Task AfterModifyingHpLostAfterOsty(IRunState runState,
@@ -1503,6 +1554,49 @@ public static class Hook
         {
             if (!modifiers.Contains(model)) continue;
             await model.AfterModifyingHpLostAfterOsty();
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    /// <summary>原版遍历战斗侧监听者且不经过结束守卫（<c>combatState.IterateHookListeners()</c>）。</summary>
+    public static Creature ModifyUnblockedDamageTarget(ICombatState combatState, Creature originalTarget,
+        decimal amount, ValueProp props, Creature? dealer)
+    {
+        Creature target = originalTarget;
+        foreach (AbstractModel item in combatState.IterateHookListeners())
+        {
+            target = item.ModifyUnblockedDamageTarget(target, amount, props, dealer);
+        }
+
+        return target;
+    }
+
+    public static decimal ModifySummonAmount(ICombatState combatState, Player summoner, decimal amount,
+        AbstractModel? source)
+    {
+        decimal result = amount;
+        foreach (AbstractModel item in IterateCombatHookListeners(combatState))
+        {
+            result = item.ModifySummonAmount(summoner, result, source);
+        }
+
+        return result;
+    }
+
+    public static async Task AfterSummon(ICombatState combatState, Player summoner, decimal amount)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.AfterSummon(summoner, amount);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task AfterOstyRevived(ICombatState combatState, Creature osty)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            await model.AfterOstyRevived(osty);
             model.InvokeExecutionFinished();
         }
     }

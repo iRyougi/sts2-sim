@@ -43,7 +43,8 @@ public sealed class EyeWithTeethTests : IDisposable
                 ascensionLevel: 0,
                 seed: "eye-distract-loop",
                 playerCount: 2,
-                slotName: "illusion");
+                slotName: "illusion",
+                primaryCompanion: ((MonsterModel)ModelDb.Monster<Fogmog>().MutableClone(), "fogmog"));
         var ringing = new List<RingingPower>();
         foreach (Player player in players)
         {

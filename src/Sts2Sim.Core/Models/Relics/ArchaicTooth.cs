@@ -11,11 +11,15 @@ public sealed class ArchaicTooth : RelicModel
         {
             [ModelDb.Card<Bash>().Id] = ModelDb.Card<Break>(),
             [ModelDb.Card<Neutralize>().Id] = ModelDb.Card<Suppress>(),
+            [ModelDb.Card<Unleash>().Id] = ModelDb.Card<Protector>(),
             [ModelDb.Card<FallingStar>().Id] = ModelDb.Card<MeteorShower>(),
             [ModelDb.Card<Dualcast>().Id] = ModelDb.Card<Quadcast>(),
         };
 
     public static IReadOnlyList<CardModel> TranscendenceCards => TranscendenceUpgrades.Values.ToList();
+
+    /// <summary>原版 <c>GetTranscendenceStarterCard</c> 的判定：Orobas 据此决定是否提供本遗物。</summary>
+    internal static bool IsTranscendenceStarter(CardModel card) => TranscendenceUpgrades.ContainsKey(card.Id);
 
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override bool HasUponPickupEffect => true;

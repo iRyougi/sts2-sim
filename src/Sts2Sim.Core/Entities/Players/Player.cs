@@ -34,6 +34,13 @@ public sealed class Player
 
     public PlayerCombatState? PlayerCombatState { get; private set; }
 
+    /// <summary>本场战斗里这名玩家的 Osty；不在战斗中为 null，死去但留在战斗里时返回那只死去的 Osty。</summary>
+    public Creature? Osty => PlayerCombatState?.GetPet<Models.Monsters.Osty>();
+
+    public bool IsOstyAlive => Osty?.IsAlive ?? false;
+
+    public bool IsOstyMissing => !IsOstyAlive;
+
     public int Gold { get; set; }
 
     public bool CanUseOrRemovePotions { get; set; } = true;

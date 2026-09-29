@@ -5,7 +5,7 @@ namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>6伤害;技能牌用完达3倍数时回手。逐字移植核心行为（<c>MegaCrit.Sts2.Core.Models.Cards.MakeItSo</c>），
 /// 偏离 #101：用 <see cref="Entities.Players.PlayerCombatState.SkillCardsPlayedThisTurn"/> 计数器
-/// 代替战斗历史日志；计数器在 <c>Hook.AfterCardPlayed</c> 分发前已记录当前完成出牌。</summary>
+/// 代替战斗历史日志；计数器在 <c>Hook.AfterCardPlayed</c> 两轮分发前已记录当前完成出牌。原版在 Late 轮回手。</summary>
 public sealed class MakeItSo : CardModel, ICardDamageVariableProvider
 {
     private decimal _damage = 6m;
@@ -31,7 +31,7 @@ public sealed class MakeItSo : CardModel, ICardDamageVariableProvider
         await DamageCmd.Attack(_damage).FromCard(this, cardPlay).Targeting(cardPlay.Target).Execute();
     }
 
-    public override Task AfterCardPlayed(CardPlay cardPlay)
+    public override Task AfterCardPlayedLate(CardPlay cardPlay)
     {
         if (cardPlay.Player == Owner && cardPlay.Card.Type == CardType.Skill && Pile?.Type != PileType.Hand)
         {

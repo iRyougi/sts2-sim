@@ -59,15 +59,12 @@ namespace Sts2Sim.Core.Models.Events
             {
                 result.Add(typeof(TouchOfOrobas));
             }
-            if (Owner.Deck.Cards.Any(IsTranscendenceStarter))
+            if (Owner.Deck.Cards.Any(ArchaicTooth.IsTranscendenceStarter))
             {
                 result.Add(typeof(ArchaicTooth));
             }
             return result.ToArray();
         }
-
-        private static bool IsTranscendenceStarter(CardModel card) =>
-            card is FallingStar or Sts2Sim.Core.Models.Cards.Neutralize;
 
         private EventOption Option(Type relicType) => RelicOption(relicType, relicType.Name);
 

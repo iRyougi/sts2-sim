@@ -33,20 +33,19 @@ public static class PowerCmd
             !ReferenceEquals(target.CombatState, combatState)))
             return null;
 
-        if (amount == 0m)
-        {
-            return null;
-        }
-
         if (!Hook.ShouldAllowHitting(combatState, target))
         {
             return null;
         }
 
+        // 原版只在新建实例时对 0 层直接返回；已有可叠加实例时照样走 ModifyAmount（跑钩子、记录 PowerReceived）。
         PowerModel canonical = ModelDb.GetById<PowerModel>(ModelDb.GetId(powerType));
         PowerModel? existing = FindExistingInstanceForStacking(canonical, target, applier);
         if (existing is null)
         {
+            if (amount == 0m)
+                return null;
+
             var power = (PowerModel)canonical.MutableClone();
             await ApplyNew(combatState, power, target, amount, applier, cardSource);
             return target.Powers.Contains(power) ? power : null;
@@ -54,6 +53,34 @@ public static class PowerCmd
 
         await ModifyAmount(combatState, existing, amount, applier, cardSource);
         return existing;
+    }
+
+    /// <summary>原版 <c>PowerCmd.Apply(PowerModel power, ...)</c>：施加一个调用方准备好的可变实例（例如 Misery 用
+    /// <c>ClonePreservingMutability</c> 复制的减益，保留层数以外的实例状态）。目标上已有可叠加实例时改为叠加层数，
+    /// 传入的实例不会被使用。</summary>
+    public static async Task Apply(
+        ICombatState combatState,
+        PowerModel power,
+        Creature target,
+        decimal amount,
+        Creature? applier,
+        CardModel? cardSource)
+    {
+        ArgumentNullException.ThrowIfNull(power);
+        if (combatState is null || (combatState is CombatState &&
+            !ReferenceEquals(target.CombatState, combatState)))
+            return;
+        if (amount == 0m || !Hook.ShouldAllowHitting(combatState, target))
+            return;
+
+        if (FindExistingInstanceForStacking(power, target, applier) is { } existing)
+        {
+            await ModifyAmount(combatState, existing, amount, applier, cardSource);
+            return;
+        }
+
+        power.AssertMutable();
+        await ApplyNew(combatState, power, target, amount, applier, cardSource);
     }
 
     private static async Task ApplyNew(ICombatState combatState, PowerModel power, Creature target, decimal amount, Creature? applier, CardModel? cardSource)
@@ -76,6 +103,7 @@ public static class PowerCmd
         if (modifiedAmount != 0m)
         {
             power.ApplyInternal(target, modifiedAmount);
+            RecordPowerReceived(combatState, power, applier);
             if (target.Side == CombatSide.Player && power.Type == PowerType.Debuff)
             {
                 power.SkipNextDurationTick = true;
@@ -110,6 +138,7 @@ public static class PowerCmd
             modifiedOffset,
             applier,
             out IEnumerable<AbstractModel> receivedModifiers);
+        RecordPowerReceived(combatState, power, applier);
         int newAmount = power.Amount + (int)modifiedOffset;
         power.SetAmount(newAmount);
         await Hook.AfterModifyingPowerAmountReceived(combatState, receivedModifiers, power);
@@ -122,6 +151,14 @@ public static class PowerCmd
             await Remove(power);
         }
         return newAmount;
+    }
+
+    // 原版在这两处记录 PowerReceivedEntry（施加时仅在数值非零时，修改层数时总是记录）；
+    // 玩法上只有 DeathsDoor 读取"本回合自己施加过 Doom"。
+    private static void RecordPowerReceived(ICombatState combatState, PowerModel power, Creature? applier)
+    {
+        if (power is Models.Powers.DoomPower && applier?.Player is { } player && combatState is CombatState concreteState)
+            concreteState.SemanticHistory.Record(concreteState, CombatSemanticHistory.ActorEvent.DoomApplied, player);
     }
 
     public static async Task Remove(PowerModel power)
@@ -145,7 +182,7 @@ public static class PowerCmd
         return ModifyAmount(combatState, power, -1m, null, null);
     }
 
-    private static PowerModel? FindExistingInstanceForStacking(PowerModel canonical, Creature target, Creature? applier)
+    public static PowerModel? FindExistingInstanceForStacking(PowerModel canonical, Creature target, Creature? applier)
     {
         return canonical.InstanceType switch
         {

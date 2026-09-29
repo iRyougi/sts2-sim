@@ -14,7 +14,7 @@ public sealed class HardenedShellPower : PowerModel
     public override PowerStackType StackType => PowerStackType.Counter;
     public int DisplayAmount => (int)Math.Max(0m, Amount - _damageReceivedThisTurn);
 
-    public override decimal ModifyHpLost(
+    public override decimal ModifyHpLostBeforeOstyLate(
         Creature target,
         decimal amount,
         ValueProp props,

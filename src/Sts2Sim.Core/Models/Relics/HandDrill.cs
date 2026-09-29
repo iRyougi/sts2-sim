@@ -11,8 +11,7 @@ public sealed class HandDrill : RelicModel
 
     public override async Task AfterBlockBroken(Creature target, Creature? breaker)
     {
-        // Inherited deviation #31: pet/Osty ownership is not represented.
-        if (breaker == Owner.Creature && !target.IsPlayer)
+        if ((breaker == Owner.Creature || breaker?.PetOwner == Owner) && !target.IsPlayer)
             await PowerCmd.Apply<VulnerablePower>(target.CombatState!, target, 2m, Owner.Creature, null);
     }
 }

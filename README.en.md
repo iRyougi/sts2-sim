@@ -10,13 +10,13 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 
 - **A port of the game logic, not a re-design.** Game rules are ported from the game's own code as literally as practical, so behaviour can be checked method by method. Doc comments cite the original type they come from (for example `MegaCrit.Sts2.Core.Commands.CardCmd`).
 - **Seed-exact RNG.** The random number generator and seed derivation follow the game, with the goal that the same seed and the same choices reproduce the same run as the game client, draw for draw.
-- **Cloneable state.** Runs and combats can be cloned (`CloneExact`) for search, or cloned with fresh randomness (`CloneReseeded`) for sampling.
-- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10.
+- **Cloneable.** Combat state can be cloned (`CombatState.Clone()`) for search; RNG streams (`Rng`, `RunRngSet`, `PlayerRngSet`) can be copied exactly (`CloneExact`) or with fresh randomness (`CloneReseeded`) for sampling. Deep cloning of a whole run (`RunState`) is not supported yet.
+- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of game v0.111.0 and all encounters and events of the four acts are ported; a few items are not implemented yet (see below).
 
 | | |
 |---|---|
 | Game baseline | STS2 v0.111.0 (release commit `41cef1ea`, `main_assembly_hash 222455745`) |
-| Characters | Defect, Ironclad, Regent, Silent |
+| Characters | Defect, Ironclad, Necrobinder, Regent, Silent |
 | Acts | Overgrowth, Underdocks, Hive, Glory |
 | Multiplayer | Not supported |
 
@@ -28,6 +28,19 @@ There are two RNG modes, and they are deliberately separate APIs:
 
 - **Sequential** (default): matches the game. Use this for anything that must agree with the client.
 - **Keyed** (`RunState.CreateKeyedForLabels`): an intentional deviation. Random draws are keyed by purpose instead of drawn in sequence, so two branches of a run stay comparable. Use it only for paired comparisons and training-data generation; it does **not** match the game.
+
+### Not implemented yet
+
+The following can be met in a single-player run but are missing or incomplete:
+
+- **Some ancient relics have no effect**: ToyBox, GoldenCompass, NutritiousSoup, Driftwood, TouchOfOrobas, SeaGlass, PrismaticGem. Ancients offer them with the original odds, but picking one does nothing or only part of what it should.
+- **Upgraded starter relics** are not ported: BlackBlood, RingOfTheDrake, InfusedCore, DivineDestiny, PhylacteryUnbound (granted by TouchOfOrobas).
+- **Enchantment** TezcatarasEmber is not ported.
+- **Afflictions** Ringing and Entangled have no model of their own; the matching powers track them instead, and card state can differ from the game.
+- **WhisperingEarring** auto-play lacks the original automatic card-selection rule.
+- The victory event after the final boss (TheArchitect) is not modelled; the simulator declares the win when the final boss dies.
+
+Multiplayer-only content, and content that exists in the game but cannot be obtained, is out of scope.
 
 Code comments sometimes mention `Deviation #N`, `Plan ...` or document paths. These refer to the maintainers' internal deviation register and planning documents, which are not part of this repository. Where a deviation matters to users it will be published as an issue labelled `有意偏离` (intentional deviation).
 
@@ -92,7 +105,7 @@ This simulator was developed by the following people. The public history starts 
 
 - **[@iRyougi](https://github.com/iRyougi)**: maintainer; core port, RNG and seeding, map and run flow, comparison tooling.
 - **[@ltlly](https://github.com/ltlly)**: ported Ironclad and Defect (including orbs); many fidelity fixes across damage and death resolution, generated-card creators, hook order, transforms and rewards, and monster move graphs.
-- **[@s1f102500012](https://github.com/s1f102500012)**: end-of-turn card order and ethereal exhaust, shuffle order of same-ID cards, draws and shuffles after combat ends, v0.111.0 card values, the PunchOff event; Necrobinder port in progress.
+- **[@s1f102500012](https://github.com/s1f102500012)**: end-of-turn card order and ethereal exhaust, shuffle order of same-ID cards, draws and shuffles after combat ends, v0.111.0 card values, the PunchOff event; ported Necrobinder (including the Osty summon and two-phase HP loss).
 - **[@Charlie-chulong](https://github.com/Charlie-chulong)**: pet system (Byrdpip, Pael's Legion), MysteriousKnight and Lantern Key combat, monster move IDs and monster RNG seeding.
 
 ## License

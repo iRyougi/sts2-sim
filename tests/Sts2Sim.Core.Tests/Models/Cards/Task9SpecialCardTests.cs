@@ -216,8 +216,9 @@ public sealed class Task9SpecialCardTests : IDisposable
         Assert.False(bane.CanBeGeneratedByModifiers);
 
         Type[] cards = ContentRegistry.AllTypes.Where(type => typeof(CardModel).IsAssignableFrom(type)).ToArray();
-        // Defect adds its 91-card pool and generated Fuel to the previous 410-card registry.
-        Assert.Equal(502, cards.Length);
+        // Defect adds its 91-card pool and generated Fuel to the previous 410-card registry; Necrobinder adds
+        // its 91-card pool plus Soul and SweepingGaze.
+        Assert.Equal(595, cards.Length);
         Assert.Contains(typeof(Enthralled), cards);
         Assert.Contains(typeof(Normality), cards);
         Assert.Contains(typeof(Sts2Sim.Core.Models.Cards.Void), cards);

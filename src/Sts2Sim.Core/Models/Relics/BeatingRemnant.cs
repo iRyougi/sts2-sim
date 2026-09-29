@@ -25,7 +25,7 @@ public sealed class BeatingRemnant : RelicModel
         return Task.CompletedTask;
     }
 
-    public override decimal ModifyHpLost(
+    public override decimal ModifyHpLostAfterOsty(
         Creature target,
         decimal amount,
         ValueProp props,

@@ -47,8 +47,8 @@ public sealed class StatefulModifierBoundaryTests : IDisposable
 
         for (int i = 0; i < 2; i++)
         {
-            Assert.Equal(0m, Hook.ModifyHpLost(room.Engine.State, player.Creature,
-                2m, ValueProp.Unpowered, null, null, out _));
+            Assert.Equal(0m, Hook.ModifyHpLost(room.Engine.State.RunState, room.Engine.State, player.Creature,
+                2m, ValueProp.Unpowered, null, null, HpLossHookPhase.All, out _));
         }
         Assert.Equal(1, player.Creature.GetPower<BufferPower>()?.Amount);
         CombatState clone = room.Engine.State.Clone();

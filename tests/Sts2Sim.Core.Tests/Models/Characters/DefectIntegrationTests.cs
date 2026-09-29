@@ -95,9 +95,12 @@ public sealed class DefectPoolTests : IDisposable
             defect.PotionPool.AllPotions.Select(potion => potion.GetType().Name));
 
         PlayerUnlockState unlocked = PlayerUnlockState.AllUnlocked();
-        Assert.Equal(new[] { "Ironclad", "Silent", "Regent", "Defect" },
+        Assert.Equal(new[] { "Ironclad", "Silent", "Regent", "Necrobinder", "Defect" },
             ModelDb.AllCharacters.Select(character => character.GetType().Name));
-        Assert.Equal(new[] { "IroncladCardPool", "SilentCardPool", "RegentCardPool", "DefectCardPool" },
+        Assert.Equal(new[]
+            {
+                "IroncladCardPool", "SilentCardPool", "RegentCardPool", "NecrobinderCardPool", "DefectCardPool",
+            },
             unlocked.CharacterCardPools.Select(pool => pool.GetType().Name));
         Assert.Equal(sourceCards.Where(name => !actualCards.Single(card => card.GetType().Name == name).IsMultiplayerOnly),
             defect.CardPool.GetUnlockedCards(unlocked, isMultiplayer: false).Select(card => card.GetType().Name));

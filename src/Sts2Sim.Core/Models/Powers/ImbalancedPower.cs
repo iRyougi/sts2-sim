@@ -19,7 +19,7 @@ public sealed class ImbalancedPower : PowerModel
         Creature target,
         CardModel? cardSource)
     {
-        if (ReferenceEquals(dealer, Owner) && result.BlockedDamage > 0 && result.UnblockedDamage == 0)
+        if (ReferenceEquals(dealer, Owner) && result.WasFullyBlocked)
         {
             if (Owner.Monster is BowlbugRock rock)
             {

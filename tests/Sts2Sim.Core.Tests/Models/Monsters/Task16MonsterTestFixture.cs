@@ -22,7 +22,8 @@ internal sealed class Task16MonsterTestFixture : IDisposable
         int ascensionLevel,
         string seed,
         int playerCount = 1,
-        string? slotName = null)
+        string? slotName = null,
+        (MonsterModel Monster, string? Slot)? primaryCompanion = null)
         where T : MonsterModel
     {
         var runState = new RunState(seed, new Overgrowth(), ascensionLevel);
@@ -34,13 +35,14 @@ internal sealed class Task16MonsterTestFixture : IDisposable
             players.Add(player);
         }
 
-        var room = new CombatRoom(() => new[]
-        {
-            ((MonsterModel)ModelDb.Monster<T>().MutableClone(), slotName),
-        });
+        // A lone secondary enemy (for example an illusion) leaves no primary enemy, so the combat counts as
+        // ending; such monsters need the primary that summons them in the native encounter.
+        var room = new CombatRoom(() => primaryCompanion is { } companion
+            ? new[] { ((MonsterModel)ModelDb.Monster<T>().MutableClone(), slotName), companion }
+            : new[] { ((MonsterModel)ModelDb.Monster<T>().MutableClone(), slotName) });
         runState.PushRoom(room);
         await room.Enter(runState);
-        T monster = Assert.IsType<T>(Assert.Single(room.Engine.State.Enemies).Monster);
+        T monster = Assert.Single(room.Engine.State.Enemies.Select(enemy => enemy.Monster).OfType<T>());
         return (monster, room, players.AsReadOnly());
     }
 

@@ -913,8 +913,9 @@ public sealed class RunDriver
                 }
                 if (decision.Skip)
                 {
-                    if (takeableReward is not PotionReward { IsOptionalMerchantChoice: true })
-                        throw new InvalidOperationException("Only optional merchant potion rewards can be skipped here.");
+                    if (takeableReward is not (PotionReward { IsOptionalMerchantChoice: true } or CardRemovalReward))
+                        throw new InvalidOperationException(
+                            "Only optional merchant potion and card removal rewards can be skipped here.");
                     await takeableReward.Skip();
                 }
                 else await takeableReward.Take();

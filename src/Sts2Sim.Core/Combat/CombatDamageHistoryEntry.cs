@@ -116,6 +116,7 @@ public sealed class CombatDamageHistoryEntry
             OverkillDamage = Result.OverkillDamage,
             WasFullyBlocked = Result.WasFullyBlocked,
             WasTargetKilled = Result.WasTargetKilled,
+            WasBlockBroken = Result.WasBlockBroken,
         };
         return new CombatDamageHistoryEntry(
             result,

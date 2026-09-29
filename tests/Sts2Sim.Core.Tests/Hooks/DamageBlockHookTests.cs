@@ -156,7 +156,7 @@ public class DamageBlockHookTests
             return DamageCap ?? decimal.MaxValue;
         }
 
-        public override decimal ModifyHpLost(
+        public override decimal ModifyHpLostAfterOsty(
             Creature target,
             decimal amount,
             ValueProp props,
@@ -264,12 +264,14 @@ public class DamageBlockHookTests
         var combatState = new FakeCombatState(new FakeRunState(noop, halver));
 
         decimal result = Hook.ModifyHpLost(
+            combatState.RunState,
             combatState,
             MakeCreature(),
             10m,
             ValueProp.Move,
             null,
             null,
+            HpLossHookPhase.All,
             out IEnumerable<AbstractModel> modifiers);
 
         Assert.Equal(5m, result);

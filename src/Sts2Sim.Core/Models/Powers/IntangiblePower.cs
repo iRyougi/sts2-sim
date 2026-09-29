@@ -7,17 +7,13 @@ using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Powers;
 
-/// <summary>
-/// 偏离 #190：权威源码的 <c>ModifyHpLostAfterOsty</c> 在本模拟器没有 Osty 重定向阶段，
-/// 因此映射到唯一等价的 <see cref="ModifyHpLost"/> hook。
-/// </summary>
 public sealed class IntangiblePower : PowerModel
 {
     public override PowerType Type => PowerType.Buff;
 
     public override PowerStackType StackType => PowerStackType.Counter;
 
-    public override decimal ModifyHpLost(
+    public override decimal ModifyHpLostAfterOsty(
         Creature target,
         decimal amount,
         ValueProp props,

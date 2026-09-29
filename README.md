@@ -10,13 +10,13 @@
 
 - **照游戏代码移植，不是重新设计。** 游戏规则尽可能逐字从游戏自身的代码移植过来，因此可以逐个方法对照核对。文档注释会标出对应的原始类型（例如 `MegaCrit.Sts2.Core.Commands.CardCmd`）。
 - **随机数与种子一致。** 随机数生成器和种子派生都照游戏实现，目标是：同样的种子、同样的选择，得到和游戏客户端逐次抽取都一致的对局。
-- **状态可克隆。** 对局和战斗都可以原样克隆（`CloneExact`）用于搜索，也可以换一套新随机数克隆（`CloneReseeded`）用于采样。
-- **完整对局。** 地图生成、涅奥等先古之民、战斗、精英与 Boss、事件、商店、休息处、宝箱、奖励、药水、遗物、附魔，以及进阶 0–10 级。
+- **可克隆。** 战斗状态可以克隆（`CombatState.Clone()`），用于搜索；随机数流（`Rng`、`RunRngSet`、`PlayerRngSet`）可以原样复制（`CloneExact`），也可以换一套新随机数复制（`CloneReseeded`），用于采样。整局状态（`RunState`）目前还不支持深克隆。
+- **完整对局。** 地图生成、涅奥等先古之民、战斗、精英与 Boss、事件、商店、休息处、宝箱、奖励、药水、遗物、附魔，以及进阶 0–10 级。游戏 v0.111.0 的全部卡牌和药水、四幕的全部遭遇与事件都已移植；少数内容尚未实现，见下文。
 
 | | |
 |---|---|
 | 游戏基线 | STS2 v0.111.0（release commit `41cef1ea`，`main_assembly_hash 222455745`） |
-| 角色 | Defect, Ironclad, Regent, Silent |
+| 角色 | Defect, Ironclad, Necrobinder, Regent, Silent |
 | 幕 | Overgrowth、Underdocks、Hive、Glory |
 | 多人模式 | 不支持 |
 
@@ -28,6 +28,19 @@
 
 - **顺序模式**（默认）：与游戏一致。凡是需要和客户端对上的场景都用它。
 - **重键模式**（`RunState.CreateKeyedForLabels`）：有意的偏离。随机抽取按用途派生，而不是按顺序抽取，这样同一局的两个分支仍然可以相互比较。只用于配对比较和生成训练数据；它与游戏**不**一致。
+
+### 尚未实现的内容
+
+以下内容在单人对局中能遇到，但模拟器里还没有实现或只实现了一部分：
+
+- **部分先古之民遗物没有效果**：ToyBox、GoldenCompass、NutritiousSoup、Driftwood、TouchOfOrobas、SeaGlass、PrismaticGem。先古之民会照原版概率把它们作为选项给出，但选了之后没有效果或效果不完整。
+- **起始遗物升级版未移植**：BlackBlood、RingOfTheDrake、InfusedCore、DivineDestiny、PhylacteryUnbound（由 TouchOfOrobas 给出）。
+- **附魔** TezcatarasEmber 未移植。
+- **Affliction** Ringing、Entangled 没有独立的模型，由对应能力代为追踪，状态可能与游戏不一致。
+- **WhisperingEarring** 的自动出牌缺少原版的自动选牌规则。
+- 第三幕 Boss 之后的胜利事件（TheArchitect）未建模，模拟器在击败最终 Boss 时直接判定胜利。
+
+多人模式专用的内容，以及游戏里存在但没有任何途径获得的内容，不在移植范围内。
 
 代码注释里有时会出现 `偏离 #N`、`Plan ...` 或文档路径。这些指向维护者内部的偏离登记册和计划文档，不在本仓库中。对使用者有影响的偏离会以带 `有意偏离` 标签的议题公开。
 
@@ -92,7 +105,7 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 
 - **[@iRyougi](https://github.com/iRyougi)**：维护者；模拟器主体移植、随机数与种子、地图与对局流程、对拍工具链。
 - **[@ltlly](https://github.com/ltlly)**：移植铁甲战士与故障机器人（含充能球机制）；大量保真修复，包括伤害与死亡结算、生成牌的 creator、钩子顺序、变牌与奖励流程、怪物招式图等。
-- **[@s1f102500012](https://github.com/s1f102500012)**：回合结束时的出牌顺序与虚无消耗、同 ID 卡的洗牌顺序、战斗结束后的抽牌与洗牌、按 v0.111.0 校正卡牌数值、PunchOff 事件；亡灵契约师的移植正在进行中。
+- **[@s1f102500012](https://github.com/s1f102500012)**：回合结束时的出牌顺序与虚无消耗、同 ID 卡的洗牌顺序、战斗结束后的抽牌与洗牌、按 v0.111.0 校正卡牌数值、PunchOff 事件；移植亡灵契约师（含召唤物 Osty 与两阶段失血）。
 - **[@Charlie-chulong](https://github.com/Charlie-chulong)**：宠物系统（Byrdpip、Pael's Legion）、MysteriousKnight 与 Lantern Key 战斗、怪物招式 ID 与怪物随机数种子对齐。
 
 ## 许可证

@@ -562,22 +562,48 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return decimal.MaxValue;
     }
 
-    public virtual decimal ModifyHpLost(
-        Creature target,
-        decimal amount,
-        ValueProp props,
-        Creature? dealer,
-        CardModel? cardSource)
-    {
-        return amount;
-    }
+    // 原版把未格挡伤害的修正分成 Osty 重定向前后两个阶段，各有一个 Late 轮次；
+    // Hook.ModifyHpLost 按 HpLossHookPhase 依次调用，重定向发生在两个阶段之间。
+    public virtual decimal ModifyHpLostBeforeOsty(Creature target, decimal amount, ValueProp props,
+        Creature? dealer, CardModel? cardSource) => amount;
+
+    public virtual decimal ModifyHpLostBeforeOstyLate(Creature target, decimal amount, ValueProp props,
+        Creature? dealer, CardModel? cardSource) => amount;
+
+    public virtual decimal ModifyHpLostAfterOsty(Creature target, decimal amount, ValueProp props,
+        Creature? dealer, CardModel? cardSource) => amount;
+
+    public virtual Task AfterModifyingHpLostBeforeOsty() => Task.CompletedTask;
+
+    /// <summary>决定未格挡伤害由谁承受；原版只有 Osty 的 DieForYouPower 会把主人换成 Osty。</summary>
+    public virtual Creature ModifyUnblockedDamageTarget(Creature target, decimal amount, ValueProp props,
+        Creature? dealer) => target;
+
+    public virtual decimal ModifySummonAmount(Player summoner, decimal amount, AbstractModel? source) => amount;
+
+    public virtual Task AfterSummon(Player summoner, decimal amount) => Task.CompletedTask;
+
+    public virtual Task AfterOstyRevived(Creature osty) => Task.CompletedTask;
+
+    public virtual Task AfterDiedToDoom(IReadOnlyList<Creature> creatures) => Task.CompletedTask;
+
+    /// <summary>玩家回合结束第一阶段的末尾、弃手牌之前；原版先跑一轮 BeforeFlush 再跑一轮 BeforeFlushLate。</summary>
+    public virtual Task BeforeFlush(Player player) => Task.CompletedTask;
+
+    public virtual Task BeforeFlushLate(Player player) => Task.CompletedTask;
+
+    public virtual Task AfterFlush(Player player, IReadOnlyCollection<CardModel> flushedCards,
+        IReadOnlyCollection<CardModel> retainedCards) => Task.CompletedTask;
+
+    public virtual Task AfterCardPlayedLate(CardPlay cardPlay) => Task.CompletedTask;
+
+    public virtual Task AfterEnergyResetLate(Player player) => Task.CompletedTask;
 
     public virtual Task BeforeBlockGained(Creature creature, decimal amount, ValueProp props, CardModel? cardSource)
     {
         return Task.CompletedTask;
     }
 
-    /// <summary>Runs after the existing HP-loss reduction stage. Osty redirection remains unmodeled (#31).</summary>
     public virtual decimal ModifyHpLostAfterOstyLate(Creature target, decimal amount, ValueProp props,
         Creature? dealer, CardModel? cardSource) => amount;
 
@@ -638,9 +664,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     /// 多阶段 Boss 靠返回 false 让驱动复活的 Power 活过死亡。</summary>
     public virtual bool ShouldPowerBeRemovedAfterOwnerDeath() => true;
 
-    /// 偏离 #228：当前模拟器尚无 Doom 内容/效果路径；该 hook 先保留为结构入口，待 Doom 内容落地时必须接入其实际移除路径。
-    /// <summary>该生物是否会被 Doom 类效果直接抹除。
-    /// 多阶段 Boss 在还有形态未走完时返回 false。</summary>
+    /// <summary>对应原版 <c>MonsterModel.ShouldDisappearFromDoom</c>，原版只用来选择 Doom 死亡动画；
+    /// Doom 的击杀走 <c>CreatureCmd.Kill</c>，是否真的死亡由 ShouldDie 类钩子决定，与此无关。</summary>
     public virtual bool ShouldDisappearFromDoom() => true;
 
     public virtual bool ShouldCreatureBeRemovedFromCombatAfterDeath(Creature creature) => true;

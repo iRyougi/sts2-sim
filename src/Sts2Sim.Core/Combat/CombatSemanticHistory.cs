@@ -8,17 +8,45 @@ using Sts2Sim.Core.ValueProps;
 namespace Sts2Sim.Core.Combat;
 
 /// <summary>
-/// The native combat history facts needed by Ironclad's Midnight, EvilEye and Unmovable.
+/// The native combat history facts needed by Ironclad's Midnight, EvilEye and Unmovable and by Necrobinder content.
 /// Entries retain stable player indices and play ordinals so speculative clones have no
 /// references to source players or card plays.
 /// </summary>
 public sealed class CombatSemanticHistory
 {
+    /// <summary>亡灵契约师内容读取的原版历史事实，按玩家与回合记录。</summary>
+    public enum ActorEvent
+    {
+        /// <summary>原版 <c>CreatureAttackedEntry</c>，攻击者是该玩家的 Osty（Flatten、Rattle）。</summary>
+        OstyAttack,
+        /// <summary>原版 <c>PowerReceivedEntry</c>，能力是 Doom、施加者是该玩家（DeathsDoor）。</summary>
+        DoomApplied,
+        /// <summary>原版 <c>CardPlayFinishedEntry.WasEthereal</c>（BansheesCry、PullFromBelow）。</summary>
+        EtherealPlayFinished,
+    }
+
     private readonly List<ExhaustEntry> _exhausts = [];
     private readonly List<BlockGainEntry> _cardBlockGains = [];
     private readonly List<OrbChannelEntry> _orbChannels = [];
     private readonly List<EnergySpentEntry> _energySpent = [];
     private readonly List<CardDrawnEntry> _cardDrawn = [];
+    private readonly List<ActorEventEntry> _actorEvents = [];
+
+    internal void Record(CombatState state, ActorEvent kind, Player actor) =>
+        _actorEvents.Add(new ActorEventEntry(kind, CaptureTurnKey(state), PlayerIndex(state, actor)));
+
+    public int CountThisTurn(CombatState state, ActorEvent kind, Player actor)
+    {
+        int actorIndex = PlayerIndex(state, actor);
+        return _actorEvents.Count(entry => entry.Kind == kind && entry.ActorIndex == actorIndex &&
+            entry.Turn.HappenedThisTurn(state));
+    }
+
+    public int CountThisCombat(CombatState state, ActorEvent kind, Player actor)
+    {
+        int actorIndex = PlayerIndex(state, actor);
+        return _actorEvents.Count(entry => entry.Kind == kind && entry.ActorIndex == actorIndex);
+    }
 
     public int CardsExhaustedThisCombat => _exhausts.Count;
 
@@ -64,6 +92,14 @@ public sealed class CombatSemanticHistory
         int actorIndex = PlayerIndex(state, actor);
         return _energySpent.Where(entry => entry.ActorIndex == actorIndex &&
             entry.Turn.HappenedThisTurn(state)).Sum(entry => entry.Amount);
+    }
+
+    /// <summary>原版 DeathMarch：本回合该玩家在回合抽牌之外抽到的牌数。</summary>
+    public int CountCardsDrawnOutsideHandDrawThisTurn(CombatState state, Player actor)
+    {
+        int actorIndex = PlayerIndex(state, actor);
+        return _cardDrawn.Count(entry => entry.ActorIndex == actorIndex &&
+            !entry.FromHandDraw && entry.Turn.HappenedThisTurn(state));
     }
 
     public int CountStatusCardsDrawnThisTurn(CombatState state, Player actor)
@@ -122,6 +158,10 @@ public sealed class CombatSemanticHistory
         {
             Turn = entry.Turn.Copy(),
         }));
+        clone._actorEvents.AddRange(_actorEvents.Select(entry => entry with
+        {
+            Turn = entry.Turn.Copy(),
+        }));
         return clone;
     }
 
@@ -166,6 +206,14 @@ public sealed class CombatSemanticHistory
             builder.Append((int)entry.CardType);
             builder.Append(entry.FromHandDraw);
         }
+
+        builder.Append(_actorEvents.Count);
+        foreach (ActorEventEntry entry in _actorEvents)
+        {
+            builder.Append((int)entry.Kind);
+            entry.Turn.Append(ref builder);
+            builder.Append(entry.ActorIndex);
+        }
     }
 
     private static int PlayerIndex(CombatState state, Player player)
@@ -191,6 +239,8 @@ public sealed class CombatSemanticHistory
 
     private readonly record struct CardDrawnEntry(
         TurnKey Turn, int ActorIndex, CardType CardType, bool FromHandDraw);
+
+    private readonly record struct ActorEventEntry(ActorEvent Kind, TurnKey Turn, int ActorIndex);
 
     private readonly record struct TurnKey(
         int RoundNumber, CombatSide Side, int?[] PlayerTurnNumbers)

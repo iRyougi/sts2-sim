@@ -76,6 +76,14 @@ public static class CardPileCmd
             throw new ArgumentOutOfRangeException(nameof(pileType), "New combat cards must enter a combat pile.");
         }
 
+        // 原版 CardPileCmd.Add 在战斗结束中（例如刚打死最后一个敌人）对战斗牌堆直接返回失败：牌不入堆，
+        // Random 位置不抽 Rng.Shuffle，也不派发入场钩子。生成记录与生成钩子在原版 Add 之外，照常进行。
+        if (combatState.IsOverOrEnding())
+        {
+            beforeEntryHook?.Invoke();
+            return;
+        }
+
         CardPile destination = Get(pileType, owner)
             ?? throw new InvalidOperationException($"Player has no {pileType} pile.");
         if (pileType == PileType.Hand && destination.Cards.Count >= CardPile.MaxCardsInHand)

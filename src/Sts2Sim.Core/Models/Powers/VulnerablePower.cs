@@ -9,8 +9,7 @@ using Sts2Sim.Core.ValueProps;
 namespace Sts2Sim.Core.Models.Powers;
 
 /// <summary>
-/// 易伤。基础倍率 1.5；按原版顺序应用攻击者的 PaperPhrog 与 CrueltyPower。
-/// DebilitatePower 尚未移植，仍按偏离 #32 登记。
+/// 易伤。基础倍率 1.5；按原版顺序应用攻击者的 PaperPhrog、CrueltyPower，最后是受击者的 DebilitatePower。
 /// </summary>
 public sealed class VulnerablePower : PowerModel
 {
@@ -44,6 +43,9 @@ public sealed class VulnerablePower : PowerModel
             if (crueltyPower is not null)
                 multiplier = crueltyPower.ModifyVulnerableMultiplier(target, multiplier, props, dealer, cardSource);
         }
+
+        if (target.GetPower<DebilitatePower>() is { } debilitate)
+            multiplier = debilitate.ModifyVulnerableMultiplier(target, multiplier, props, dealer, cardSource);
 
         return multiplier;
     }

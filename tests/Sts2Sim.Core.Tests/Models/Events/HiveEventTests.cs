@@ -140,10 +140,11 @@ public sealed class HiveEventTests : IDisposable
         (RunState run, Player player) = CreateRun("colorful");
         var ev = Begin<ColorfulPhilosophers>(run, player);
         Assert.True(ev.IsAllowed(run));
-        Assert.Equal(new[] { "IRONCLAD", "SILENT", "DEFECT" },
+        // Regent sees four other colors, as in the full native roster, so one is removed with the event Rng.
+        Assert.Equal(new[] { "NECROBINDER", "IRONCLAD", "SILENT" },
             ev.CurrentOptions.Select(candidate => candidate.Key));
-        EventOption option = Assert.Single(ev.CurrentOptions, candidate => candidate.Key == "SILENT");
-        Assert.Equal(0, ev.Rng.Counter);
+        EventOption option = ev.CurrentOptions[^1];
+        Assert.Equal(1, ev.Rng.Counter);
 
         int rewardsBefore = player.PlayerRng.Rewards.Counter;
         await ev.ChooseOption(option);
@@ -416,7 +417,7 @@ public sealed class HiveEventTests : IDisposable
     }
 
     [Theory]
-    [InlineData(typeof(Orobas), 5, 13)]
+    [InlineData(typeof(Orobas), 5, 14)]
     [InlineData(typeof(Pael), 3, 10)]
     [InlineData(typeof(Tezcatara), 3, 10)]
     public async Task HiveAncients_HealOfferThreeRngChoicesAndObtainAncientRelic(
@@ -588,9 +589,11 @@ public sealed class HiveEventTests : IDisposable
             run.AdvanceToNextAct();
             var ev = Begin<ColorfulPhilosophers>(run, player);
             int before = player.PlayerRng.Rewards.Counter;
-            Assert.Equal(new[] { "IRONCLAD", "SILENT", "DEFECT" },
-                ev.CurrentOptions.Select(candidate => candidate.Key));
-            await ev.ChooseOption(Assert.Single(ev.CurrentOptions, candidate => candidate.Key == "SILENT"));
+            string[] colors = ["NECROBINDER", "IRONCLAD", "SILENT", "DEFECT"];
+            string[] keys = ev.CurrentOptions.Select(candidate => candidate.Key).ToArray();
+            Assert.Equal(3, keys.Length);
+            Assert.Equal(colors.Where(keys.Contains), keys);
+            await ev.ChooseOption(ev.CurrentOptions[^1]);
             Assert.Equal(18, player.PlayerRng.Rewards.Counter - before);
             while (ev.TryDequeuePendingRewardOffer(out RewardsSet? rewards))
                 upgraded += rewards.Card.Options.Count(card => card.IsUpgraded);
@@ -642,7 +645,7 @@ public sealed class HiveEventTests : IDisposable
     {
         typeof(Amalgamator),
         typeof(Bugslayer),
-        typeof(ColorfulPhilosophers),
+        // ColorfulPhilosophers draws its event Rng once the non-own colors exceed three (all native characters present).
         typeof(ColossalFlower),
         typeof(FieldOfManSizedHoles),
         typeof(InfestedAutomaton),
