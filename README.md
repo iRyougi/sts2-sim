@@ -22,7 +22,7 @@
 
 ## 保真现状（请先读）
 
-顺序随机数模式**以**与游戏逐位一致**为目标**。我们用真实客户端和 headless 游戏宿主录下的对局做回放、逐项比对结果，这里修掉的大部分问题都是这样发现的。**但仍有已知的不一致，没有全部修复。** 不要未经核对就假定结果和游戏完全相同；发现差异请报告（见下文）。
+顺序随机数模式**以**与游戏逐位一致**为目标**。我们用真实客户端和 headless 游戏宿主录下的对局做回放、逐项比对结果，这里修掉的大部分问题都是这样发现的。**但仍有已知的不一致，没有全部修复**，列表见带 [`保真差异`](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82) 标签的议题。 不要未经核对就假定结果和游戏完全相同；发现差异请报告（见下文）。
 
 随机数有两种模式，刻意做成了互相独立的 API：
 
@@ -85,6 +85,15 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 - 欢迎提 PR。本仓库由私有上游仓库导出，被接受的改动会先合入上游，在下一次导出时出现在这里，并保留你的作者署名。详见 [CONTRIBUTING.md](CONTRIBUTING.md)；AI 编程助手请遵守 [AGENTS.md](AGENTS.md)。
 
 议题和 PR 用中文或英文都可以。
+
+## 贡献者
+
+本模拟器由以下成员共同开发（按 GitHub 账号排列）。公开仓库的历史从导出开始，看不到之前的提交记录，因此在这里列出：
+
+- **[@iRyougi](https://github.com/iRyougi)**：维护者；模拟器主体移植、随机数与种子、地图与对局流程、对拍工具链。
+- **[@ltlly](https://github.com/ltlly)**：移植铁甲战士与故障机器人（含充能球机制）；大量保真修复，包括伤害与死亡结算、生成牌的 creator、钩子顺序、变牌与奖励流程、怪物招式图等。
+- **[@s1f102500012](https://github.com/s1f102500012)**：回合结束时的出牌顺序与虚无消耗、同 ID 卡的洗牌顺序、战斗结束后的抽牌与洗牌、按 v0.111.0 校正卡牌数值、PunchOff 事件；亡灵契约师的移植正在进行中。
+- **[@Charlie-chulong](https://github.com/Charlie-chulong)**：宠物系统（Byrdpip、Pael's Legion）、MysteriousKnight 与 Lantern Key 战斗、怪物招式 ID 与怪物随机数种子对齐。
 
 ## 许可证
 

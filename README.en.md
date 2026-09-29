@@ -22,7 +22,7 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 
 ## Fidelity status — please read
 
-The sequential RNG mode **aims** for bit-for-bit agreement with the game. It has been validated by replaying recorded games from the real client and a headless game host and diffing the results, and those comparisons are how most bugs here were found. **Known discrepancies remain and not all of them are fixed.** Do not assume a result is identical to the game without checking; if you find a difference, please report it (see below).
+The sequential RNG mode **aims** for bit-for-bit agreement with the game. It has been validated by replaying recorded games from the real client and a headless game host and diffing the results, and those comparisons are how most bugs here were found. **Known discrepancies remain and not all of them are fixed**; see issues labelled [`保真差异`](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82) (fidelity difference). Do not assume a result is identical to the game without checking; if you find a difference, please report it (see below).
 
 There are two RNG modes, and they are deliberately separate APIs:
 
@@ -85,6 +85,15 @@ Release tags follow the game version they target. `v0.111.0` is the first releas
 - Pull requests are welcome. This repository is exported from a private upstream, so accepted changes are applied there and appear here in the next export, with you credited as co-author. See [CONTRIBUTING.md](CONTRIBUTING.md) (in Chinese); AI coding assistants should follow [AGENTS.md](AGENTS.md).
 
 Issues and pull requests may be written in English or Chinese.
+
+## Contributors
+
+This simulator was developed by the following people. The public history starts at the first export, so earlier commits are not visible here:
+
+- **[@iRyougi](https://github.com/iRyougi)**: maintainer; core port, RNG and seeding, map and run flow, comparison tooling.
+- **[@ltlly](https://github.com/ltlly)**: ported Ironclad and Defect (including orbs); many fidelity fixes across damage and death resolution, generated-card creators, hook order, transforms and rewards, and monster move graphs.
+- **[@s1f102500012](https://github.com/s1f102500012)**: end-of-turn card order and ethereal exhaust, shuffle order of same-ID cards, draws and shuffles after combat ends, v0.111.0 card values, the PunchOff event; Necrobinder port in progress.
+- **[@Charlie-chulong](https://github.com/Charlie-chulong)**: pet system (Byrdpip, Pael's Legion), MysteriousKnight and Lantern Key combat, monster move IDs and monster RNG seeding.
 
 ## License
 
