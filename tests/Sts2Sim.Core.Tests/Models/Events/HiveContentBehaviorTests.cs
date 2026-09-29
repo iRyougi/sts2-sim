@@ -7,6 +7,7 @@ using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.CardPools;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Enchantments;
@@ -124,6 +125,27 @@ public sealed class HiveContentBehaviorTests : IDisposable
     {
         (RunState run, Player player) = CreateRun("hive-energy-draw");
         await RelicCmd.Obtain(ModelDb.Relic<PrismaticGem>(), player);
+        var gem = Assert.Single(player.Relics.OfType<PrismaticGem>());
+        var originalPool = player.Character.CardPool;
+        CardCreationOptions Options(params CardPoolModel[] pools) =>
+            new(pools, CardCreationSource.Encounter, CardRarityOddsType.Uniform, card => card is Anger);
+        var merged = Hook.ModifyCardRewardCreationOptions(run, player,
+            Options(originalPool, ColorlessCardPool.Instance).WithFlags(CardCreationFlags.IsCardReward));
+        Assert.Equal(player.UnlockState.CharacterCardPools.Union([originalPool, ColorlessCardPool.Instance]).Select(pool => pool.GetType()),
+            merged.CardPools.Select(pool => pool.GetType()));
+        var reward = new Sts2Sim.Core.Rewards.CardReward(player, Options(originalPool), 1);
+        reward.Populate(run);
+        Assert.IsType<Anger>(Assert.Single(reward.Options));
+        Assert.Equal([typeof(ColorlessCardPool)], Hook.ModifyCardRewardCreationOptions(run, player,
+            Options(ColorlessCardPool.Instance).WithFlags(CardCreationFlags.IsCardReward))
+            .CardPools.Select(pool => pool.GetType()));
+        Assert.Equal([originalPool], Hook.ModifyCardRewardCreationOptions(run, player,
+            Options(originalPool).WithFlags(CardCreationFlags.IsCardReward | CardCreationFlags.NoCardPoolModifications)).CardPools);
+        Assert.Equal([originalPool], Hook.ModifyCardRewardCreationOptions(run, player,
+            Options(originalPool)).CardPools);
+        Player other = Player.CreateForNewRun(ModelDb.Character<Silent>(), run);
+        Assert.Equal([originalPool], gem.ModifyCardRewardCreationOptions(other,
+            Options(originalPool).WithFlags(CardCreationFlags.IsCardReward)).CardPools);
         await RelicCmd.Obtain(ModelDb.Relic<PaelsBlood>(), player);
         await RelicCmd.Obtain(ModelDb.Relic<VeryHotCocoa>(), player);
         CombatRoom room = await EnterCombat(run);

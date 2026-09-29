@@ -14,7 +14,7 @@ public sealed class BattleFriendV2 : MonsterModel
     public override int MaxInitialHp => 150;
 
     public override Task AfterAddedToRoom() =>
-        PowerCmd.Apply<BattlewornDummyTimeLimitPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        PowerCmd.Apply<BattlewornDummyTimeLimitPower>(Creature.CombatState!, Creature, 3m, null, null);
 
     public override Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)
     {

@@ -41,6 +41,7 @@ public sealed class BattleFriendTests : IDisposable
             enemy.GetPower<BattlewornDummyTimeLimitPower>());
         Assert.Equal(PowerType.Buff, timeLimit.Type);
         Assert.Equal(3, timeLimit.Amount);
+        Assert.Null(timeLimit.Applier);
     }
 
     [Fact]

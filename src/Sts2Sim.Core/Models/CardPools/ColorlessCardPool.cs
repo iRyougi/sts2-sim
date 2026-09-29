@@ -6,6 +6,7 @@ namespace Sts2Sim.Core.Models.CardPools;
 public sealed class ColorlessCardPool : CardPoolModel
 {
     public static ColorlessCardPool Instance { get; } = new();
+    public override bool IsColorless => true;
     public override IReadOnlyList<CardModel> AllCards => ModelDb.All<CardModel>().Where(c => c.IsColorless).ToArray();
     protected override IEnumerable<CardModel> FilterThroughEpochs(PlayerUnlockState unlockState,
         IEnumerable<CardModel> cards) => cards.Where(unlockState.IsColorlessCardUnlocked);

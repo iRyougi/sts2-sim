@@ -5,6 +5,7 @@ namespace Sts2Sim.Core.Models.CardPools;
 /// <summary>Stable character-card membership with run-entry unlock and multiplayer filtering.</summary>
 public abstract class CardPoolModel
 {
+    public virtual bool IsColorless => false;
     public abstract IReadOnlyList<CardModel> AllCards { get; }
 
     public IEnumerable<CardModel> GetUnlockedCards(

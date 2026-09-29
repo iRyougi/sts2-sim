@@ -5,19 +5,13 @@ using Sts2Sim.Core.Models.Relics;
 namespace Sts2Sim.Core.Content;
 
 /// <summary>
-/// Content whose real effect draws from other characters' card pools (<c>UnlockState.CharacterCardPools</c>
-/// in the authoritative source), which this project cannot faithfully reproduce yet because Phase 1 only
-/// ports the Regent's own content — other characters' card pools don't exist in <see cref="ModelDb"/> at all.
+/// Decision-time exclusions for content whose cross-character behavior still has unresolved fidelity gaps.
 ///
 /// The authoritative game has exactly four such mechanisms (confirmed via a full-text search of
 /// <c>CharacterCardPools</c> across the entire decompiled source, 2026-08-29): <c>PrismaticGem</c>
 /// (relic), <c>ColorfulPhilosophers</c> (event), <c>Splash</c> (card), <c>Kaleidoscope</c> (relic).
-/// <c>PrismaticGem</c>/<c>ColorfulPhilosophers</c> are not implemented in this project at all, so they're
-/// structurally unreachable already — nothing to register here. <c>Splash</c> and <c>Kaleidoscope</c>
-/// *are* implemented, but their "other character" step degrades into "draw from the Regent's own pool
-/// again" (see their own deviation comments, #98 and #187) — which is a materially different, and
-/// currently unfixable, effect from the real game. Letting the AI obtain either of them during training
-/// would teach it a behavior around a broken effect that won't match the real game.
+/// <c>PrismaticGem</c> now uses the native reward-pool union. <c>Splash</c> and
+/// <c>Kaleidoscope</c> retain decision-time exclusions pending their separate fidelity audits.
 ///
 /// This registry is deliberately kept separate from the core game-rule layer (card pool generation,
 /// <c>IsAllowedAtNeow</c>, RNG consumption) — excluding content there would shrink candidate pools
@@ -28,8 +22,6 @@ namespace Sts2Sim.Core.Content;
 /// still generates and offers this content exactly like the real game (preserving RNG fidelity); the
 /// decision layer just declines to pick it.
 ///
-/// If <c>PrismaticGem</c>/<c>ColorfulPhilosophers</c> are ever implemented, add them here in the same
-/// pass — don't let this list quietly fall out of sync with what's actually reachable.
 /// </summary>
 public static class CrossCharacterContentExclusions
 {
