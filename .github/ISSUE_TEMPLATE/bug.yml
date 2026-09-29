@@ -1,24 +1,24 @@
-name: Bug report
-description: A crash or other incorrect behaviour
+name: Bug 报告
+description: 崩溃或其他错误行为
 labels: ["bug"]
 body:
   - type: input
     id: sim-version
     attributes:
-      label: Simulator version or commit
+      label: 模拟器版本或提交
     validations:
       required: true
   - type: textarea
     id: what
     attributes:
-      label: What happened
-      description: Include the exception and stack trace if there is one.
+      label: 发生了什么
+      description: 如果有异常，请附上异常信息和堆栈。
     validations:
       required: true
   - type: textarea
     id: repro
     attributes:
-      label: How to reproduce
-      description: Seed, character, ascension and steps, or a minimal code snippet.
+      label: 如何复现
+      description: 种子、角色、进阶等级和步骤，或一段最小代码。
     validations:
       required: true

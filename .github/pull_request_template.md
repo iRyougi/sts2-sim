@@ -1,14 +1,14 @@
-## What this changes
+## 改了什么
 
-## Why
+## 为什么
 
-<!-- For fidelity fixes: the game type/method this follows, and the seed or case that showed the difference. -->
+<!-- 保真修复：写明依据的游戏类型/方法，以及暴露差异的种子或用例。 -->
 
-## Checklist
+## 自查
 
-- [ ] Follows the game's actual code; no added or reordered RNG draws, no loosened comparisons
-- [ ] Any intentional deviation from the game is stated above (game behaviour, simulator behaviour, reason)
-- [ ] No game files, decompiled source files, assets or localization text
-- [ ] `dotnet build` and `dotnet test` pass
+- [ ] 符合游戏实际代码；没有补抽或重排随机数，没有放宽比对
+- [ ] 如有与游戏的有意偏离，已在上文写明（游戏怎么做、模拟器怎么做、理由）
+- [ ] 不含游戏文件、反编译源码文件、资源或本地化文本
+- [ ] `dotnet build` 与 `dotnet test` 通过
 
-This repository is exported from a private upstream. Accepted pull requests are applied upstream and appear here in the next export, with you credited; the pull request is then closed rather than merged. See CONTRIBUTING.md.
+本仓库从私有上游导出。被接受的 PR 会合入上游，在下一次导出时出现在这里并保留你的署名，之后本 PR 会被关闭而不是合并。详见 CONTRIBUTING.md。

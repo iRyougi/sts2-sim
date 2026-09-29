@@ -1,56 +1,56 @@
 # AGENTS.md — sts2-sim
 
-Rules for everyone working in this repository, human or AI assistant (Codex, Claude Code, and others). Read this before making changes; it takes precedence over your default habits. [CONTRIBUTING.md](CONTRIBUTING.md) describes how contributions are reviewed and released.
+本文件是本仓库所有参与者（人和 AI 编程助手：Codex、Claude Code 等）都必须遵守的规则。动手改代码前先读完本文件；它的优先级高于你的默认习惯。贡献如何审查和发布，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 1. What this project is
+## 1. 项目是什么
 
-A headless Slay the Spire 2 simulator, ported from the game's own code. The goal is that, in sequential RNG mode, the same seed and the same choices reproduce the same run as the game client, draw for draw. The current game baseline is in the README.
+《杀戮尖塔2》的 headless 模拟器，照游戏自身的代码移植。目标是：在顺序随机数模式下，同样的种子、同样的选择，得到和游戏客户端逐次抽取都一致的对局。当前的游戏基线写在 README 里。
 
-## 2. Fidelity rules
+## 2. 保真原则
 
-1. **Port literally.** The game's code is the specification. Do not "improve", simplify or reinterpret game rules. Any place where the simulator knowingly differs from the game is an intentional deviation and must be stated in the pull request: the game's behaviour, what the simulator does instead, and why.
-2. **Watch overloads and default parameters.** Methods with the same name can take integer arguments that mean different things in different overloads (for example a maximum repeat count in one and a cooldown in another, not a weight). Port the exact call the game makes; never rewrite a call by what you think it means.
-3. **Fix the first divergence, not the symptom.** When the simulator disagrees with the game, find the first point where they diverge and fix that. Never add RNG draws, remove or reorder draws, change seeds, or loosen a comparison to make a result match.
-4. **A green test suite is not proof of fidelity.** Tests have been found that were written against the simulator's own mistaken behaviour and locked the mistake in. If you find one, correct the assertion to match the game.
-5. **Everything is unlocked.** The simulator always behaves as if every unlock, achievement and epoch in the game is complete. Do not port unlock tracking. This does not apply to live run state (gold, HP, deck contents): gates that depend on the current run must be ported as written.
-6. **Keep the RNG modes separate.** Sequential mode matches the game. Keyed mode (`RunState.CreateKeyedForLabels`) is an intentional deviation used only for paired comparisons and training data. `CloneExact`, `CloneReseeded` and the keyed APIs are deliberately separate methods: **do not merge them behind a boolean parameter.** Choosing the wrong one does not fail; it silently produces wrong results that are very hard to trace.
-7. **Be careful with shared engine code.** Changes to `src/Sts2Sim.Core/Random/Rng.cs`, hook dispatch, and combat state cloning affect everything downstream. Keep such changes minimal and explain them.
+1. **逐字移植。** 游戏代码就是规格。不要"改进"、简化或重新诠释游戏规则。凡是模拟器明知与游戏不同的地方都属于有意偏离，必须在 PR 里写明：游戏怎么做、模拟器改成怎么做、为什么。
+2. **特别小心重载与默认参数。** 同名方法的整数参数在不同重载中含义可能不同（例如在一个重载里是"最多重复次数"，在另一个里是"冷却"，都不是权重）。照游戏的原调用移植，不要凭语义改写。
+3. **修首因，不修症状。** 模拟器和游戏对不上时，找到两者第一次分叉的地方并修那里。不要补抽、删掉或重排随机数，不要改种子，也不要为了让结果对上而放宽比对。
+4. **测试全绿不等于实现正确。** 曾经发现过照着模拟器自己的错误行为写成、反而把错误锁死的测试。发现这类测试时，按游戏原文修正断言。
+5. **全解锁。** 模拟器永远按游戏里所有解锁、成就、纪元都已完成的状态运行，不要移植解锁追踪。**注意区分**：依赖当前对局实时状态的门槛（金币、HP、牌组构成）不适用这条，要照原样移植。
+6. **两种随机数模式分开。** 顺序模式与游戏一致。重键模式（`RunState.CreateKeyedForLabels`）是有意偏离，只用于配对比较和训练数据。`CloneExact`、`CloneReseeded` 和重键相关 API 是刻意分开的方法，**不要合并成布尔参数**。用错了不会报错，只会悄悄产生错误结果，极难定位。
+7. **谨慎修改底层引擎代码。** `src/Sts2Sim.Core/Random/Rng.cs`、钩子调度和战斗状态克隆的改动会影响所有下游。这类改动要尽量小，并说明理由。
 
-## 3. What must never be committed
+## 3. 绝不能提交的内容
 
-- Game assemblies, executables, decompiled source files, game assets, or localization text.
-- Large pasted blocks of decompiled game code, in code comments, issues or pull requests. Citing the original type or method name (for example `MegaCrit.Sts2.Core.Commands.CardCmd`) is fine and encouraged.
-- Local machine paths, credentials, or large raw experiment outputs (logs, captures, big JSON files).
+- 游戏程序集、可执行文件、反编译源码文件、游戏资源或本地化文本。
+- 大段粘贴的反编译游戏代码，无论是在代码注释、议题还是 PR 里。写出原始类型或方法名作为出处（例如 `MegaCrit.Sts2.Core.Commands.CardCmd`）没问题，也鼓励这样做。
+- 本机路径、凭据，或大体积的原始实验产物（日志、采集记录、大 JSON 文件）。
 
-## 4. Tests
+## 4. 测试纪律
 
-Tests cost run time and, for AI assistants, context. Keep them lean:
+测试的成本不只是运行时间，对 AI 助手来说还有上下文。保持精简：
 
-1. Test only the behaviour you changed. Do not test the framework or existing code, and do not restate the same invariant in a second test.
-2. Use `[Theory]` with `[InlineData]` for several levels or parameters, not one `[Fact]` per case.
-3. Check everything one fixture can show in one test, with assertion messages that carry the seed and position so a failure is easy to locate.
-4. A test is worth keeping only if its failure would point to a specific change that breaks behaviour.
-5. Run targeted tests while working (`--filter`); run the full suite once before opening a pull request.
-6. Long measurements and experiments are not unit tests. Keep them out of the test project.
+1. 只测本次改动的行为。不测框架或既有代码本身，同一条不变量不要换个说法再写一遍。
+2. 多个档位或参数用 `[Theory]` + `[InlineData]`，不要一个档位写一个 `[Fact]`。
+3. 同一个夹具能验证的事在一个用例里一次验完，靠断言消息（带种子、位置）保证定位能力。
+4. 判断一个测试值不值得存在：看它失败时是否指向一个具体的、会让行为出错的改动。
+5. 开发时用 `--filter` 跑定向测试；开 PR 前跑一次全量。
+6. 长时间的测量和实验不是单元测试，不要放进测试项目。
 
-Some tests are opt-in and skipped by default; they are enabled by an environment variable named in their skip message.
+有些测试是 opt-in 的，默认跳过；开启它们需要设置跳过信息里写明的环境变量。
 
-## 5. Build and test
+## 5. 构建与测试
 
-Requires the .NET 9 SDK. No game files are needed.
+需要 .NET 9 SDK，不需要游戏文件。
 
 ```sh
 dotnet build Sts2Sim.sln -c Release
 dotnet test Sts2Sim.sln -c Release
-dotnet test Sts2Sim.sln -c Release --filter "FullyQualifiedName~<ClassName>"
+dotnet test Sts2Sim.sln -c Release --filter "FullyQualifiedName~<类名>"
 ```
 
-## 6. Code comments
+## 6. 代码注释
 
-Comments may mention `Deviation #N`, `Plan ...` or document paths. These refer to the maintainers' internal deviation register and planning documents, which are not in this repository. Leave them as they are; do not invent content for them.
+注释里可能出现 `偏离 #N`、`Plan ...` 或文档路径。它们指向维护者内部的偏离登记册和计划文档，不在本仓库中。保持原样，不要替它们编造内容。
 
-## 7. Commits and pull requests
+## 7. 提交与 PR
 
-- Commit messages: `<type>: <description>`, where type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
-- One pull request per change. For fidelity fixes, name the game type and method you followed and the seed or case that showed the difference.
-- This repository is exported from a private upstream. Accepted pull requests are applied upstream and appear here in the next export; see CONTRIBUTING.md.
+- 提交信息：`<类型>: <描述>`，类型为 `feat`、`fix`、`refactor`、`docs`、`test`、`chore`、`perf`、`ci` 之一。
+- 一项改动一个 PR。保真修复要写明你依据的游戏类型和方法，以及暴露差异的种子或用例。
+- 本仓库从私有上游导出。被接受的 PR 会合入上游，并在下一次导出时出现在这里；见 CONTRIBUTING.md。

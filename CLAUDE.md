@@ -1,5 +1,5 @@
 # CLAUDE.md
 
-Project rules for this repository are in AGENTS.md (shared by Codex, Claude Code and other assistants):
+本仓库的规则写在 AGENTS.md（Codex、Claude Code 等助手共用同一份）：
 
 @AGENTS.md

@@ -1,53 +1,53 @@
-name: Fidelity report
-description: The simulator behaves differently from the game
-labels: ["fidelity"]
+name: 保真差异报告
+description: 模拟器的行为和游戏不一致
+labels: ["保真差异"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks! Please do not paste large blocks of decompiled game code; cite the type and method name instead.
+        感谢报告！请不要粘贴大段反编译的游戏代码，写出类型和方法名即可。中文或英文都可以。
   - type: input
     id: game-version
     attributes:
-      label: Game version
-      description: The game version you compared against. The simulator's baseline is in the README.
+      label: 游戏版本
+      description: 你对比的游戏版本。模拟器的基线写在 README 里。
       placeholder: v0.111.0
     validations:
       required: true
   - type: input
     id: sim-version
     attributes:
-      label: Simulator version or commit
+      label: 模拟器版本或提交
     validations:
       required: true
   - type: input
     id: setup
     attributes:
-      label: Seed, character, ascension
+      label: 种子、角色、进阶等级
       placeholder: "EXAMPLE1, Silent, A10"
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
-      description: Choices made up to the point of difference (floor, room, cards played, options picked).
+      label: 复现步骤
+      description: 一直到出现差异为止所做的选择（楼层、房间、打出的牌、选的选项）。
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: What the game did
+      label: 游戏的表现
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: What the simulator did
+      label: 模拟器的表现
     validations:
       required: true
   - type: textarea
     id: source
     attributes:
-      label: Relevant game code (optional)
-      description: Type and method names you compared against, and what they do.
+      label: 相关的游戏代码（可选）
+      description: 你对照的类型和方法名，以及它们做了什么。

@@ -1,42 +1,44 @@
 # sts2-sim
 
-An unofficial, headless simulator for **Slay the Spire 2**, written in C# (.NET 9).
+**中文** | [English](README.en.md)
 
-This project is not affiliated with or endorsed by Mega Crit. It contains no game files, assets or localization text. Building and testing it does not require the game; comparing its behaviour against the real game requires your own legitimate copy.
+《杀戮尖塔2》（Slay the Spire 2）的非官方 headless 模拟器，用 C#（.NET 9）编写。
 
-## What it is
+本项目与 Mega Crit 无关，也未获其认可。仓库不含任何游戏文件、美术资源或本地化文本。构建和测试不需要游戏；如果要和真实游戏对比行为，需要自备正版游戏。
 
-- **A port of the game logic, not a re-design.** Game rules are ported from the game's own code as literally as practical, so behaviour can be checked method by method. Doc comments cite the original type they come from (for example `MegaCrit.Sts2.Core.Commands.CardCmd`).
-- **Seed-exact RNG.** The random number generator and seed derivation follow the game, with the goal that the same seed and the same choices reproduce the same run as the game client, draw for draw.
-- **Cloneable state.** Runs and combats can be cloned (`CloneExact`) for search, or cloned with fresh randomness (`CloneReseeded`) for sampling.
-- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10.
+## 这是什么
+
+- **照游戏代码移植，不是重新设计。** 游戏规则尽可能逐字从游戏自身的代码移植过来，因此可以逐个方法对照核对。文档注释会标出对应的原始类型（例如 `MegaCrit.Sts2.Core.Commands.CardCmd`）。
+- **随机数与种子一致。** 随机数生成器和种子派生都照游戏实现，目标是：同样的种子、同样的选择，得到和游戏客户端逐次抽取都一致的对局。
+- **状态可克隆。** 对局和战斗都可以原样克隆（`CloneExact`）用于搜索，也可以换一套新随机数克隆（`CloneReseeded`）用于采样。
+- **完整对局。** 地图生成、涅奥等先古之民、战斗、精英与 Boss、事件、商店、休息处、宝箱、奖励、药水、遗物、附魔，以及进阶 0–10 级。
 
 | | |
 |---|---|
-| Game baseline | STS2 v0.111.0 (release commit `41cef1ea`, `main_assembly_hash 222455745`) |
-| Characters | Defect, Ironclad, Regent, Silent |
-| Acts | Overgrowth, Underdocks, Hive, Glory |
-| Multiplayer | Not supported |
+| 游戏基线 | STS2 v0.111.0（release commit `41cef1ea`，`main_assembly_hash 222455745`） |
+| 角色 | Defect, Ironclad, Regent, Silent |
+| 幕 | Overgrowth、Underdocks、Hive、Glory |
+| 多人模式 | 不支持 |
 
-## Fidelity status — please read
+## 保真现状（请先读）
 
-The sequential RNG mode **aims** for bit-for-bit agreement with the game. It has been validated by replaying recorded games from the real client and a headless game host and diffing the results, and those comparisons are how most bugs here were found. **Known discrepancies remain and not all of them are fixed.** Do not assume a result is identical to the game without checking; if you find a difference, please report it (see below).
+顺序随机数模式**以**与游戏逐位一致**为目标**。我们用真实客户端和 headless 游戏宿主录下的对局做回放、逐项比对结果，这里修掉的大部分问题都是这样发现的。**但仍有已知的不一致，没有全部修复。** 不要未经核对就假定结果和游戏完全相同；发现差异请报告（见下文）。
 
-There are two RNG modes, and they are deliberately separate APIs:
+随机数有两种模式，刻意做成了互相独立的 API：
 
-- **Sequential** (default): matches the game. Use this for anything that must agree with the client.
-- **Keyed** (`RunState.CreateKeyedForLabels`): an intentional deviation. Random draws are keyed by purpose instead of drawn in sequence, so two branches of a run stay comparable. Use it only for paired comparisons and training-data generation; it does **not** match the game.
+- **顺序模式**（默认）：与游戏一致。凡是需要和客户端对上的场景都用它。
+- **重键模式**（`RunState.CreateKeyedForLabels`）：有意的偏离。随机抽取按用途派生，而不是按顺序抽取，这样同一局的两个分支仍然可以相互比较。只用于配对比较和生成训练数据；它与游戏**不**一致。
 
-Code comments sometimes mention `Deviation #N`, `Plan ...` or document paths. These refer to the maintainers' internal deviation register and planning documents, which are not part of this repository. Where a deviation matters to users it will be published as an issue labelled `known-deviation`.
+代码注释里有时会出现 `偏离 #N`、`Plan ...` 或文档路径。这些指向维护者内部的偏离登记册和计划文档，不在本仓库中。对使用者有影响的偏离会以带 `有意偏离` 标签的议题公开。
 
-## Quick start
+## 快速上手
 
 ```sh
 dotnet build Sts2Sim.sln -c Release
 dotnet test Sts2Sim.sln -c Release
 ```
 
-Play one run with a trivial policy (a new console project referencing `src/Sts2Sim.Core`):
+用一个最简单的策略跑一局（新建一个控制台项目，引用 `src/Sts2Sim.Core`）：
 
 ```csharp
 using Sts2Sim.Core.Combat;
@@ -58,8 +60,8 @@ var driver = new RunDriver(runState, new FirstChoiceDecisions());
 RunDriver.Result result = await driver.RunAsync(maxFloors: 60);
 Console.WriteLine($"Outcome={result.Outcome} floors={result.FloorsVisited} hp={result.FinalPlayerHp}");
 
-// Only map and combat choices are required; rewards, shops, rest sites and
-// events fall back to the interface's default policies.
+// 只有地图和战斗决策是必须实现的；奖励、商店、休息处和事件
+// 会使用接口自带的默认策略。
 sealed class FirstChoiceDecisions : IRunDecisionSource
 {
     public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options) =>
@@ -70,20 +72,20 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 }
 ```
 
-A policy that only ends its turn dies on the first floor, of course. Implement `IRunDecisionSource` to plug in your own agent; the tests under `tests/Sts2Sim.Core.Tests` show many more entry points (single combats, events, shops, specific cards and relics).
+只会结束回合的策略当然会死在第一层。实现 `IRunDecisionSource` 就能接入你自己的 AI；`tests/Sts2Sim.Core.Tests` 下的测试展示了更多入口（单场战斗、事件、商店、特定卡牌和遗物等）。
 
-## Versioning
+## 版本号
 
-Release tags follow the game version they target. `v0.111.0` is the first release for game v0.111.0; later simulator fixes on the same game baseline are `v0.111.0.1`, `v0.111.0.2`, and so on. When the game updates, numbering restarts at the new game version (for example `v0.112.0`). The first three numbers therefore always tell you which game version to compare against.
+发布标签跟随所针对的游戏版本。`v0.111.0` 是针对游戏 v0.111.0 的首次发布；同一游戏基线上的后续修复依次是 `v0.111.0.1`、`v0.111.0.2`……。游戏更新后，从新的游戏版本号重新开始（例如 `v0.112.0`）。所以前三段数字永远告诉你该和哪个游戏版本对比。
 
-## Reporting issues and contributing
+## 报告问题与参与贡献
 
-- Behaviour that differs from the game: open a **Fidelity report** with the game version, seed, character, ascension and the steps to reproduce.
-- Other bugs: open a **Bug report**.
-- Pull requests are welcome. This repository is exported from a private upstream, so accepted changes are applied there and appear here in the next export, with you credited as co-author. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- 行为和游戏不一致：提交**保真差异报告**，写明游戏版本、种子、角色、进阶等级和复现步骤。
+- 其他 bug：提交 **Bug 报告**。
+- 欢迎提 PR。本仓库由私有上游仓库导出，被接受的改动会先合入上游，在下一次导出时出现在这里，并保留你的作者署名。详见 [CONTRIBUTING.md](CONTRIBUTING.md)；AI 编程助手请遵守 [AGENTS.md](AGENTS.md)。
 
-Issues and pull requests may be written in English or Chinese.
+议题和 PR 用中文或英文都可以。
 
-## License
+## 许可证
 
-[MIT](LICENSE). Slay the Spire 2 and its content are the property of Mega Crit.
+[MIT](LICENSE)。《杀戮尖塔2》及其内容归 Mega Crit 所有。
