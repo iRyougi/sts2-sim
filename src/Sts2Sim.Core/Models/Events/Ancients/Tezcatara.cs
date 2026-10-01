@@ -8,7 +8,9 @@ namespace Sts2Sim.Core.Models.Events
 
     /// <summary>
     /// Tezcatara Ancient selection. Basic Strike gating and the three authoritative random pools are exact.
-    /// Deviation #204: Ancient dialogue/history and Defect's dialogue blacklist are absent from the headless base.
+    /// Deviation #204: Ancient dialogue/history and Defect's friendly-dialogue blacklist are absent
+    /// from the headless base. Native NEventRoom uses the blacklist only to filter dialogue, then
+    /// chooses a line with presentation-only Rng.Chaotic; relic options and Run/Player RNG are unaffected.
     /// </summary>
     public sealed class Tezcatara : AncientEventModel
     {
