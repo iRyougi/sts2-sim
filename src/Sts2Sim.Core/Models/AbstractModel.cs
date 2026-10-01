@@ -252,7 +252,17 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return Task.CompletedTask;
     }
 
+    public virtual Task AfterAutoPrePlayPhaseEnteredEarly(Player player)
+    {
+        return Task.CompletedTask;
+    }
+
     public virtual Task AfterAutoPrePlayPhaseEntered(Player player)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task AfterAutoPrePlayPhaseEnteredLate(Player player)
     {
         return Task.CompletedTask;
     }

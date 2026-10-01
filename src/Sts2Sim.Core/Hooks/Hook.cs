@@ -657,9 +657,26 @@ public static class Hook
         ICombatState combatState,
         Player player)
     {
+        // Native dispatches each phase from a fresh listener enumeration. The local listener
+        // wrapper snapshots each phase before callbacks, preserving its existing same-phase order.
+        if (combatState.IsOverOrEnding()) return;
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        {
+            await model.AfterAutoPrePlayPhaseEnteredEarly(player);
+            model.InvokeExecutionFinished();
+        }
+
+        if (combatState.IsOverOrEnding()) return;
         foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
         {
             await model.AfterAutoPrePlayPhaseEntered(player);
+            model.InvokeExecutionFinished();
+        }
+
+        if (combatState.IsOverOrEnding()) return;
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        {
+            await model.AfterAutoPrePlayPhaseEnteredLate(player);
             model.InvokeExecutionFinished();
         }
     }

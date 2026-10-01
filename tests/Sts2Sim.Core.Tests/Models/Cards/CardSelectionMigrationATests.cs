@@ -76,7 +76,29 @@ public sealed class CardSelectionMigrationATests : IDisposable
             power.ApplyInternal(player.Creature, 2);
             model = power;
             expected = hand;
+            Player foreignPlayer = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+            CardModel[] ownerHand = player.PlayerCombatState.Hand.Cards.ToArray();
+            int selectionCounter = run.Rng.CombatCardSelection.Counter;
+
+            await power.AfterPlayerTurnStart(foreignPlayer);
+            Assert.Empty(source.Requests);
+            Assert.True(ownerHand.SequenceEqual(player.PlayerCombatState.Hand.Cards, ReferenceEqualityComparer.Instance),
+                $"seed=migration-a-{effect}, phase=foreign-player: owner hand changed");
+            Assert.Equal(selectionCounter, run.Rng.CombatCardSelection.Counter);
+
             await power.AfterSideTurnStart(CombatSide.Player, new[] { player.Creature });
+            Assert.Empty(source.Requests);
+            Assert.True(ownerHand.SequenceEqual(player.PlayerCombatState.Hand.Cards, ReferenceEqualityComparer.Instance),
+                $"seed=migration-a-{effect}, phase=old-side: owner hand changed");
+            Assert.Equal(selectionCounter, run.Rng.CombatCardSelection.Counter);
+
+            await power.AfterPlayerTurnStart(player);
+            ownerHand = player.PlayerCombatState.Hand.Cards.ToArray();
+            selectionCounter = run.Rng.CombatCardSelection.Counter;
+            await power.AfterSideTurnStart(CombatSide.Player, new[] { player.Creature });
+            Assert.True(ownerHand.SequenceEqual(player.PlayerCombatState.Hand.Cards, ReferenceEqualityComparer.Instance),
+                $"seed=migration-a-{effect}, phase=old-side-after-owner: owner hand changed");
+            Assert.Equal(selectionCounter, run.Rng.CombatCardSelection.Counter);
         }
         else if (effect == "ToastyMittens")
         {

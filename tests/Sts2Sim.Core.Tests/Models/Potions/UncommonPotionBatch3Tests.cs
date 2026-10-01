@@ -291,22 +291,30 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
         Assert.True(stillCostly.TemporaryFreeThisCombat);
     }
 
-    [Fact]
-    public async Task TouchOfInsanity_MakesXStarCostFreeWithoutSpendingStars()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TouchOfInsanity_SkipsPureXCosts_AndXStarsStillSpendOnPlay(bool xStars)
     {
-        (Player player, _) = await CreateCombatAsync("touch-x-star-cost");
+        (Player player, _) = await CreateCombatAsync($"touch-x-cost-{xStars}");
         var selection = new LegacySelectionDecisionSource();
         ((Sts2Sim.Core.Combat.CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
         ClearHand(player);
-        Task9XStarCostCard starCost = AddToHand<Task9XStarCostCard>(player);
+        CardModel xCard = xStars
+            ? AddToHand<Task9XStarCostCard>(player)
+            : AddToHand<Whirlwind>(player);
         await PlayerCmd.GainStars(3, player);
         int starsBefore = player.PlayerCombatState!.Stars;
 
         await UsePotionAsync("TouchOfInsanity", player, player.Creature);
-        await starCost.PlayAsync(target: null);
 
-        Assert.Equal(starsBefore, player.PlayerCombatState.Stars);
-        Assert.False(starCost.TemporaryFreeUntilPlayed);
+        Assert.False(xCard.TemporaryFreeThisCombat);
+        if (xStars)
+        {
+            Assert.Equal(starsBefore, xCard.StarCost);
+            await xCard.PlayAsync(target: null);
+            Assert.Equal(0, player.PlayerCombatState.Stars);
+        }
     }
 
     [Fact]

@@ -106,18 +106,21 @@ public sealed class CardModelTemporaryCostTests : IDisposable
     }
 
     [Fact]
-    public async Task MakeTemporaryFreeThisTurn_ZeroesXStarCostAndDoesNotSpendStars()
+    public async Task MakeTemporaryFreeThisTurn_DoesNotChangeXStarCostOrCapturedEffect()
     {
-        (Player player, _) = await CreateCombatAsync("temporary-x-stars");
+        (Player player, CombatRoom room) = await CreateCombatAsync("temporary-x-stars");
         Stardust card = AddToHand<Stardust>(player);
         player.PlayerCombatState!.GainStars(3);
         int starsBefore = player.PlayerCombatState.Stars;
+        Creature enemy = room.Engine.State.Enemies.Single();
+        decimal hpBefore = enemy.CurrentHp;
 
         card.MakeTemporaryFreeThisTurn();
 
-        Assert.Equal(0, card.StarCost);
+        Assert.Equal(starsBefore, card.StarCost);
         await card.PlayAsync(target: null);
-        Assert.Equal(starsBefore, player.PlayerCombatState.Stars);
+        Assert.Equal(0, player.PlayerCombatState.Stars);
+        Assert.Equal(hpBefore - 5m * starsBefore, enemy.CurrentHp);
     }
 
     [Fact]

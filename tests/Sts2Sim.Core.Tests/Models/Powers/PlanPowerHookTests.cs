@@ -273,7 +273,7 @@ public sealed class PlanPowerHookTests : IDisposable
         DefendRegent original = AddToHand<DefendRegent>(player);
         await PowerCmd.Apply<EntropyPower>(room.Engine.State, player.Creature, 1m, null, null);
 
-        await Hook.AfterSideTurnStart(room.Engine.State, CombatSide.Player, new[] { player.Creature });
+        await Hook.AfterPlayerTurnStart(room.Engine.State, player);
 
         Assert.DoesNotContain(original, player.PlayerCombatState!.Hand.Cards);
         Assert.All(player.PlayerCombatState.Hand.Cards,

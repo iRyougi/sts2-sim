@@ -343,10 +343,13 @@ public sealed class GeneratedCardRepairTask7Tests : IDisposable
         Task7NoStarProbeCard noStars = AddTo<Task7NoStarProbeCard>(owner, PileType.Hand);
 
         await room.Engine.PlayCardAsync(owner, xEnergy, null);
+        int starsBeforeX = owner.PlayerCombatState!.Stars;
         await room.Engine.PlayCardAsync(owner, xStars, null);
 
         Assert.Equal(new ResourceInfo(3, 3, 0, 0), xEnergy.LastPlay!.Resources);
-        Assert.Equal(new ResourceInfo(0, 0, 0, 0), xStars.LastPlay!.Resources);
+        // Native X-star cost returns current stars before VoidForm's star-cost hook.
+        Assert.Equal(new ResourceInfo(0, 0, starsBeforeX, starsBeforeX), xStars.LastPlay!.Resources);
+        Assert.Equal(0, owner.PlayerCombatState.Stars);
         Assert.Equal(-1, noStars.StarCost);
         Assert.False(noStars.HasStarCost);
         Assert.Equal(2, noStars.EnergyCost);

@@ -26,16 +26,25 @@ public sealed class KaleidoscopeTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
-    [Fact]
-    public async Task AfterObtained_OffersTwoCardChoicesDrawnFromOtherCharacterPools()
+    [Theory]
+    [InlineData("kaleidoscope-offer", false, null, null)]
+    [InlineData("34WWJ6MXE9NN", true,
+        new[] { "WISP", "SWEEPING_BEAM", "CRUSH_UNDER" },
+        new[] { "SOW", "VICIOUS", "ASTRAL_PULSE" })]
+    [InlineData("7LTB4PEDGP3E", true,
+        new[] { "TESLA_COIL", "SHROUD", "TREMBLE" },
+        new[] { "ITERATION", "PALE_BLUE_DOT", "DEATHS_DOOR" })]
+    public async Task AfterObtained_OffersTwoCardChoicesDrawnFromOtherCharacterPools(
+        string seed, bool isSilent, string[]? firstNativeCandidates, string[]? secondNativeCandidates)
     {
-        (RunState runState, Player player) = CreateRun("kaleidoscope-offer");
+        (RunState runState, Player player) = CreateRun(seed, isSilent);
         EventRoom room = await EnterEventRoom(runState);
         int deckCountBefore = player.Deck.Cards.Count;
+        int nicheCounterBefore = runState.Rng.Niche.Counter;
+        int rewardsCounterBefore = player.PlayerRng.Rewards.Counter;
 
-        // 偏离 #307：权威用 Rng.Niche 打乱"非本角色卡池"取前 3 个、每池抽 1 张。
-        // 期望张数因此随已实现角色数增长：当前 2 个角色 ⇒ 他系池 1 个 ⇒ 每份 1 张。
-        // 这里不写死 3，否则新增角色时又要回来改。
+        // v0.111.0 sorts other character pools by their ModelId before Niche shuffling.
+        // All five character pools are registered: each choice draws from three of the other four.
         List<CardPoolModel> otherPools = player.UnlockState.CharacterCardPools
             .Where(pool => pool.GetType() != player.Character.CardPool.GetType())
             .ToList();
@@ -45,8 +54,19 @@ public sealed class KaleidoscopeTests : IDisposable
             .Select(card => card.Id)
             .ToHashSet();
         Assert.NotEmpty(otherPoolCardIds);
+        if (firstNativeCandidates is not null)
+        {
+            // Public 09a2 rerun-200 decisions rows 0→1: both streams start at zero.
+            Assert.True(nicheCounterBefore == 0 && rewardsCounterBefore == 0,
+                $"seed={seed}, before obtain: Niche={nicheCounterBefore}, Rewards={rewardsCounterBefore}");
+        }
 
         await RelicCmd.Obtain(ModelDb.Relic<Kaleidoscope>(), player);
+
+        Assert.True(runState.Rng.Niche.Counter - nicheCounterBefore == 6,
+            $"seed={seed}, obtain: Niche delta={runState.Rng.Niche.Counter - nicheCounterBefore}, expected=6");
+        Assert.True(player.PlayerRng.Rewards.Counter - rewardsCounterBefore == 18,
+            $"seed={seed}, obtain: Rewards delta={player.PlayerRng.Rewards.Counter - rewardsCounterBefore}, expected=18");
 
         Assert.True(room.Event.TryDequeuePendingRewardOffer(out RewardsSet? rewards));
         Assert.NotNull(rewards);
@@ -54,6 +74,17 @@ public sealed class KaleidoscopeTests : IDisposable
         Assert.Equal(expectedOptions, rewards.Card.Options.Count);
         CardReward second = Assert.IsType<CardReward>(Assert.Single(rewards.ExtraRewards));
         Assert.Equal(expectedOptions, second.Options.Count);
+        if (firstNativeCandidates is not null && secondNativeCandidates is not null)
+        {
+            // Native ordered candidates from archive/09a2-captures, rerun-200 rows 1 and 2.
+            // Keep these independent of the simulator's pool ordering and card factory.
+            string[] firstActual = rewards.Card.Options.Select(card => card.Id.Entry).ToArray();
+            string[] secondActual = second.Options.Select(card => card.Id.Entry).ToArray();
+            Assert.True(firstNativeCandidates.SequenceEqual(firstActual),
+                $"seed={seed}, reward=1: expected=[{string.Join(",", firstNativeCandidates)}], actual=[{string.Join(",", firstActual)}]");
+            Assert.True(secondNativeCandidates.SequenceEqual(secondActual),
+                $"seed={seed}, reward=2: expected=[{string.Join(",", secondNativeCandidates)}], actual=[{string.Join(",", secondActual)}]");
+        }
         foreach (CardReward choice in new[] { rewards.Card, second })
         {
             Assert.Equal(expectedOptions, choice.Options.Select(card => card.Id).Distinct().Count());
@@ -120,10 +151,11 @@ public sealed class KaleidoscopeTests : IDisposable
 
         Assert.True(ModelDb.Relic<Kaleidoscope>().IsAllowedAtNeow(runState));
     }
-    private static (RunState RunState, Player Player) CreateRun(string seed)
+    private static (RunState RunState, Player Player) CreateRun(string seed, bool isSilent = false)
     {
-        var runState = new RunState(seed, new Overgrowth());
-        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
+        var runState = new RunState(seed, new Overgrowth(), ascensionLevel: isSilent ? 10 : 0);
+        CharacterModel character = isSilent ? ModelDb.Character<Silent>() : ModelDb.Character<Regent>();
+        Player player = Player.CreateForNewRun(character, runState);
         runState.AddPlayer(player);
         return (runState, player);
     }

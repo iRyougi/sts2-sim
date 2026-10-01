@@ -124,16 +124,20 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         return Math.Max(0, cost);
     }
 
-    public virtual int StarCost => ResolveStarCost(out _);
+    public virtual int StarCost => ResolveStarCost();
 
     /// <summary>Card-local star cost before combat-wide hooks are applied.</summary>
     public int LocalStarCost => TemporaryStarCostOverrideThisTurn ??
         (TemporaryFreeThisTurn || TemporaryFreeUntilPlayed || TemporaryFreeThisCombat
             ? 0 : CanonicalStarCost);
 
-    private int ResolveStarCost(out bool hookModified)
+    private int ResolveStarCost()
     {
-        hookModified = false;
+        // Native GetStarCostWithModifiers returns current stars for X before consulting
+        // temporary star costs or combat-wide cost hooks.
+        if (IsXStarCost)
+            return Owner?.PlayerCombatState?.Stars ?? 0;
+
         int resolvedCost = LocalStarCost;
         if (CombatState is not ICombatState combatState)
         {
@@ -141,7 +145,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
 
         decimal modified = Hook.ModifyStarCostInCombat(
-            combatState, this, resolvedCost, out hookModified);
+            combatState, this, resolvedCost, out bool hookModified);
         return hookModified ? (int)Math.Max(0m, modified) : resolvedCost;
     }
 
@@ -728,8 +732,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     private (int energySpent, int starsSpent) SpendResources(
         int resolvedEnergyCost,
-        int resolvedStarCost,
-        bool starHookModified)
+        int resolvedStarCost)
     {
         AssertMutable();
         PlayerCombatState combatState = Owner.PlayerCombatState!;
@@ -740,11 +743,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             concreteState.IsLiveCombat())
             concreteState.SemanticHistory.RecordEnergySpent(concreteState, Owner, energyToSpend);
         combatState.LoseEnergy(energyToSpend);
-        bool hasTemporaryStarFree = TemporaryStarCostOverrideThisTurn.HasValue ||
-            TemporaryFreeThisTurn || TemporaryFreeUntilPlayed || TemporaryFreeThisCombat;
-        int starsToSpend = IsXStarCost && !hasTemporaryStarFree && !starHookModified
-            ? combatState.Stars
-            : Math.Max(0, Math.Min(resolvedStarCost, combatState.Stars));
+        int starsToSpend = Math.Max(0, Math.Min(resolvedStarCost, combatState.Stars));
         combatState.LoseStars(starsToSpend);
         return (energyToSpend, starsToSpend);
     }
@@ -763,12 +762,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             ? playerState.Energy
             : Math.Max(0, Math.Min(resolvedEnergyCost, playerState.Energy));
         // Native SpendResources resolves both amounts before either spending hook runs.
-        int resolvedStarCost = ResolveStarCost(out bool starHookModified);
-        bool hasTemporaryStarFree = TemporaryStarCostOverrideThisTurn.HasValue ||
-            TemporaryFreeThisTurn || TemporaryFreeUntilPlayed || TemporaryFreeThisCombat;
-        int starsToSpend = IsXStarCost && !hasTemporaryStarFree && !starHookModified
-            ? playerState.Stars
-            : Math.Max(0, Math.Min(resolvedStarCost, playerState.Stars));
+        int resolvedStarCost = ResolveStarCost();
+        int starsToSpend = Math.Max(0, Math.Min(resolvedStarCost, playerState.Stars));
         if (energyToSpend > 0 && combatState is CombatState concreteState && concreteState.IsLiveCombat())
             concreteState.SemanticHistory.RecordEnergySpent(concreteState, Owner, energyToSpend);
         playerState.LoseEnergy(energyToSpend);
@@ -905,22 +900,17 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
         PlayerCombatState playerCombatState = Owner.PlayerCombatState!;
         int resolvedEnergyCost = ResolveEnergyCost(out _);
-        int resolvedStarCost = ResolveStarCost(out bool starHookModified);
-        bool hasTemporaryStarCost = TemporaryStarCostOverrideThisTurn.HasValue ||
-            TemporaryFreeThisTurn || TemporaryFreeUntilPlayed || TemporaryFreeThisCombat;
+        int resolvedStarCost = ResolveStarCost();
         int energyValue = IsXEnergyCost
             ? playerCombatState.Energy
             : Math.Max(0, resolvedEnergyCost);
-        int starValue = IsXStarCost && !hasTemporaryStarCost && !starHookModified
-            ? playerCombatState.Stars
-            : Math.Max(0, resolvedStarCost);
+        int starValue = Math.Max(0, resolvedStarCost);
         CardPileCmd.Add(this, PileType.Play);
         (int energySpent, int starsSpent) = isAutoPlay && !spendResources
             ? (0, 0)
             : SpendResources(
                 resolvedEnergyCost,
-                resolvedStarCost,
-                starHookModified);
+                resolvedStarCost);
         if (energySpent > 0)
         {
             await Hook.AfterEnergySpent(combatState, this, energySpent);

@@ -23,6 +23,7 @@ public sealed class Kaleidoscope : RelicModel
     ///
     /// 当前五个可玩角色均已注册，每份奖励从四个他系池洗牌后取三个。
     /// #296 的 09a2 离线回放中 57 局 Niche 账本一致，但 53 局的卡牌候选内容仍不同（#303）；
+    /// #303 恢复原版 StableShuffle 的卡池预排序，并补齐单池生成的 NoCardPoolModifications；
     /// 抽取一致不能证明完整奖励等价。</summary>
     public override Task AfterObtained()
     {
@@ -37,9 +38,11 @@ public sealed class Kaleidoscope : RelicModel
 
     private CardReward CreateChoice()
     {
-        // 权威：Rng.Niche 打乱他系角色卡池，取前 3 个，每池抽 1 张。
+        // 原版 StableShuffle 先按 ModelId 排序。此处所有池的 category 都是 CARD_POOL；
+        // 模拟器 CardPoolModel 不继承 AbstractModel，故用相同的 entry slug 作 Ordinal 排序。
         List<CardPoolModel> pools = Owner.UnlockState.CharacterCardPools
             .Where(pool => pool.GetType() != Owner.Character.CardPool.GetType())
+            .OrderBy(pool => ModelDb.GetEntry(pool.GetType()), StringComparer.Ordinal)
             .ToList();
         Owner.RunState.Rng.Niche.Shuffle(pools);
 
@@ -52,7 +55,8 @@ public sealed class Kaleidoscope : RelicModel
                 new CardCreationOptions(
                     [pool],
                     CardCreationSource.Other,
-                    CardRarityOddsType.RegularEncounter)).FirstOrDefault();
+                    CardRarityOddsType.RegularEncounter)
+                    .WithFlags(CardCreationFlags.NoCardPoolModifications)).FirstOrDefault();
             if (card is not null)
             {
                 options.Add(card);

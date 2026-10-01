@@ -44,6 +44,7 @@ public class StrengthPotionTests : IDisposable
 
         var strength = player.Creature.Powers.OfType<StrengthPower>().Single();
         Assert.Equal(2, strength.Amount);
+        Assert.Same(player.Creature, strength.Applier);
         Assert.DoesNotContain(potion, player.PotionSlots);
     }
 }

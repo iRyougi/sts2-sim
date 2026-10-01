@@ -12,7 +12,7 @@ public sealed class WhisperingEarring : RelicModel
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override decimal ModifyMaxEnergy(Player player, decimal amount) => player == Owner ? amount + 1m : amount;
 
-    public override async Task AfterAutoPrePlayPhaseEntered(Player player)
+    public override async Task AfterAutoPrePlayPhaseEnteredLate(Player player)
     {
         if (player != Owner || player.PlayerCombatState is not { } playerCombatState ||
             playerCombatState.TurnNumber > 1 || Owner.Creature.CombatState is not { } combatState) return;

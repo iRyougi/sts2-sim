@@ -20,6 +20,6 @@ public sealed class StrengthPotion : PotionModel
     protected override async Task OnUse(Creature? target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        await PowerCmd.Apply<StrengthPower>(target.CombatState!, target, StrengthGranted, applier: null, cardSource: null);
+        await PowerCmd.Apply<StrengthPower>(target.CombatState!, target, StrengthGranted, applier: Owner.Creature, cardSource: null);
     }
 }
