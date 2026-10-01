@@ -1,6 +1,21 @@
+<div align="center">
+
 # sts2-sim
 
 **中文** | [English](README.en.md)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/iRyougi/sts2-sim/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/iRyougi/sts2-sim/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/iRyougi/sts2-sim?label=release&color=blue)](https://github.com/iRyougi/sts2-sim/releases/latest)
+[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/9.0)
+[![STS2 v0.111.0](https://img.shields.io/badge/%E6%B8%B8%E6%88%8F%E5%9F%BA%E7%BA%BF-STS2%20v0.111.0-8B0000)](#)
+[![License: MIT](https://img.shields.io/github/license/iRyougi/sts2-sim?color=green)](LICENSE)
+[![保真差异](https://img.shields.io/github/issues/iRyougi/sts2-sim/%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82?label=%E6%9C%AA%E4%BF%AE%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82&color=orange)](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+is%3Aopen+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82)
+[![Stars](https://img.shields.io/github/stars/iRyougi/sts2-sim?style=flat&logo=github)](https://github.com/iRyougi/sts2-sim/stargazers)
+[![QQ 1106541324](https://img.shields.io/badge/QQ%E7%BE%A4-1106541324-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/f7BKSECnzU)
+
+**开发交流 QQ 群：[1106541324](https://qm.qq.com/q/f7BKSECnzU)**（Torch塔2mod交流群；使用、移植、保真差异都可以来聊）
+
+</div>
 
 《杀戮尖塔2》（Slay the Spire 2）的非官方 headless 模拟器，用 C#（.NET 9）编写。
 
@@ -97,7 +112,7 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 - 其他 bug：提交 **Bug 报告**。
 - 欢迎提 PR。本仓库由私有上游仓库导出，被接受的改动会先合入上游，在下一次导出时出现在这里，并保留你的作者署名。详见 [CONTRIBUTING.md](CONTRIBUTING.md)；AI 编程助手请遵守 [AGENTS.md](AGENTS.md)。
 
-议题和 PR 用中文或英文都可以。
+议题和 PR 用中文或英文都可以。日常讨论可以加开发交流 QQ 群：**[1106541324](https://qm.qq.com/q/f7BKSECnzU)**。
 
 ## 贡献者
 

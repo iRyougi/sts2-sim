@@ -1,6 +1,21 @@
+<div align="center">
+
 # sts2-sim
 
 [中文](README.md) | **English**
+
+[![CI](https://img.shields.io/github/actions/workflow/status/iRyougi/sts2-sim/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/iRyougi/sts2-sim/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/iRyougi/sts2-sim?label=release&color=blue)](https://github.com/iRyougi/sts2-sim/releases/latest)
+[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/9.0)
+[![STS2 v0.111.0](https://img.shields.io/badge/game-STS2%20v0.111.0-8B0000)](#)
+[![License: MIT](https://img.shields.io/github/license/iRyougi/sts2-sim?color=green)](LICENSE)
+[![保真差异](https://img.shields.io/github/issues/iRyougi/sts2-sim/%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82?label=open%20fidelity%20issues&color=orange)](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+is%3Aopen+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82)
+[![Stars](https://img.shields.io/github/stars/iRyougi/sts2-sim?style=flat&logo=github)](https://github.com/iRyougi/sts2-sim/stargazers)
+[![QQ 1106541324](https://img.shields.io/badge/QQ%20group-1106541324-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/f7BKSECnzU)
+
+**Developer chat (QQ group): [1106541324](https://qm.qq.com/q/f7BKSECnzU)** — questions about usage, porting and fidelity are all welcome.
+
+</div>
 
 An unofficial, headless simulator for **Slay the Spire 2**, written in C# (.NET 9).
 
@@ -97,7 +112,7 @@ Release tags follow the game version they target. `v0.111.0` is the first releas
 - Other bugs: open a **Bug 报告** (bug report).
 - Pull requests are welcome. This repository is exported from a private upstream, so accepted changes are applied there and appear here in the next export, with you credited as co-author. See [CONTRIBUTING.md](CONTRIBUTING.md) (in Chinese); AI coding assistants should follow [AGENTS.md](AGENTS.md).
 
-Issues and pull requests may be written in English or Chinese.
+Issues and pull requests may be written in English or Chinese. For day-to-day discussion, join the developer QQ group **[1106541324](https://qm.qq.com/q/f7BKSECnzU)** (mostly Chinese-speaking).
 
 ## Contributors
 

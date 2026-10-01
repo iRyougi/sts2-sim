@@ -188,7 +188,8 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
             null,
             null);
 
-        Assert.Equal(new[] { "damage" }, probe.DamageEvents);
+        // 原版 Damage 在钩子前跳过死亡目标，不再派发伤害钩子。
+        Assert.Empty(probe.DamageEvents);
         Assert.Equal(1, probe.DeathCount);
     }
 

@@ -134,6 +134,9 @@ public static class CreatureCmd
         // One hit applies damage to every target before any result hook or death changes listeners.
         foreach (Creature target in targetList)
         {
+            if (target.IsDead)
+                continue;
+
             pending.AddRange(await DamageSingle(combatState, target, amount, props, dealer, cardSource, cardPlay));
         }
 
@@ -429,6 +432,9 @@ public static class CreatureCmd
                 DamageResult teammateDeath = teammate.LoseHpInternal(
                     teammate.CurrentHp,
                     ValueProp.Unblockable | ValueProp.Unpowered);
+                if (teammateDeath.UnblockedDamage > 0)
+                    await Hook.AfterCurrentHpChanged(runState, teammate.CombatState,
+                        teammate, -teammateDeath.UnblockedDamage);
                 await ResolvePotentialDeath(runState, combatState, teammate, teammateDeath);
             }
         }

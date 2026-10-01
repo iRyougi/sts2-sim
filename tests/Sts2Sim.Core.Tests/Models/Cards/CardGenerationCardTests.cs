@@ -110,18 +110,30 @@ public sealed class CardGenerationCardTests : IDisposable
         Assert.False(upgraded.HasKeyword(CardKeyword.Exhaust));
     }
 
-    [Fact]
-    public async Task Splash_GeneratesAttackCard_FromCharacterPool()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Splash_GeneratesAttackCard_FromCharacterPool(bool upgraded)
     {
         (Player player, _) = await CreateCombatAsync("splash");
-        var selection = new LegacySelectionDecisionSource();
+        var selection = new SplashSelectionSource(upgraded);
         ((Sts2Sim.Core.Combat.CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
         Splash card = AddToHand<Splash>(player);
+        if (upgraded) card.Upgrade();
         int attackCardsInHandBefore = player.PlayerCombatState!.Hand.Cards.Count(c => c.Type == CardType.Attack);
 
         await card.PlayAsync(target: null);
 
         Assert.Equal(attackCardsInHandBefore + 1, player.PlayerCombatState!.Hand.Cards.Count(c => c.Type == CardType.Attack));
+        CrashLanding selected = Assert.IsType<CrashLanding>(selection.Selected);
+        Assert.Same(selected, player.PlayerCombatState.Hand.Cards.Single(c => c is CrashLanding));
+        Assert.Equal(0, selected.EnergyCost);
+        Assert.Equal(0, selected.StarCost);
+        Assert.Equal(0, selected.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        Assert.Equal(0, selected.TemporaryStarCostOverrideThisTurn);
+        CollisionCourse unselected = Assert.IsType<CollisionCourse>(selection.Unselected);
+        Assert.Null(unselected.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        Assert.Null(unselected.TemporaryStarCostOverrideThisTurn);
     }
 
     [Fact]
@@ -163,6 +175,26 @@ public sealed class CardGenerationCardTests : IDisposable
         Assert.Equal(shouldClone ? 2 : 1,
             player.PlayerCombatState!.Hand.Cards.Count(c => c.GetType() == candidateType));
         Assert.Contains(candidate, player.PlayerCombatState!.Hand.Cards);
+    }
+
+    private sealed class SplashSelectionSource(bool upgraded) : Sts2Sim.Core.Combat.ICardSelectionDecisionSource
+    {
+        public CrashLanding? Selected { get; private set; }
+        public CollisionCourse? Unselected { get; private set; }
+
+        public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(Sts2Sim.Core.Combat.CardSelectionRequest request)
+        {
+            Selected = Assert.Single(request.Candidates.OfType<CrashLanding>());
+            Unselected = Assert.Single(request.Candidates.OfType<CollisionCourse>());
+            Assert.Equal(1, Selected.EnergyCost);
+            Assert.All(request.Candidates, candidate =>
+            {
+                Assert.Equal(upgraded, candidate.IsUpgraded);
+                Assert.Null(candidate.TemporaryCostOverrideThisTurnOrUntilPlayed);
+                Assert.Null(candidate.TemporaryStarCostOverrideThisTurn);
+            });
+            return Task.FromResult<IReadOnlyList<CardModel>>([Selected]);
+        }
     }
 
     private static TCard AddToHand<TCard>(Player player)

@@ -13,7 +13,7 @@ namespace Sts2Sim.Core.Models.Cards;
 /// "本项目只实现了储君一个角色"。静默猎手落地后该前提消失，现按权威源码走
 /// <c>UnlockState.CharacterCardPools</c>——池数 &gt; 1 时移除本角色卡池，只从他系角色池抽。
 ///
-/// 偏离 #97：省略"本次出牌免费"。</summary>
+/// 选择结束后，将选中牌设为本回合或首次打出前免费，再生成到手牌。</summary>
 public sealed class Splash : CardModel
 {
     public override CardType Type => CardType.Skill;
@@ -58,6 +58,7 @@ public sealed class Splash : CardModel
         CardModel? selected = (await CardSelectCmd.SelectCardsAsync(combatState, Owner, generated, 0, 1, this, cancelable: true)).FirstOrDefault();
         if (selected is not null)
         {
+            selected.SetToFreeThisTurn();
             await CardPileCmd.Generate(combatState, selected, PileType.Hand);
         }
     }
