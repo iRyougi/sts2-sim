@@ -3,49 +3,55 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Powers;
+using Sts2Sim.Core.Models.Afflictions;
 
 namespace Sts2Sim.Core.Models.Powers;
 
-/// <summary>Marks the owner's combat cards and permits only the first marked card play each turn.</summary>
+/// <summary>
+/// Afflicts the owner's unafflicted combat cards with <see cref="Ringing"/> and permits only the first card play
+/// each turn while a Ringing card is involved. As in the native power, cards that already carry another
+/// affliction are left alone, and removal clears only Ringing.
+/// </summary>
 public sealed class RingingPower : PowerModel
 {
-    private HashSet<CardModel> _ringingCards = new(ReferenceEqualityComparer.Instance);
-
     public override PowerType Type => PowerType.Debuff;
 
     public override PowerStackType StackType => PowerStackType.Single;
 
-    public bool IsRinging(CardModel card) => _ringingCards.Contains(card);
-
-    public override Task AfterApplied(Creature? applier, CardModel? cardSource)
+    public override async Task AfterApplied(Creature? applier, CardModel? cardSource)
     {
-        foreach (CardModel card in Owner.Player!.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards))
+        foreach (CardModel card in Owner.Player!.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards).ToArray())
         {
-            _ringingCards.Add(card);
+            if (card.Affliction is null)
+            {
+                await CardCmd.Afflict<Ringing>(card, 1m);
+            }
         }
-
-        return Task.CompletedTask;
     }
 
-    public override Task AfterCardEnteredCombat(CardModel card)
+    public override async Task AfterCardEnteredCombat(CardModel card)
     {
-        if (card.Owner.Creature == Owner)
+        if (card.Owner == Owner.Player && card.Affliction is null)
         {
-            _ringingCards.Add(card);
+            await CardCmd.Afflict<Ringing>(card, 1m);
         }
-
-        return Task.CompletedTask;
     }
 
+    /// <summary>Entry rollback (simulator-only): a card whose combat entry failed must not keep the Ringing
+    /// this listener attached during that entry.</summary>
     public override Task AfterCardEntryAborted(CardModel card)
     {
-        _ringingCards.Remove(card);
+        if (card.Affliction is Ringing)
+        {
+            CardCmd.ClearAffliction(card);
+        }
+
         return Task.CompletedTask;
     }
 
     public override bool ShouldPlay(CardModel card, bool isAutoPlay)
     {
-        if (card.Owner.Creature != Owner || !_ringingCards.Contains(card))
+        if (card.Owner.Creature != Owner || card.Affliction is not Ringing)
         {
             return true;
         }
@@ -63,36 +69,16 @@ public sealed class RingingPower : PowerModel
 
     public override Task AfterRemoved(Creature oldOwner)
     {
-        _ringingCards.Clear();
-        return Task.CompletedTask;
-    }
-
-    protected override void DeepCloneFields()
-    {
-        base.DeepCloneFields();
-        _ringingCards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
-    }
-
-    internal override void RestoreCombatCloneReferencesFrom(
-        PowerModel source,
-        IReadOnlyDictionary<CardModel, CardModel> cardMap,
-        IReadOnlyDictionary<Creature, Creature> creatureMap)
-    {
-        base.RestoreCombatCloneReferencesFrom(source, cardMap, creatureMap);
-        var sourcePower = (RingingPower)source;
-        foreach (CardModel card in sourcePower._ringingCards)
+        IEnumerable<CardModel> cards = oldOwner.Player?.PlayerCombatState?.AllPiles.SelectMany(pile => pile.Cards)
+            ?? Array.Empty<CardModel>();
+        foreach (CardModel card in cards)
         {
-            if (cardMap.TryGetValue(card, out CardModel? clone))
+            if (card.Affliction is Ringing)
             {
-                _ringingCards.Add(clone);
+                CardCmd.ClearAffliction(card);
             }
         }
-    }
 
-    internal override void AppendCombatStateDescription(
-        ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
-        global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
-    {
-        context.AppendCardReferences(ref builder, _ringingCards);
+        return Task.CompletedTask;
     }
 }

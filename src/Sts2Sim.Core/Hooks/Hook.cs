@@ -973,6 +973,16 @@ public static class Hook
         }
     }
 
+    /// <summary>原版 <c>Hook.ModifyKeywordsInCombat</c>：由 <see cref="CardModel.GetKeywordsWithSources"/> 在需要
+    /// Global 关键字时调用，结果不写回卡牌。</summary>
+    public static void ModifyKeywordsInCombat(ICombatState combatState, CardModel card, ISet<CardKeyword> keywords)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            model.TryModifyKeywordsInCombat(card, keywords);
+        }
+    }
+
     public static decimal ModifyEnergyCostInCombat(
         ICombatState combatState,
         CardModel card,

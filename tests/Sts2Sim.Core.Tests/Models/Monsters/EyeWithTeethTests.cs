@@ -10,6 +10,7 @@ using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves.Intents;
 using Sts2Sim.Core.ValueProps;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class EyeWithTeethTests : IDisposable
@@ -77,7 +78,7 @@ public sealed class EyeWithTeethTests : IDisposable
                     Assert.Same(room.Engine.State, card.CombatState);
                     Assert.Contains(CardKeyword.Ethereal, card.Keywords);
                     Assert.Contains(CardKeyword.Unplayable, card.Keywords);
-                    Assert.True(ringing[playerIndex].IsRinging(card));
+                    Assert.True(card.Affliction is Ringing);
                 });
             }
         }

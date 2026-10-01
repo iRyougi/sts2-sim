@@ -23,6 +23,7 @@ using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.ValueProps;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class CombatStateCloneTests
@@ -44,7 +45,7 @@ public sealed class CombatStateCloneTests
             typeof(TrainingDummy),
             typeof(Sown),
             typeof(Glam),
-            typeof(RingingPower),
+            typeof(RingingPower), typeof(Ringing),
             typeof(FirePotion),
             typeof(CloneRuntimeMonster),
             typeof(CloneTransientMonster),
@@ -1074,14 +1075,13 @@ public sealed class CombatStateCloneTests
                     Assert.Same(creatureMap[expectedPower.Applier], actualPower.Applier);
                 }
 
-                if (expectedPower is RingingPower expectedRinging &&
-                    actualPower is RingingPower actualRinging)
+                if (expectedPower is RingingPower && actualPower is RingingPower)
                 {
                     foreach ((CardModel expectedCard, CardModel actualCard) in cardMap)
                     {
                         Assert.Equal(
-                            expectedRinging.IsRinging(expectedCard),
-                            actualRinging.IsRinging(actualCard));
+                            expectedCard.Affliction is Ringing,
+                            actualCard.Affliction is Ringing);
                     }
                 }
             }

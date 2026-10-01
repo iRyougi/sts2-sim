@@ -16,6 +16,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class TangledPowerTests : IDisposable
@@ -45,7 +46,7 @@ public sealed class TangledPowerTests : IDisposable
         ModelDb.Init(new[]
         {
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
-            typeof(DivineRight), typeof(WanderingGrunt), typeof(SovereignBlade), typeof(TangledPower),
+            typeof(DivineRight), typeof(WanderingGrunt), typeof(SovereignBlade), typeof(TangledPower), typeof(Entangled),
             typeof(CardEntryProbePower),
         });
     }

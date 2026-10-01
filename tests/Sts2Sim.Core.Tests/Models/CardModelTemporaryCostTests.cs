@@ -12,6 +12,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Models.Afflictions;
 
 namespace Sts2Sim.Core.Tests.Models;
 
@@ -26,7 +27,7 @@ public sealed class CardModelTemporaryCostTests : IDisposable
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(DivineRight), typeof(WanderingGrunt), typeof(TemporaryCostReplayCard),
             typeof(ThrowingHandDepartureCard), typeof(TemporaryFixedStarCostCard), typeof(Stardust),
-            typeof(TangledPower),
+            typeof(TangledPower), typeof(Entangled),
         });
     }
 

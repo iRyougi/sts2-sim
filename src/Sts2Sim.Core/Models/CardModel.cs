@@ -410,23 +410,54 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     private AfflictionModel? _affliction;
 
-    /// <summary>卡牌自身的关键字，不含苦难（如 Hexed 附加的虚无）。对应原版
-    /// <c>GetKeywordsWithSources(KeywordSources.Local)</c>；增删关键字都以它为基准，避免把苦难效果固化进卡牌。</summary>
+    [ThreadStatic]
+    private static HashSet<CardKeyword>? _globalKeywordScratch;
+
+    /// <summary>卡牌自身的关键字，不含战斗中其他模型给的全局关键字（如 HexPower 给 Hexed 卡的虚无）。对应原版
+    /// <c>GetKeywordsWithSources(KeywordSources.Local)</c>；增删关键字都以它为基准，避免把全局关键字固化进卡牌。</summary>
     internal IReadOnlyCollection<CardKeyword> LocalKeywords =>
         (IReadOnlyCollection<CardKeyword>?)_keywordOverride ?? CanonicalKeywords;
 
-    public IReadOnlyCollection<CardKeyword> Keywords
-    {
-        get
-        {
-            IReadOnlyCollection<CardKeyword> keywords = LocalKeywords;
-            if (_affliction is null)
-            {
-                return keywords;
-            }
+    /// <summary>本地加全局关键字（原版 <c>KeywordSources.All</c>）。</summary>
+    public IReadOnlyCollection<CardKeyword> Keywords => GetKeywordsWithSources(KeywordSources.All);
 
-            var modifiedKeywords = new HashSet<CardKeyword>(keywords);
-            return _affliction.TryModifyKeywords(modifiedKeywords) ? modifiedKeywords : keywords;
+    /// <summary>
+    /// 原版 <c>CardModel.GetKeywordsWithSources</c>：规范实例或不在战斗中时只有本地关键字；否则把本地关键字交给
+    /// <see cref="Hook.ModifyKeywordsInCombat"/> 按需计算全局关键字，结果不写回卡牌。
+    /// </summary>
+    /// <remarks>
+    /// 已构造类型仅包含原版 HexPower 覆写时，无 Hexed 的卡不可能获得全局关键字，直接返回本地集合。
+    /// 其它情况仍逐次派发；为了不在每次读取时新建集合，这里借用线程内的临时集合；
+    /// 全局关键字没有改变结果时直接返回本地集合，有改变时才复制。监听者在修改过程中如果重入读取关键字，
+    /// 会拿到新的临时集合，不会互相覆盖。
+    /// </remarks>
+    public IReadOnlyCollection<CardKeyword> GetKeywordsWithSources(KeywordSources sources)
+    {
+        IReadOnlyCollection<CardKeyword> local = sources.HasFlag(KeywordSources.Local)
+            ? LocalKeywords
+            : Array.Empty<CardKeyword>();
+        if (!sources.HasFlag(KeywordSources.Global) || IsCanonical || CombatState is not ICombatState combatState)
+        {
+            return local;
+        }
+
+        if (Affliction is not Hexed && GlobalKeywordsRequireHexed)
+        {
+            return local;
+        }
+
+        HashSet<CardKeyword> scratch = _globalKeywordScratch ?? new HashSet<CardKeyword>();
+        _globalKeywordScratch = null;
+        try
+        {
+            scratch.UnionWith(local);
+            Hook.ModifyKeywordsInCombat(combatState, this, scratch);
+            return scratch.SetEquals(local) ? local : new HashSet<CardKeyword>(scratch);
+        }
+        finally
+        {
+            scratch.Clear();
+            _globalKeywordScratch = scratch;
         }
     }
 

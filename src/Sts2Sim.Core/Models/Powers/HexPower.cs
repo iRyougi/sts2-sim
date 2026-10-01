@@ -6,12 +6,18 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Powers;
 using Sts2Sim.Core.Models.Afflictions;
 
-/// <summary>Afflicts the owner's current and future combat cards with <see cref="Hexed"/>.</summary>
+/// <summary>Afflicts the owner's current and future combat cards with <see cref="Hexed"/> and makes them Ethereal
+/// while it lasts.</summary>
 public sealed class HexPower : PowerModel
 {
     public override PowerType Type => PowerType.Debuff;
 
     public override PowerStackType StackType => PowerStackType.Single;
+
+    /// <summary>A global keyword (<see cref="KeywordSources.Global"/>), as in the native power: it disappears with
+    /// the power and is never stored in the card's local keywords.</summary>
+    public override bool TryModifyKeywordsInCombat(CardModel card, ISet<CardKeyword> keywords) =>
+        card.Owner == Owner.Player && card.Affliction is Hexed && keywords.Add(CardKeyword.Ethereal);
 
     public override async Task AfterApplied(Creature? applier, CardModel? cardSource)
     {

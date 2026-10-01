@@ -10,6 +10,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Models.Afflictions;
 
 internal sealed class Task15MonsterTestFixture : IDisposable
 {
@@ -21,7 +22,7 @@ internal sealed class Task15MonsterTestFixture : IDisposable
             monsterType,
             typeof(Slimed),
             typeof(AscendersBane),
-            typeof(RingingPower),
+            typeof(RingingPower), typeof(Ringing),
             typeof(Regent),
             typeof(StrikeRegent),
             typeof(DefendRegent),

@@ -10,6 +10,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves;
 using Sts2Sim.Core.MonsterMoves.Intents;
 using Sts2Sim.Core.ValueProps;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class CeremonialBeastTests : IDisposable
@@ -189,7 +190,7 @@ public sealed class CeremonialBeastTests : IDisposable
                 player.Creature.GetPower<RingingPower>());
             Assert.Equal(1, ringing.Amount);
             Assert.All(player.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards),
-                card => Assert.True(ringing.IsRinging(card)));
+                card => Assert.True(card.Affliction is Ringing));
         }
         Assert.Equal("STOMP_MOVE", beast.NextMove!.StateId);
 

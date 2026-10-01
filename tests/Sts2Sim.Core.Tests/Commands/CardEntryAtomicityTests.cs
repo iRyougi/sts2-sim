@@ -14,6 +14,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class CardEntryAtomicityTests : IDisposable
@@ -68,7 +69,7 @@ public sealed class CardEntryAtomicityTests : IDisposable
         {
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(DivineRight), typeof(WanderingGrunt), typeof(SovereignBlade),
-            typeof(WeakPower), typeof(VulnerablePower), typeof(TangledPower), typeof(ThrowingEntryPower),
+            typeof(WeakPower), typeof(VulnerablePower), typeof(TangledPower), typeof(Entangled), typeof(ThrowingEntryPower),
             typeof(AbortTrackingPower),
         });
     }

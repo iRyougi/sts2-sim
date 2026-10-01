@@ -19,6 +19,13 @@ namespace Sts2Sim.Core.Models;
 /// </summary>
 public abstract class AbstractModel : IComparable<AbstractModel>
 {
+    // v0.111.0's only global keyword override is sealed HexPower, which requires Hexed.
+    // Observe concrete types at construction (including unregistered models). Once another
+    // override exists, never re-enable this shortcut: old instances may outlive ModelDb reset.
+    // This is type capability metadata, not a cache of combat state or hook results.
+    private static int _hasOtherGlobalKeywordModifier;
+    internal static bool GlobalKeywordsRequireHexed => Volatile.Read(ref _hasOtherGlobalKeywordModifier) == 0;
+
     public virtual bool ShouldFlush(Player player) => true;
     public virtual bool ShouldProcurePotion(PotionModel potion, Player player) => true;
 
@@ -56,6 +63,12 @@ public abstract class AbstractModel : IComparable<AbstractModel>
             throw new DuplicateModelException(type);
         }
         Id = ModelDb.GetId(type);
+        if (GlobalKeywordsRequireHexed && type != typeof(Powers.HexPower) &&
+            type.GetMethod(nameof(TryModifyKeywordsInCombat), [typeof(CardModel), typeof(ISet<CardKeyword>)])!
+                .DeclaringType != typeof(AbstractModel))
+        {
+            Volatile.Write(ref _hasOtherGlobalKeywordModifier, 1);
+        }
     }
 
     public virtual int CompareTo(AbstractModel? other)
@@ -392,6 +405,10 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         modifiedCost = originalCost;
         return false;
     }
+
+    /// <summary>Adds or removes a card's global keywords (<see cref="KeywordSources.Global"/>); they are computed on
+    /// demand and never stored on the card.</summary>
+    public virtual bool TryModifyKeywordsInCombat(CardModel card, ISet<CardKeyword> keywords) => false;
 
     public virtual bool TryModifyEnergyCostInCombatLate(
         CardModel card,

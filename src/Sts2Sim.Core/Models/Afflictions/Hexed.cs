@@ -4,12 +4,10 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Models.Powers;
 
-/// <summary>Hex's combat-only card attachment, which makes its card Ethereal while Hex remains active.</summary>
+/// <summary>Hex's combat-only card attachment. The Ethereal it implies is a global keyword granted by
+/// <see cref="HexPower.TryModifyKeywordsInCombat"/>, never a keyword of the card itself.</summary>
 public sealed class Hexed : AfflictionModel
 {
-    public override bool TryModifyKeywords(ISet<CardKeyword> keywords) =>
-        keywords.Add(CardKeyword.Ethereal);
-
     public override Task AfterCardEnteredCombat(CardModel card)
     {
         if (ReferenceEquals(card, Card) && !card.Owner.Creature.HasPower<HexPower>())

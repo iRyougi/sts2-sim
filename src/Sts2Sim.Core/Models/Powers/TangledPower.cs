@@ -5,44 +5,56 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Powers;
+using Sts2Sim.Core.Models.Afflictions;
 
-/// <summary>Raises the combat energy cost of the owner's attack cards until its side turn ends.</summary>
+/// <summary>
+/// Afflicts the owner's attack cards with <see cref="Entangled"/> and raises their combat energy cost until its
+/// side turn ends. <see cref="CardCmd.Afflict{T}"/> refuses cards that already carry another affliction, so those
+/// attacks keep their cost, as in the native power.
+/// </summary>
 public sealed class TangledPower : PowerModel
 {
-    private HashSet<CardModel> _affectedCards = new(ReferenceEqualityComparer.Instance);
-
     public override PowerType Type => PowerType.Debuff;
 
     public override PowerStackType StackType => PowerStackType.Counter;
 
-    public override Task AfterApplied(Creature? applier, CardModel? cardSource)
+    public override async Task AfterApplied(Creature? applier, CardModel? cardSource)
     {
-        foreach (CardModel card in Owner.Player!.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards))
+        foreach (CardModel card in Owner.Player!.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards)
+                     .Where(card => card.Type == CardType.Attack).ToArray())
         {
-            MarkIfOwnedAttack(card);
+            await CardCmd.Afflict<Entangled>(card, 1m);
+        }
+    }
+
+    public override async Task AfterCardEnteredCombat(CardModel card)
+    {
+        if (card.Owner == Owner.Player && card.Affliction is null && card.Type == CardType.Attack)
+        {
+            await CardCmd.Afflict<Entangled>(card, 1m);
+        }
+    }
+
+    /// <summary>Entry rollback (simulator-only): a card whose combat entry failed must not keep the Entangled
+    /// this listener attached during that entry.</summary>
+    public override Task AfterCardEntryAborted(CardModel card)
+    {
+        if (card.Affliction is Entangled)
+        {
+            CardCmd.ClearAffliction(card);
         }
 
         return Task.CompletedTask;
     }
 
-    public override Task AfterCardEnteredCombat(CardModel card)
-    {
-        MarkIfOwnedAttack(card);
-        return Task.CompletedTask;
-    }
-
-    public override Task AfterCardEntryAborted(CardModel card)
-    {
-        _affectedCards.Remove(card);
-        return Task.CompletedTask;
-    }
-
+    /// <remarks>X-cost cards never reach here natively: <c>CardEnergyCost.GetWithModifiers</c> returns before the
+    /// combat hooks. The <see cref="CardModel.CostsXEnergy"/> guard keeps that for direct hook callers.</remarks>
     public override bool TryModifyEnergyCostInCombat(
         CardModel card,
         decimal originalCost,
         out decimal modifiedCost)
     {
-        if (card.Owner != Owner.Player || card.CostsXEnergy || !_affectedCards.Contains(card))
+        if (card.Owner != Owner.Player || card.CostsXEnergy || card.Affliction is not Entangled)
         {
             modifiedCost = originalCost;
             return false;
@@ -64,44 +76,16 @@ public sealed class TangledPower : PowerModel
 
     public override Task AfterRemoved(Creature oldOwner)
     {
-        _affectedCards.Clear();
-        return Task.CompletedTask;
-    }
-
-    protected override void DeepCloneFields()
-    {
-        base.DeepCloneFields();
-        _affectedCards = new HashSet<CardModel>(ReferenceEqualityComparer.Instance);
-    }
-
-    internal override void RestoreCombatCloneReferencesFrom(
-        PowerModel source,
-        IReadOnlyDictionary<CardModel, CardModel> cardMap,
-        IReadOnlyDictionary<Creature, Creature> creatureMap)
-    {
-        base.RestoreCombatCloneReferencesFrom(source, cardMap, creatureMap);
-        var sourcePower = (TangledPower)source;
-        foreach (CardModel card in sourcePower._affectedCards)
+        IEnumerable<CardModel> cards = oldOwner.Player?.PlayerCombatState?.AllPiles.SelectMany(pile => pile.Cards)
+            ?? Array.Empty<CardModel>();
+        foreach (CardModel card in cards)
         {
-            if (cardMap.TryGetValue(card, out CardModel? clone))
+            if (card.Affliction is Entangled)
             {
-                _affectedCards.Add(clone);
+                CardCmd.ClearAffliction(card);
             }
         }
-    }
 
-    private void MarkIfOwnedAttack(CardModel card)
-    {
-        if (card.Owner == Owner.Player && card.Type == CardType.Attack)
-        {
-            _affectedCards.Add(card);
-        }
-    }
-
-    internal override void AppendCombatStateDescription(
-        ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
-        global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
-    {
-        context.AppendCardReferences(ref builder, _affectedCards);
+        return Task.CompletedTask;
     }
 }

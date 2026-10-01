@@ -21,9 +21,6 @@ public abstract class AfflictionModel : AbstractModel
         CanAfflictCardType(card.Type) &&
         (card.Affliction is null || (IsStackable && card.Affliction.GetType() == GetType()));
 
-    /// <summary>Allows combat-only afflictions to add effective card keywords without mutating the card's base keywords.</summary>
-    public virtual bool TryModifyKeywords(ISet<CardKeyword> keywords) => false;
-
     internal void Attach(CardModel card, decimal amount)
     {
         AssertMutable();

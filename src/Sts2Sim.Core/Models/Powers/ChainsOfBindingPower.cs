@@ -7,17 +7,25 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Powers;
 using Sts2Sim.Core.Models.Afflictions;
 
+/// <summary>
+/// Binds the first <see cref="PowerModel.Amount"/> cards the owner draws each turn with a <see cref="Bound"/> of
+/// that same amount, and allows only one Bound card play per turn.
+/// </summary>
+/// <remarks>
+/// The native power counts this turn's <c>CardAfflictedEntry</c> rows for Bound; this is its only Bound source, so
+/// a per-turn counter reset at the owner's side turn end gives the same count.
+/// </remarks>
 public sealed class ChainsOfBindingPower : PowerModel
 {
     private int _cardsAfflictedThisTurn;
     private bool _boundCardPlayedThisTurn;
 
     public override PowerType Type => PowerType.Debuff;
-    public override PowerStackType StackType => PowerStackType.Single;
+    public override PowerStackType StackType => PowerStackType.Counter;
 
     public override async Task AfterCardDrawn(CardModel card, bool fromHandDraw)
     {
-        if (Owner.CombatState?.CurrentSide != CombatSide.Player ||
+        if (Owner.CombatState?.CurrentSide != Owner.Side ||
             !ReferenceEquals(card.Owner, Owner.Player) ||
             _cardsAfflictedThisTurn >= Amount ||
             card.Affliction is not null)
@@ -25,7 +33,7 @@ public sealed class ChainsOfBindingPower : PowerModel
             return;
         }
 
-        if (await CardCmd.Afflict<Bound>(card, 1m) is not null)
+        if (await CardCmd.Afflict<Bound>(card, Amount) is not null)
         {
             _cardsAfflictedThisTurn++;
         }
@@ -33,7 +41,9 @@ public sealed class ChainsOfBindingPower : PowerModel
 
     public override Task BeforeCardPlayed(CardPlay cardPlay)
     {
-        if (ReferenceEquals(cardPlay.Player, Owner.Player) && cardPlay.Card.Affliction is Bound)
+        if (!cardPlay.Card.IsDupe &&
+            ReferenceEquals(cardPlay.Card.Owner.Creature, Owner) &&
+            cardPlay.Card.Affliction is Bound)
         {
             _boundCardPlayedThisTurn = true;
         }
@@ -48,7 +58,7 @@ public sealed class ChainsOfBindingPower : PowerModel
 
     public override Task BeforeSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)
     {
-        if (side != CombatSide.Player || !participants.Contains(Owner))
+        if (!participants.Contains(Owner))
         {
             return Task.CompletedTask;
         }

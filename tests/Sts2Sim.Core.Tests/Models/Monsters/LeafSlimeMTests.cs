@@ -6,6 +6,7 @@ using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves.Intents;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class LeafSlimeMTests : IDisposable
@@ -63,7 +64,7 @@ public sealed class LeafSlimeMTests : IDisposable
                 Assert.Same(player, card.Owner);
                 Assert.Same(player.PlayerCombatState.DiscardPile, card.Pile);
                 Assert.Same(room.Engine.State, card.CombatState);
-                Assert.True(ringing[index].IsRinging(card));
+                Assert.True(card.Affliction is Ringing);
             });
         }
 

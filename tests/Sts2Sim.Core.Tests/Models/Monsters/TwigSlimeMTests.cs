@@ -7,6 +7,7 @@ using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves;
 using Sts2Sim.Core.MonsterMoves.Intents;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class TwigSlimeMTests : IDisposable
@@ -61,7 +62,7 @@ public sealed class TwigSlimeMTests : IDisposable
             Assert.Same(player, generated.Owner);
             Assert.Same(player.PlayerCombatState.DiscardPile, generated.Pile);
             Assert.Same(room.Engine.State, generated.CombatState);
-            Assert.True(ringing[index].IsRinging(generated));
+            Assert.True(generated.Affliction is Ringing);
         }
 
         SingleAttackIntent pounceIntent = Assert.IsType<SingleAttackIntent>(Assert.Single(monster.NextMove.Intents));

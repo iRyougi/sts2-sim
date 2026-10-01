@@ -11,6 +11,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Models.Afflictions;
 
 namespace Sts2Sim.Core.Tests.Models.Powers;
 
@@ -23,7 +24,7 @@ public sealed class RingingPowerTests : IDisposable
         ModelDb.Init(new[]
         {
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
-            typeof(DivineRight), typeof(WanderingGrunt), typeof(RingingPower), typeof(BeatDown), typeof(ThrowingRingingCard),
+            typeof(DivineRight), typeof(WanderingGrunt), typeof(RingingPower), typeof(Ringing), typeof(BeatDown), typeof(ThrowingRingingCard),
         });
     }
 
@@ -37,15 +38,15 @@ public sealed class RingingPowerTests : IDisposable
         RingingPower ringing = Assert.IsType<RingingPower>(
             await PowerCmd.Apply<RingingPower>(room.Engine.State, player.Creature, 1m, null, null));
 
-        Assert.All(existingCards, card => Assert.True(ringing.IsRinging(card)));
+        Assert.All(existingCards, card => Assert.True(card.Affliction is Ringing));
 
         DefendRegent first = CreateOwnedDefend(player);
         DefendRegent second = CreateOwnedDefend(player);
         await CardPileCmd.Generate(room.Engine.State, first, PileType.Hand);
         await CardPileCmd.Generate(room.Engine.State, second, PileType.Hand);
 
-        Assert.True(ringing.IsRinging(first));
-        Assert.True(ringing.IsRinging(second));
+        Assert.True(first.Affliction is Ringing);
+        Assert.True(second.Affliction is Ringing);
         player.PlayerCombatState.Energy = 3;
         Assert.True(first.CanPlay(out UnplayableReason firstReason));
         Assert.Equal(UnplayableReason.None, firstReason);
@@ -65,7 +66,7 @@ public sealed class RingingPowerTests : IDisposable
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Null(player.Creature.GetPower<RingingPower>());
-        Assert.All(existingCards.Append(first).Append(second), card => Assert.False(ringing.IsRinging(card)));
+        Assert.All(existingCards.Append(first).Append(second), card => Assert.False(card.Affliction is Ringing));
         Assert.True(second.CanPlay(out UnplayableReason afterRemovalReason));
         Assert.Equal(UnplayableReason.None, afterRemovalReason);
     }

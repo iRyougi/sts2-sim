@@ -8,6 +8,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves;
 using Sts2Sim.Core.MonsterMoves.Intents;
 using Sts2Sim.Core.Rooms;
+using Sts2Sim.Core.Models.Afflictions;
 
 [Collection("ModelDb")]
 public sealed class LeafSlimeSTests : IDisposable
@@ -60,7 +61,7 @@ public sealed class LeafSlimeSTests : IDisposable
             Assert.Same(player, generated.Owner);
             Assert.Same(player.PlayerCombatState.DiscardPile, generated.Pile);
             Assert.Same(room.Engine.State, generated.CombatState);
-            Assert.True(ringing[index].IsRinging(generated));
+            Assert.True(generated.Affliction is Ringing);
         }
 
         SingleAttackIntent tackleIntent = Assert.IsType<SingleAttackIntent>(Assert.Single(monster.NextMove.Intents));
