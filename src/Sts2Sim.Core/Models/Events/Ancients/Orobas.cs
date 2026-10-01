@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Relics;
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Cards;
 
@@ -9,7 +10,7 @@ namespace Sts2Sim.Core.Models.Events
 
     /// <summary>
     /// Orobas Ancient reward selection.
-    /// SeaGlass character binding and Touch payload limitations are recorded per relic in #212-#213;
+    /// Touch payload limitations are recorded in #213;
     /// event-pool eligibility and locked third-option semantics remain faithful.
     /// </summary>
     public sealed class Orobas : AncientEventModel
@@ -25,7 +26,7 @@ namespace Sts2Sim.Core.Models.Events
                 .Concat(new[] { typeof(TouchOfOrobas), typeof(ArchaicTooth) })
                 .Select(CloneRelic)
                 .Concat(ModelDb.All<CharacterModel>().Where(character => character.IsPlayable)
-                    .Select(_ => CloneRelic(typeof(SeaGlass))))
+                    .Select(character => (RelicModel)ForCharacter(character)))
                 .Append(CloneRelic(typeof(PrismaticGem)))
                 .ToArray();
 
@@ -34,7 +35,7 @@ namespace Sts2Sim.Core.Models.Events
             List<CharacterModel> otherCharacters = ModelDb.All<CharacterModel>()
                 .Where(character => character.IsPlayable && character.GetType() != Owner.Character.GetType())
                 .ToList();
-            _ = Rng.NextItem(otherCharacters) ?? Owner.Character;
+            CharacterModel seaGlassCharacter = Rng.NextItem(otherCharacters) ?? Owner.Character;
 
             Type thirdPool1Candidate = Rng.NextFloat() < (1f / 3f)
                 ? typeof(PrismaticGem)
@@ -44,7 +45,7 @@ namespace Sts2Sim.Core.Models.Events
 
             return new[]
             {
-                Option(Rng.NextItem(firstCandidates)!),
+                Option(Rng.NextItem(firstCandidates)!, seaGlassCharacter),
                 Option(Rng.NextItem(Pool2)!),
                 pool3.Length == 0
                     ? new EventOption("OPTION_POOL_3_LOCKED", null)
@@ -66,7 +67,23 @@ namespace Sts2Sim.Core.Models.Events
             return result.ToArray();
         }
 
-        private EventOption Option(Type relicType) => RelicOption(relicType, relicType.Name);
+        private EventOption Option(Type relicType, CharacterModel? seaGlassCharacter = null)
+        {
+            if (relicType != typeof(SeaGlass)) return RelicOption(relicType, relicType.Name);
+            SeaGlass relic = ForCharacter(seaGlassCharacter ?? Owner.Character);
+            return new EventOption(nameof(SeaGlass), async () =>
+            {
+                await RelicCmd.Obtain(relic, Owner);
+                Finish();
+            });
+        }
+
+        private static SeaGlass ForCharacter(CharacterModel character)
+        {
+            var relic = (SeaGlass)ModelDb.Relic<SeaGlass>().MutableClone();
+            relic.CharacterId = character.Id;
+            return relic;
+        }
 
         private static RelicModel CloneRelic(Type type) => (RelicModel)ModelDb.Get(type).MutableClone();
     }

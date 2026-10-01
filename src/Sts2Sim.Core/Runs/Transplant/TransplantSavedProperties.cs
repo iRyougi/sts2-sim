@@ -15,6 +15,7 @@ internal static class TransplantSavedProperties
     private static readonly IReadOnlyDictionary<string, Binding> Bindings =
         new Dictionary<string, Binding>(StringComparer.Ordinal)
         {
+            ["SeaGlass.CharacterId"] = new("_characterId", "model_ids"),
             ["BoneTea.CombatsLeft"] = new("_combatsLeft", "ints"),
             ["BookOfFiveRings.CardsAdded"] = new("_cardsAdded", "ints"),
             ["DustyTome.AncientCard"] = new("_ancientCard", "model_ids"),

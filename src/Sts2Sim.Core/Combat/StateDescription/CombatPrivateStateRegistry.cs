@@ -108,6 +108,8 @@ internal static class CombatPrivateStateRegistry
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["SeaGlass._characterId"] =
+                "The character choice is used only during the already-completed pickup effect and for presentation.",
             ["CeremonialBeast.<IsStunnedByPlowRemoval>k__BackingField"] =
                 "Presentation flag; the transient STUN_MOVE and its performed state encode the future transition.",
             ["CeremonialBeast.<IsInSecondPhase>k__BackingField"] =

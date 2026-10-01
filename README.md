@@ -48,7 +48,7 @@
 
 以下内容在单人对局中能遇到，但模拟器里还没有实现或只实现了一部分：
 
-- **部分先古之民遗物没有效果**：ToyBox、GoldenCompass、NutritiousSoup、Driftwood、TouchOfOrobas、SeaGlass。先古之民会照原版概率把它们作为选项给出，但选了之后没有效果或效果不完整。
+- **部分先古之民遗物没有效果**：ToyBox、GoldenCompass、NutritiousSoup、Driftwood、TouchOfOrobas。先古之民会照原版概率把它们作为选项给出，但选了之后没有效果或效果不完整。
 - **起始遗物升级版未移植**：BlackBlood、RingOfTheDrake、InfusedCore、DivineDestiny、PhylacteryUnbound（由 TouchOfOrobas 给出）。
 - **附魔** TezcatarasEmber 未移植。
 - **Affliction** Ringing、Entangled 没有独立的模型，由对应能力代为追踪，状态可能与游戏不一致。

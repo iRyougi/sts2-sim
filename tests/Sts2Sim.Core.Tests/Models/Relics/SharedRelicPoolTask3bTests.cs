@@ -13,6 +13,7 @@ using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Enchantments;
+using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Models.Relics;
@@ -33,6 +34,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
     public RewardsSet? Offer { get; set; }
     public int RewardChoices { get; set; }
     public CardSelectionRequest? Selection { get; set; }
+    public int SeaGlassPickCount { get; set; } = 2;
     public List<RestSiteDecision> RestChoices { get; } = [];
     public bool FillSlotsEarly { get; set; }
     public int EarlyCalls { get; set; }
@@ -49,6 +51,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
     [InlineData(typeof(PunchDagger))]
     [InlineData(typeof(RoyalStamp))]
     [InlineData(typeof(WingCharm))]
+    [InlineData(typeof(SeaGlass))]
     public async Task SharedRelic_ImplementsAnObservableContract(Type relicType)
     {
         ModelDb.ResetForTests();
@@ -185,6 +188,47 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             Assert.Same(originals[2], reward.Options[2]);
             await reward.SelectOption(changed);
             Assert.IsType<Swift>(Assert.Single(player.Deck.Cards.Last().Enchantments));
+        }
+        else if (relicType == typeof(SeaGlass))
+        {
+            Orobas? offered = null;
+            for (int seed = 0; seed < 64 && offered is null; seed++)
+            {
+                run = NewRun("task3b-sea-glass-" + seed);
+                player = run.Players[0];
+                var ancient = (Orobas)ModelDb.Event<Orobas>().MutableClone();
+                ancient.AssignOwner(player);
+                ancient.BeginEvent(run);
+                if (ancient.CurrentOptions[0].Key == nameof(SeaGlass)) offered = ancient;
+            }
+            Assert.NotNull(offered);
+            Assert.Equal(ModelDb.AllCharacters.Select(character => character.Id),
+                offered.AllPossibleOptions.OfType<SeaGlass>().Select(relic => relic.CharacterId));
+            run.ConfigureCardSelectionSource(this);
+            int deckBefore = player.Deck.Cards.Count;
+            await offered.ChooseOption(offered.CurrentOptions[0]);
+            CardSelectionRequest request = Assert.IsType<CardSelectionRequest>(Selection);
+            Assert.IsType<SeaGlass>(request.Source);
+            SeaGlass obtained = Assert.Single(player.Relics.OfType<SeaGlass>());
+            Assert.NotNull(obtained.CharacterId);
+            Assert.NotEqual(player.Character.Id, obtained.CharacterId);
+            CharacterModel selectedCharacter = ModelDb.GetById<CharacterModel>(obtained.CharacterId);
+            Assert.All(request.Candidates, card => Assert.Contains(selectedCharacter.CardPool.AllCards,
+                candidate => candidate.Id == card.Id));
+            Assert.Equal((0, 15, 15), (request.MinCount, request.MaxCount, request.Candidates.Count));
+            Assert.Equal([CardRarity.Common, CardRarity.Uncommon, CardRarity.Rare],
+                request.Candidates.Chunk(5).Select(group => Assert.Single(group.Select(card => card.Rarity).Distinct())));
+            Assert.Equal(deckBefore + 2, player.Deck.Cards.Count);
+            Assert.Equal(request.Candidates.Take(2), player.Deck.Cards.TakeLast(2));
+
+            run = NewRun("task3b-sea-glass-fallback");
+            player = run.Players[0];
+            run.ConfigureCardSelectionSource(this);
+            SeaGlassPickCount = 0;
+            deckBefore = player.Deck.Cards.Count;
+            await RelicCmd.Obtain(ModelDb.Relic<SeaGlass>(), player);
+            Assert.Equal(ModelDb.Character<Ironclad>().Id, Assert.Single(player.Relics.OfType<SeaGlass>()).CharacterId);
+            Assert.Equal(deckBefore, player.Deck.Cards.Count);
         }
     }
 
@@ -323,7 +367,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
     public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request)
     {
         Selection = request;
-        return Task.FromResult<IReadOnlyList<CardModel>>(request.Candidates.Take(request.MaxCount).ToArray());
+        return Task.FromResult<IReadOnlyList<CardModel>>(request.Candidates.Take(request.Source is SeaGlass ? SeaGlassPickCount : request.MaxCount).ToArray());
     }
     public Task<RestSiteDecision> ChooseRestSiteActionAsync(Player player, IReadOnlyList<RestSiteDecision> candidates)
     {

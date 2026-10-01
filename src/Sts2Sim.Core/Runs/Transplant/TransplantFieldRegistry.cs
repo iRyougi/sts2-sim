@@ -15,6 +15,7 @@ public static class TransplantFieldRegistry
 {
     private static readonly HashSet<string> NativeSavedFields =
     [
+        "SeaGlass._characterId",
         "BoneTea._combatsLeft", "BookOfFiveRings._cardsAdded", "DustyTome._ancientCard",
         "EmberTea._combatsLeft", "FakeHappyFlower._turnsSeen", "FakeVenerableTeaSet._isArmed",
         "FurCoat._actIndex", "FurCoat._markedCoordinates", "GalacticDust._starsSpent",
