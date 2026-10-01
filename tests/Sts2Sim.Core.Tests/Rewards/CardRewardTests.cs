@@ -1,4 +1,5 @@
 using Sts2Sim.Core.Content;
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Players;
@@ -55,6 +56,30 @@ public class CardRewardTests : IDisposable
         Assert.InRange(reward.Options.Count, 0, 3);
         Assert.All(reward.Options, card => Assert.NotEqual(CardRarity.Basic, card.Rarity));
         Assert.Equal(reward.Options.Count, reward.Options.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Driftwood_RerollsOneCardRewardOnceAndKeepsTheReplacementSelectable()
+    {
+        var run = new RunState("driftwood-reroll", new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        await RelicCmd.Obtain(ModelDb.Relic<Driftwood>(), player);
+        var reward = new CardReward(player, CardRarityOddsType.RegularEncounter);
+        reward.Populate(run);
+        CardModel[] original = reward.Options.ToArray();
+
+        CardRewardAlternative reroll = Assert.Single(reward.Alternatives);
+        Assert.Equal("REROLL", reroll.OptionId);
+        await reward.SelectAlternative(reroll);
+
+        Assert.False(reward.IsResolved);
+        Assert.Equal(original.Length, reward.Options.Count);
+        Assert.False(original.SequenceEqual(reward.Options));
+        Assert.Empty(reward.Alternatives);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reward.SelectAlternative(reroll));
+        await reward.SelectOption(reward.Options[0]);
+        Assert.True(reward.IsResolved);
     }
 
     [Fact]

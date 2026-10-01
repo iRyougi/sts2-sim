@@ -11,7 +11,16 @@ using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Enchantments;
 using Sts2Sim.Core.Models.Relics;
+using Sts2Sim.Core.Map;
+using Sts2Sim.Core.Hooks;
+using Sts2Sim.Core.Rooms;
+using Sts2Sim.Core.Rewards;
+using Sts2Sim.Core.Events;
+using Sts2Sim.Core.Models.Events;
+using Sts2Sim.Core.Models.Monsters;
+using Sts2Sim.Core.ValueProps;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Runs.Transplant;
 
 namespace Sts2Sim.Core.Tests.Models.Relics;
 
@@ -155,6 +164,128 @@ public sealed class AncientRelicBatch1Tests : IDisposable
         GoldenPearl relic = Assert.Single(player.Relics.OfType<GoldenPearl>());
         Assert.Equal(RelicRarity.Ancient, relic.Rarity);
         Assert.True(relic.HasUponPickupEffect);
+    }
+
+    [Fact]
+    public async Task NutritiousSoup_EnchantsEligibleBasicStrikesWithPermanentZeroCostEternalAndThreeDamage()
+    {
+        (_, Player player) = CreateRun("nutritious-soup-ember");
+        CardModel[] strikes = player.Deck.Cards
+            .Where(card => card.Rarity == CardRarity.Basic && card.Tags.Contains(CardTag.Strike))
+            .ToArray();
+        CardModel[] otherCards = player.Deck.Cards.Except(strikes).ToArray();
+        Assert.NotEmpty(strikes);
+
+        await RelicCmd.Obtain(ModelDb.Relic<NutritiousSoup>(), player);
+
+        Assert.All(strikes, card =>
+        {
+            TezcatarasEmber ember = Assert.IsType<TezcatarasEmber>(Assert.Single(card.Enchantments));
+            Assert.Equal(0, card.LocalEnergyCost);
+            Assert.True(card.HasKeyword(CardKeyword.Eternal));
+            Assert.Equal(3m, ember.EnchantDamageAdditive(0m, Sts2Sim.Core.ValueProps.ValueProp.Move));
+            Assert.Equal(0m, ember.EnchantDamageAdditive(0m, Sts2Sim.Core.ValueProps.ValueProp.Unpowered));
+        });
+        Assert.All(otherCards, card => Assert.Empty(card.Enchantments));
+    }
+
+    [Fact]
+    public async Task GoldenCompass_ReplacesOnlyCurrentActWithConnectedGoldenPathAndEventUnknowns()
+    {
+        var run = new RunState("golden-compass-path", [new Overgrowth(), new Hive()]);
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        ActMap original = run.Map;
+
+        await RelicCmd.Obtain(ModelDb.Relic<GoldenCompass>(), player);
+
+        GoldenCompass compass = Assert.Single(player.Relics.OfType<GoldenCompass>());
+        Assert.Equal(0, compass.GoldenPathAct);
+        Assert.NotSame(original, run.Map);
+        MapPointType[] expected =
+        [
+            MapPointType.Monster, MapPointType.Unknown, MapPointType.Monster,
+            MapPointType.RestSite, MapPointType.Monster, MapPointType.RestSite,
+            MapPointType.Unknown, MapPointType.Treasure, MapPointType.Unknown,
+            MapPointType.Treasure, MapPointType.Unknown, MapPointType.Shop,
+            MapPointType.Elite, MapPointType.RestSite, MapPointType.Elite,
+            MapPointType.RestSite,
+        ];
+        Assert.Equal(expected, Enumerable.Range(1, expected.Length)
+            .Select(row => Assert.Single(run.Map.GetPointsInRow(row)).PointType));
+        Assert.Equal(MapPointType.Ancient, run.Map.StartingMapPoint.PointType);
+        Assert.Equal(MapPointType.Boss, run.Map.BossMapPoint.PointType);
+        MapPoint previous = run.Map.StartingMapPoint;
+        foreach (int row in Enumerable.Range(1, expected.Length))
+        {
+            MapPoint next = Assert.Single(run.Map.GetPointsInRow(row));
+            Assert.Contains(next, previous.Children);
+            previous = next;
+        }
+        Assert.Contains(run.Map.BossMapPoint, previous.Children);
+        Assert.Equal([RoomType.Event], Hook.ModifyUnknownMapPointRoomTypes(run,
+            new HashSet<RoomType> { RoomType.Monster, RoomType.Event }));
+
+        _ = run.CurrentAncientEventType;
+        MapPoint target = Assert.Single(run.Map.GetPointsInRow(1));
+        RunTransplantSnapshot snapshot = RunTransplantExporter.Export(run, target);
+        RunState imported = RunTransplantImporter.Import(snapshot);
+        Assert.IsType<GoldenPathActMap>(imported.Map);
+        Assert.Equal(expected, Enumerable.Range(1, expected.Length)
+            .Select(row => Assert.Single(imported.Map.GetPointsInRow(row)).PointType));
+
+        run.AdvanceToNextAct();
+        Assert.IsType<StandardActMap>(run.Map);
+        Assert.Equal(2, Hook.ModifyUnknownMapPointRoomTypes(run,
+            new HashSet<RoomType> { RoomType.Monster, RoomType.Event }).Count);
+    }
+
+    [Fact]
+    public async Task ToyBox_OffersFiveWaxRelicsAndMeltsTheFirstUnmeltedEveryThirdCombat()
+    {
+        (RunState run, Player player) = CreateRun("toy-box-five-wax");
+        var room = new EventRoom(() => (EventModel)ModelDb.Event<JungleMazeAdventure>().MutableClone());
+        run.PushRoom(room);
+        await room.Enter(run);
+
+        await RelicCmd.Obtain(ModelDb.Relic<ToyBox>(), player);
+
+        ToyBox box = Assert.Single(player.Relics.OfType<ToyBox>());
+        Assert.True(box.HasUponPickupEffect);
+        Assert.True(room.Event.TryDequeuePendingRewardOffer(out RewardsSet? offer));
+        RelicReward[] rewards = Assert.IsType<RewardsSet>(offer).ExtraRewards
+            .Select(Assert.IsType<RelicReward>).ToArray();
+        Assert.Equal(5, rewards.Length);
+        Assert.Equal(5, rewards.Select(reward => reward.Relic!.Id).Distinct().Count());
+        foreach (RelicReward reward in rewards)
+            await reward.Take();
+        RelicModel[] wax = player.Relics.Where(relic => relic.IsWax).ToArray();
+        Assert.Equal(5, wax.Length);
+        Assert.All(wax, relic => Assert.False(relic.IsMelted));
+
+        Assert.Same(room, run.PopCurrentRoom());
+        var combatRoom = new CombatRoom(() =>
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        run.PushRoom(combatRoom);
+        await combatRoom.Enter(run);
+        await CreatureCmd.Damage(combatRoom.Engine.State,
+            combatRoom.Engine.State.Enemies.ToArray(), 9999m, ValueProp.Unpowered,
+            player.Creature, null, null);
+        Assert.True(combatRoom.Engine.CheckWinCondition());
+        await combatRoom.ResolveOutcomeAsync(generateRewards: false);
+        Assert.Equal(1, box.CombatsSeen);
+        await combatRoom.Exit(run);
+        Assert.Same(combatRoom, run.PopCurrentRoom());
+
+        for (int combat = 2; combat <= 15; combat++)
+        {
+            await box.AfterCombatEnd();
+            Assert.Equal(combat, box.CombatsSeen);
+            Assert.Equal(combat / 3, wax.Count(relic => relic.IsMelted));
+            Assert.All(wax.Take(combat / 3), relic => Assert.True(relic.IsMelted));
+            Assert.Equal(combat == 15, box.IsUsedUp);
+        }
+        Assert.All(wax, relic => Assert.Contains(relic, player.Relics));
     }
 
     [Fact]

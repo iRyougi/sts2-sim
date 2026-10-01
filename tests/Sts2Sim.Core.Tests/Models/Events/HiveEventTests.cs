@@ -140,6 +140,7 @@ public sealed class HiveEventTests : IDisposable
     public async Task ColorfulPhilosophers_OffersOtherUnlockedColor_AndThreeRarityRewards()
     {
         (RunState run, Player player) = CreateRun("colorful");
+        await RelicCmd.Obtain(ModelDb.Relic<Driftwood>(), player);
         var ev = Begin<ColorfulPhilosophers>(run, player);
         Assert.True(ev.IsAllowed(run));
         Assert.Equal(NativeFullUnlockColorOrder.OrderBy(id => id, StringComparer.Ordinal),
@@ -165,6 +166,19 @@ public sealed class HiveEventTests : IDisposable
             offered.Select(set => Assert.Single(set.Card.Options.Select(card => card.Rarity).Distinct())));
         Assert.All(offered, set => Assert.Equal(3, set.Card.Options.Count));
         Assert.Equal(18, player.PlayerRng.Rewards.Counter - rewardsBefore);
+        var silentCards = ModelDb.Character<Silent>().CardPool.AllCards.Select(card => card.Id).ToHashSet();
+        foreach (RewardsSet rewardSet in offered)
+        {
+            CardReward cardReward = rewardSet.Card;
+            CardRarity rarity = cardReward.Options[0].Rarity;
+            Assert.True(cardReward.CanReroll);
+            await cardReward.Reroll();
+            Assert.All(cardReward.Options, card =>
+            {
+                Assert.Equal(rarity, card.Rarity);
+                Assert.Contains(card.Id, silentCards);
+            });
+        }
         Assert.True(ev.IsFinished);
     }
 

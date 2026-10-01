@@ -379,6 +379,9 @@ public sealed partial class RunState : IRunState
         Hooks.Hook.AfterMapGenerated(this, Map, CurrentActIndex).GetAwaiter().GetResult();
     }
 
+    /// <summary>Regenerate the current act map when an obtained relic replaces its topology.</summary>
+    internal void RegenerateCurrentMap() => GenerateCurrentMap();
+
     /// <summary>按真实游戏 <c>RoomSet.NextNormalEncounter</c>/<c>NextEliteEncounter</c>/<c>NextBossEncounter</c>
     /// 的取用语义：从开局一次性抽好的序列里按访问次数取，取用即推进指针。</summary>
     public EncounterDefinition PullNextEncounter(RoomType roomType)
@@ -529,7 +532,8 @@ public sealed partial class RunState : IRunState
             // enumerate a stable listener snapshot for this dispatch.
             foreach (RelicModel relic in player.Relics.ToArray())
             {
-                yield return relic;
+                if (!relic.IsMelted)
+                    yield return relic;
             }
 
             foreach (PotionModel potion in player.PotionSlots.OfType<PotionModel>())

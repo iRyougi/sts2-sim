@@ -28,7 +28,28 @@ public abstract class RelicModel : AbstractModel, ICombatStateDescriptionContrib
 
     public virtual bool AddsPet => false;
 
-    public virtual bool IsMelted => false;
+    private bool _isWax;
+    private bool _isMelted;
+
+    public bool IsWax
+    {
+        get => _isWax;
+        set
+        {
+            AssertMutable();
+            _isWax = value;
+        }
+    }
+
+    public bool IsMelted
+    {
+        get => _isMelted;
+        internal set
+        {
+            AssertMutable();
+            _isMelted = value;
+        }
+    }
 
     public bool IsTradable => !IsUsedUp && !HasUponPickupEffect && !IsMelted && !AddsPet &&
         Rarity is not (RelicRarity.Starter or RelicRarity.Event or RelicRarity.Ancient);

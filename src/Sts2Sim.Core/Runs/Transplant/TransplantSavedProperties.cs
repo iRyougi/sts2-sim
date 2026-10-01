@@ -46,6 +46,8 @@ internal static class TransplantSavedProperties
             ["Dowsing.RoomsEntered"] = new("_unknownRoomsEntered", "ints"),
             ["Guilty.CombatsSeen"] = new("_combatsCompleted", "ints"),
             ["FishingRod.CombatsSeen"] = new("<CombatsSeen>k__BackingField", "ints"),
+            ["GoldenCompass.GoldenPathAct"] = new("<GoldenPathAct>k__BackingField", "ints"),
+            ["ToyBox.CombatsSeen"] = new("<CombatsSeen>k__BackingField", "ints"),
             ["LavaRock.HasTriggered"] = new("<HasTriggered>k__BackingField", "bools"),
             ["LavaLamp.TookDamageThisCombat"] = new("_tookDamageThisCombat", "bools"),
             ["PumpkinCandle.KindleCount"] = new("<KindleCount>k__BackingField", "ints"),
@@ -61,6 +63,17 @@ internal static class TransplantSavedProperties
     {
         TransplantFieldRegistry.AssertImportableModel(model, path);
         var groups = new Dictionary<string, List<object>>(StringComparer.Ordinal);
+        if (model is RelicModel relic)
+        {
+            if (relic.IsWax)
+                groups["bools"] = [new { name = "IsWax", value = true }];
+            if (relic.IsMelted)
+            {
+                if (!groups.TryGetValue("bools", out List<object>? flags))
+                    groups.Add("bools", flags = []);
+                flags.Add(new { name = "IsMelted", value = true });
+            }
+        }
         if (model is FurCoat furCoat)
         {
             MapCoord[] coords = furCoat.MarkedCoordinates.ToArray();
@@ -234,6 +247,16 @@ internal static class TransplantSavedProperties
                         !options.Contains(value.GetString(), StringComparer.Ordinal))
                         throw new TransplantMappingException($"{path}.{name}",
                             "Invalid native presentation skin.");
+                    continue;
+                }
+                if (model is RelicModel relic && name is ("IsWax" or "IsMelted"))
+                {
+                    if (group.Name != "bools" || value.ValueKind is not
+                        (JsonValueKind.True or JsonValueKind.False))
+                        throw new TransplantMappingException($"{path}.{name}",
+                            "Invalid native relic wax property.");
+                    if (name == "IsWax") relic.IsWax = value.GetBoolean();
+                    else relic.IsMelted = value.GetBoolean();
                     continue;
                 }
                 if (!Bindings.TryGetValue(bindingKey, out Binding? binding) || binding.Group != group.Name)

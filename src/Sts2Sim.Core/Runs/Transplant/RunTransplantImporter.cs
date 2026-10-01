@@ -6,6 +6,7 @@ using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Exceptions;
+using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Saves;
@@ -64,12 +65,18 @@ public static class RunTransplantImporter
             run.RestoreForTransplant(snapshot, roomType);
             player.RestoreForTransplant(snapshot.Player);
             run.RestoreSharedRelicBagForTransplant(snapshot.SharedRelicBag);
+            if (player.Relics.OfType<GoldenCompass>()
+                    .Any(compass => compass.GoldenPathAct == run.CurrentActIndex))
+                run.RegenerateCurrentMap();
         }
         else
         {
             // Ordinary runs generate the target-act map with the live deck's map hooks.
             player.RestoreForTransplant(snapshot.Player);
             run.RestoreSharedRelicBagForTransplant(snapshot.SharedRelicBag);
+            if (snapshot.ActIndex == 0 && player.Relics.OfType<GoldenCompass>()
+                    .Any(compass => compass.GoldenPathAct == 0))
+                run.RegenerateCurrentMap();
             var spoils = player.Deck.Cards.Select((card, index) => (card, index))
                 .Where(item => item.card is SpoilsMap)
                 .Select(item => (item.index, ((SpoilsMap)item.card).SpoilsCoord)).ToArray();

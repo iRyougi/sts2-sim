@@ -17,6 +17,7 @@ internal static class CombatPrivateStateRegistry
         "Fetch._finishedRound", "Fetch._finishedSide", "Fetch._finishedTurnNumbers",
         "OblivionPower._amountsForPlayedCards",
         "FishingRod.<CombatsSeen>k__BackingField", "LavaRock.<HasTriggered>k__BackingField",
+        "GoldenCompass.<GoldenPathAct>k__BackingField", "ToyBox.<CombatsSeen>k__BackingField",
         "FurCoat._actIndex", "FurCoat._markedCoordinates",
         "BrilliantScarf._cardsPlayed", "IronClub._cardsPlayed", "MusicBox._wasUsedThisTurn", "MusicBox._cardBeingPlayed", "ThrowingAxe._used",
         "PaelsEye._usedThisCombat", "PaelsEye._wasOwnerPartOfLastPlayerTurn", "PaelsEye._eligibleForExtraTurn",

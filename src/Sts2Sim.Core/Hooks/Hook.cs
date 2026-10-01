@@ -334,6 +334,14 @@ public static class Hook
         foreach (AbstractModel model in runState.IterateHookListeners(null))
             model.TryModifyCardRewardAlternatives(player, reward, alternatives);
     }
+
+    public static bool CanRerollCardReward(IRunState runState, Player player, CardReward reward)
+    {
+        bool canReroll = false;
+        foreach (AbstractModel model in runState.IterateHookListeners(null))
+            canReroll |= model.TryEnableCardRewardReroll(player, reward);
+        return canReroll;
+    }
     public static async Task AfterPotionUsed(IRunState runState, PotionModel potion, Player player)
     {
         foreach (AbstractModel model in runState.IterateHookListeners(null))

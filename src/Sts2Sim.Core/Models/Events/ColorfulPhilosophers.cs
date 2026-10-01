@@ -39,7 +39,11 @@ public sealed class ColorfulPhilosophers : EventModel
         foreach (CardRarity rarity in new[] { CardRarity.Common, CardRarity.Uncommon, CardRarity.Rare })
         {
             IReadOnlyList<CardModel> options = CardFactory.CreateForReward(Owner, 3, pool, rarity);
-            var cardReward = new CardReward(Owner, options);
+            var rerollOptions = new CardCreationOptions([pool], CardCreationSource.Other,
+                CardRarityOddsType.Uniform, card => card.Rarity == rarity)
+                .WithFlags(CardCreationFlags.NoRarityModification |
+                    CardCreationFlags.NoCardPoolModifications);
+            var cardReward = new CardReward(Owner, options, rerollOptions);
             cardReward.Populate(RunState);
             OfferRewards(RewardsSet.CreateCustom(Owner, card: cardReward));
         }

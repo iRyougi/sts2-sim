@@ -458,6 +458,10 @@ public static class CombatStateDescription
             case PowerModel power:
                 power.AppendIntrinsicCombatStateDescription(ref builder, context);
                 break;
+            case RelicModel relic:
+                builder.Append(relic.IsWax);
+                builder.Append(relic.IsMelted);
+                break;
         }
         if (model is ICombatStateDescriptionContributor contributor)
         {

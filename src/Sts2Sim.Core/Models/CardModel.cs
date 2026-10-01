@@ -650,6 +650,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         _energyCostUpgradeDelta += amount;
     }
 
+    /// <summary>Permanent energy-cost upgrade used by card enchantments such as TezcatarasEmber.</summary>
+    internal void ReduceEnergyCostFromEnchantment(int amount) => ReduceEnergyCost(amount);
+
     protected void AddKeyword(CardKeyword keyword)
     {
         AssertMutable();

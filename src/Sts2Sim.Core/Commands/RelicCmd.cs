@@ -73,4 +73,15 @@ public static class RelicCmd
         RemoveObtainedRelicFromBags(owner, replacement);
         await replacement.AfterObtained();
     }
+
+    /// <summary>Keep a wax relic in inventory while disabling its effects.</summary>
+    public static async Task Melt(RelicModel relic)
+    {
+        ArgumentNullException.ThrowIfNull(relic);
+        if (!relic.IsWax || relic.IsMelted || relic.Owner is null ||
+            !relic.Owner.Relics.Contains(relic))
+            throw new InvalidOperationException("Only an owned, unmelted wax relic can melt.");
+        relic.IsMelted = true;
+        await relic.AfterRemoved();
+    }
 }

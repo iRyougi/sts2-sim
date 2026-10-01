@@ -63,7 +63,8 @@ public sealed class Kaleidoscope : RelicModel
             }
         }
 
-        var reward = new CardReward(Owner, options);
+        var reward = new CardReward(Owner, options,
+            CardCreationOptions.ForNonCombatWithDefaultOdds(Array.Empty<CardPoolModel>()));
         reward.Populate(Owner.RunState);
         return reward;
     }

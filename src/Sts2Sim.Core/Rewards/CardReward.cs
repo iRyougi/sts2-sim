@@ -15,8 +15,10 @@ public sealed class CardReward : Reward
     private readonly CardRarityOddsType _oddsType;
     private readonly IReadOnlyList<CardModel>? _explicitOptions;
     private readonly CardCreationOptions? _creationOptions;
+    private readonly CardCreationOptions? _rerollOptions;
     private readonly int _optionCount = OptionCount;
     private bool _isPopulated;
+    private bool _hasBeenRerolled;
     private Task? _resolutionTask;
     private object? _resolutionIdentity;
     private IReadOnlyList<CardRewardAlternative>? _alternatives;
@@ -24,6 +26,7 @@ public sealed class CardReward : Reward
 
     public IReadOnlyList<CardModel> Options { get; private set; } = Array.Empty<CardModel>();
     public CardModel? SelectedOption { get; private set; }
+    public bool CanReroll { get; private set; }
 
     public IReadOnlyList<CardRewardAlternative> Alternatives
     {
@@ -55,7 +58,8 @@ public sealed class CardReward : Reward
         _optionCount = optionCount;
     }
 
-    public CardReward(Player player, IReadOnlyList<CardModel> options) : base(player)
+    public CardReward(Player player, IReadOnlyList<CardModel> options,
+        CardCreationOptions? rerollOptions = null) : base(player)
     {
         ArgumentNullException.ThrowIfNull(options);
         CardModel[] copy = options.ToArray();
@@ -66,6 +70,8 @@ public sealed class CardReward : Reward
 
         _oddsType = CardRarityOddsType.None;
         _explicitOptions = Array.AsReadOnly(copy);
+        _optionCount = copy.Length;
+        _rerollOptions = rerollOptions?.WithFlags(CardCreationFlags.IsCardReward);
     }
 
     private CardReward(Player player) : base(player)
@@ -89,7 +95,13 @@ public sealed class CardReward : Reward
             return;
         }
 
-        if (_creationOptions is not null)
+        if (_hasBeenRerolled && _explicitOptions is not null)
+        {
+            Options = CardFactory.CreateForReward(Player, _optionCount,
+                _rerollOptions ?? throw new InvalidOperationException(
+                    "Explicit card reward has no reroll options."));
+        }
+        else if (_creationOptions is not null)
         {
             Options = CardFactory.CreateForReward(Player, _optionCount, _creationOptions);
         }
@@ -117,6 +129,9 @@ public sealed class CardReward : Reward
         }
 
         _isPopulated = true;
+        CanReroll = !_hasBeenRerolled &&
+            (_explicitOptions is null || _rerollOptions is not null) &&
+            Hooks.Hook.CanRerollCardReward(runState, Player, this);
     }
 
     public Task SelectOption(CardModel chosen) => Resolve(chosen, () =>
@@ -137,11 +152,33 @@ public sealed class CardReward : Reward
     public Task SelectAlternative(CardRewardAlternative alternative)
     {
         ArgumentNullException.ThrowIfNull(alternative);
+        if (!alternative.CompletesReward)
+        {
+            if (IsResolved || !Alternatives.Any(offered => ReferenceEquals(offered, alternative)) ||
+                !alternative.IsAvailable)
+                throw new InvalidOperationException("Alternative is not available on this card reward.");
+            return alternative.Select();
+        }
         return Resolve(alternative, () =>
         {
             if (!Alternatives.Any(offered => ReferenceEquals(offered, alternative)) || !alternative.IsAvailable)
                 throw new InvalidOperationException("Alternative is not available on this card reward.");
         }, alternative.Select);
+    }
+
+    public Task Reroll()
+    {
+        lock (_resolutionLock)
+        {
+            if (IsResolved || _resolutionTask is not null || !CanReroll)
+                throw new InvalidOperationException("This card reward cannot be rerolled.");
+            CanReroll = false;
+            _hasBeenRerolled = true;
+        }
+        _isPopulated = false;
+        _alternatives = null;
+        Populate(Player.RunState);
+        return Task.CompletedTask;
     }
     private Task Resolve(object? identity, Action validate, Func<Task> execute)
     {

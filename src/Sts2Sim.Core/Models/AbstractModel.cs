@@ -781,6 +781,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     public virtual bool TryModifyCardRewardAlternatives(Player player, Rewards.CardReward reward,
         List<Rewards.CardRewardAlternative> alternatives) => false;
 
+    public virtual bool TryEnableCardRewardReroll(Player player, Rewards.CardReward reward) => false;
+
     public virtual Task AfterStarsGained(int amount, Player gainer) => Task.CompletedTask;
 
     public virtual Task AfterStarsSpent(int amount, Player spender) => Task.CompletedTask;
