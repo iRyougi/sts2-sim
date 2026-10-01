@@ -13,6 +13,7 @@ using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.ValueProps;
+using Sts2Sim.Core.Tests.Commands;
 
 namespace Sts2Sim.Core.Tests.Models.Powers;
 
@@ -37,6 +38,7 @@ public sealed class PlanPowerHookTests : IDisposable
             typeof(MonarchsGazePower), typeof(TheGambitPower), typeof(MayhemPower), typeof(EntropyPower),
             typeof(MonarchsGazeStrengthDownPower),
             typeof(StrengthPower), typeof(DrawCardsNextTurnPower), typeof(Purity), typeof(Supermassive),
+            typeof(PillarOfCreationPower), typeof(TransformGenerationProbeRelic),
         });
     }
 
@@ -265,6 +267,10 @@ public sealed class PlanPowerHookTests : IDisposable
     public async Task EntropyPower_AndBatchTransform_RecordGenerationForSupermassive()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("entropy");
+        Assert.Equal(0, player.PlayerCombatState!.CardsGeneratedThisCombat);
+        await RelicCmd.Obtain(ModelDb.Relic<TransformGenerationProbeRelic>(), player);
+        TransformGenerationProbeRelic probe = player.Relics.OfType<TransformGenerationProbeRelic>().Single();
+        await PowerCmd.Apply<PillarOfCreationPower>(room.Engine.State, player.Creature, 5m, player.Creature, null);
         foreach (CardModel c in player.PlayerCombatState!.Hand.Cards.ToList())
         {
             CardPileCmd.Add(c, PileType.Draw, CardPilePosition.Top);
@@ -279,18 +285,32 @@ public sealed class PlanPowerHookTests : IDisposable
         Assert.All(player.PlayerCombatState.Hand.Cards,
             card => Assert.Contains(player.Character.CardPool.AllCards, candidate => candidate.Id == card.Id));
         Assert.Equal(1, player.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(5, player.Creature.Block);
+        var entropyCall = Assert.Single(probe.Calls);
+        Assert.Same(Assert.Single(player.PlayerCombatState.Hand.Cards), entropyCall.Card);
+        Assert.Same(player, entropyCall.Creator);
 
         DefendRegent batchOriginal = AddToHand<DefendRegent>(player);
+        DefendRegent secondOriginal = AddToHand<DefendRegent>(player);
         var batchReplacement = (DefendRegent)ModelDb.Card<DefendRegent>().MutableClone();
+        var secondReplacement = (DefendRegent)ModelDb.Card<DefendRegent>().MutableClone();
         batchReplacement.AssignOwner(player);
-        await CardCmd.Transform([new CardTransformation(batchOriginal, batchReplacement)], rng: null);
+        secondReplacement.AssignOwner(player);
+        probe.ExpectedBatchCards = [batchReplacement, secondReplacement];
+        await CardCmd.Transform(
+            [new CardTransformation(secondOriginal, secondReplacement), new CardTransformation(batchOriginal, batchReplacement)],
+            rng: null);
 
-        Assert.Equal(2, player.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(3, player.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(15, player.Creature.Block);
+        Assert.Collection(probe.Calls.Skip(1),
+            call => { Assert.Same(batchReplacement, call.Card); Assert.Same(player, call.Creator); },
+            call => { Assert.Same(secondReplacement, call.Card); Assert.Same(player, call.Creator); });
         Supermassive supermassive = AddToHand<Supermassive>(player);
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hpBefore = enemy.CurrentHp;
         await supermassive.PlayAsync(enemy);
-        Assert.Equal(hpBefore - 11, enemy.CurrentHp);
+        Assert.Equal(hpBefore - 14, enemy.CurrentHp);
     }
 
     private static TCard AddToHand<TCard>(Player player)

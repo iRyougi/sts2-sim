@@ -245,6 +245,10 @@ public static class CardCmd
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(replacement);
+        if (IsCombatEnding(original))
+        {
+            return;
+        }
         CardPile? pile = original.Pile;
         if (pile is null)
         {
@@ -285,7 +289,7 @@ public static class CardCmd
                 replacement = Hook.ModifyCardBeingAddedToDeck(owner.RunState, replacement);
             if (pileType != PileType.Deck && combatState is not null && combatState.IsLiveCombat())
             {
-                await EnterTransformedCardInCombat(combatState, replacement, pileType);
+                await EnterTransformedCardInCombat(combatState, replacement, pileType, originalIndex);
             }
             else
             {
@@ -303,6 +307,10 @@ public static class CardCmd
             original.AssignOwnerInternal(owner);
             pile.AddInternal(original, originalIndex);
             throw;
+        }
+        if (replacement.Pile?.Type is PileType.Draw or PileType.Hand or PileType.Discard or PileType.Exhaust or PileType.Play)
+        {
+            await Hook.AfterCardGeneratedForCombat(replacement.CombatState!, replacement, replacement.Owner);
         }
     }
 
@@ -368,6 +376,12 @@ public static class CardCmd
             throw new InvalidOperationException("Eternal cards cannot be transformed in the persistent deck.");
         }
 
+        if (IsCombatEnding(original))
+        {
+            // Native Transform returns no results while ending; its random wrapper calls First().
+            throw new InvalidOperationException("Sequence contains no elements");
+        }
+
         Models.CardModel replacement = CardFactory.CreateRandomCardForTransform(original, original.CombatState is not null, rng);
         // Adapt the factory's owner-assigned clone to this simulator's single-card Transform
         // precondition; native Transform requires the replacement to keep the same owner.
@@ -383,6 +397,10 @@ public static class CardCmd
     public static async Task<IReadOnlyList<Models.CardModel>> Transform(IEnumerable<CardTransformation> transformations, Rng? rng)
     {
         CardTransformation[] items = transformations.ToArray();
+        if (items.Length > 0 && IsCombatEnding(items[0].Original))
+        {
+            return Array.Empty<Models.CardModel>();
+        }
         var prepared = new List<(Models.CardModel Original, Models.CardModel Replacement, CardPile Pile)>();
         foreach (CardTransformation item in items)
         {
@@ -444,8 +462,7 @@ public static class CardCmd
                 {
                     var combatState = entry.Original.Owner.Creature.CombatState
                         ?? throw new InvalidOperationException("Combat transformation requires active combat.");
-                    await EnterTransformedCardInCombat(combatState, replacement, entry.Pile.Type);
-                    if (ReferenceEquals(replacement.Pile, entry.Pile)) entry.Pile.AddInternal(replacement, entry.Index);
+                    await EnterTransformedCardInCombat(combatState, replacement, entry.Pile.Type, entry.Index);
                 }
                 catch
                 {
@@ -461,13 +478,24 @@ public static class CardCmd
             }
             results.Add(replacement);
         }
+        foreach (Models.CardModel replacement in results)
+        {
+            if (replacement.Pile?.Type is PileType.Draw or PileType.Hand or PileType.Discard or PileType.Exhaust or PileType.Play)
+            {
+                await Hook.AfterCardGeneratedForCombat(replacement.CombatState!, replacement, replacement.Owner);
+            }
+        }
         return results;
     }
+
+    private static bool IsCombatEnding(Models.CardModel original) =>
+        original.CombatState is { } combatState && combatState.IsLiveCombat() && combatState.IsOverOrEnding();
 
     private static async Task EnterTransformedCardInCombat(
         Sts2Sim.Core.Combat.ICombatState combatState,
         Models.CardModel replacement,
-        PileType pileType)
+        PileType pileType,
+        int index)
     {
         PlayerCombatState generationState = replacement.Owner.PlayerCombatState
             ?? throw new InvalidOperationException("Combat transformations require player combat state.");
@@ -475,7 +503,7 @@ public static class CardCmd
         generationState.RecordCardGenerated();
         try
         {
-            await CardPileCmd.EnterCombat(combatState, replacement, pileType);
+            await CardPileCmd.EnterCombatAtIndex(combatState, replacement, pileType, index);
         }
         catch
         {

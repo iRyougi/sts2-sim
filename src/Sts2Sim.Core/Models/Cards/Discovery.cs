@@ -7,8 +7,7 @@ using Sts2Sim.Core.Models;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>Exhaust，3选1随机生成卡免费进手牌。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.Discovery</c>），
-/// 偏离 #97：省略真实源码的"本次出牌免费"（SetToFreeThisTurn）——
-/// 本项目 CardModel.EnergyCost 没有"本回合临时费用修饰符"叠加链（偏离 #32 延续），生成卡进手牌后仍按其本身费用出牌。</summary>
+/// 选中后设置本回合或首次打出前免费，再生成到手牌。</summary>
 public sealed class Discovery : CardModel
 {
     public override CardType Type => CardType.Skill;
@@ -35,6 +34,7 @@ public sealed class Discovery : CardModel
         CardModel? selected = (await CardSelectCmd.SelectCardsAsync(combatState, Owner, generated, 0, 1, this, cancelable: true)).FirstOrDefault();
         if (selected is not null)
         {
+            selected.SetToFreeThisTurn();
             await CardPileCmd.Generate(combatState, selected, PileType.Hand);
         }
     }

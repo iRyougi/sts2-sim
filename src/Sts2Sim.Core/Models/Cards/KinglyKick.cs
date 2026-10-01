@@ -4,8 +4,7 @@ using Sts2Sim.Core.Entities.Cards;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>27伤害;被抽到手牌时本战斗费用-1。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.KinglyKick</c>）：
-/// 真实源码通过战斗内临时费用修饰符减少费用（与升级降费分开计算）；
-/// 本项目 <see cref="ReduceEnergyCost"/> 只有一个统一的费用扣减累加器，两种降费叠加即可，效果等价。</summary>
+/// 通过战斗内临时费用修饰符减少费用，基础费用与升级降费独立保留。</summary>
 public sealed class KinglyKick : CardModel, ICardDamageVariableProvider
 {
     private decimal _damage = 27m;
@@ -34,7 +33,7 @@ public sealed class KinglyKick : CardModel, ICardDamageVariableProvider
     {
         if (card == this)
         {
-            ReduceEnergyCost(1);
+            AddEnergyCostThisCombat(-1);
         }
 
         return Task.CompletedTask;

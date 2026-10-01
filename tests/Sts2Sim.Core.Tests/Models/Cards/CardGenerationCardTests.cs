@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
@@ -92,22 +93,51 @@ public sealed class CardGenerationCardTests : IDisposable
         Assert.Equal(colorlessInHandBefore + 4, player.PlayerCombatState!.Hand.Cards.Count(c => c.IsColorless));
     }
 
-    [Fact]
-    public async Task Discovery_GeneratesFromCharacterPool_UpgradeRemovesExhaust()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discovery_GeneratesFromCharacterPool_UpgradeRemovesExhaust(bool upgraded)
     {
         (Player player, _) = await CreateCombatAsync("discovery");
-        var selection = new LegacySelectionDecisionSource();
-        ((Sts2Sim.Core.Combat.CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
+        var selection = new PositiveCostSelectionObserver();
+        ((CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
         Discovery card = AddToHand<Discovery>(player);
-        Assert.True(card.HasKeyword(CardKeyword.Exhaust));
+        if (upgraded) card.Upgrade();
+        Assert.Equal(!upgraded, card.HasKeyword(CardKeyword.Exhaust));
 
         await card.PlayAsync(target: null);
 
-        Assert.Contains(player.PlayerCombatState!.Hand.Cards, c => !c.IsColorless && c is not Discovery);
+        CardModel selected = Assert.IsAssignableFrom<CardModel>(selection.Selected);
+        Assert.True(selection.SelectedCostBefore > 0);
+        Assert.Null(selection.SelectedOverrideBefore);
+        Assert.Contains(selected, player.PlayerCombatState!.Hand.Cards);
+        Assert.False(selected.IsColorless);
+        Assert.IsNotType<Discovery>(selected);
+        Assert.Equal(0, selected.LocalEnergyCost);
+        Assert.Equal(0, selected.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        foreach (var offer in selection.Offers.Where(offer => offer.Card != selected))
+        {
+            Assert.Equal(offer.Cost, offer.Card.LocalEnergyCost);
+            Assert.Equal(offer.UntilPlayed, offer.Card.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        }
+    }
 
-        Discovery upgraded = AddToHand<Discovery>(player);
-        upgraded.Upgrade();
-        Assert.False(upgraded.HasKeyword(CardKeyword.Exhaust));
+    private sealed class PositiveCostSelectionObserver : ICardSelectionDecisionSource
+    {
+        public CardModel? Selected { get; private set; }
+        public int SelectedCostBefore { get; private set; }
+        public int? SelectedOverrideBefore { get; private set; }
+        public (CardModel Card, int Cost, int? UntilPlayed)[] Offers { get; private set; } = [];
+
+        public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request)
+        {
+            Offers = request.Candidates.Select(card =>
+                (card, card.LocalEnergyCost, card.TemporaryCostOverrideThisTurnOrUntilPlayed)).ToArray();
+            Selected = request.Candidates.First(card => card.LocalEnergyCost > 0);
+            SelectedCostBefore = Selected.LocalEnergyCost;
+            SelectedOverrideBefore = Selected.TemporaryCostOverrideThisTurnOrUntilPlayed;
+            return Task.FromResult<IReadOnlyList<CardModel>>([Selected]);
+        }
     }
 
     [Theory]

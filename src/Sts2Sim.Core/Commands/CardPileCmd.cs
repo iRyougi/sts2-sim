@@ -51,13 +51,19 @@ public static class CardPileCmd
         CardPilePosition position = CardPilePosition.Bottom) =>
         EnterCombatInternal(combatState, card, pileType, position, beforeEntryHook: null, rollbackBeforeEntryHook: null);
 
+    /// <summary>Inserts a transformed card at its original index before entry listeners observe it.</summary>
+    internal static Task EnterCombatAtIndex(ICombatState combatState, CardModel card, PileType pileType, int index) =>
+        EnterCombatInternal(combatState, card, pileType, CardPilePosition.Bottom,
+            beforeEntryHook: null, rollbackBeforeEntryHook: null, insertionIndex: index);
+
     private static async Task EnterCombatInternal(
         ICombatState combatState,
         CardModel card,
         PileType pileType,
         CardPilePosition position,
         Action? beforeEntryHook,
-        Action? rollbackBeforeEntryHook)
+        Action? rollbackBeforeEntryHook,
+        int? insertionIndex = null)
     {
         ArgumentNullException.ThrowIfNull(combatState);
         ArgumentNullException.ThrowIfNull(card);
@@ -97,7 +103,7 @@ public static class CardPileCmd
         bool beforeEntryApplied = false;
         try
         {
-            destination.AddInternal(card, GetInsertionIndex(card, destination, position));
+            destination.AddInternal(card, insertionIndex ?? GetInsertionIndex(card, destination, position));
             listeners = Hook.SnapshotCardEnteredCombatListeners(combatState);
             beforeEntryHook?.Invoke();
             beforeEntryApplied = beforeEntryHook is not null;

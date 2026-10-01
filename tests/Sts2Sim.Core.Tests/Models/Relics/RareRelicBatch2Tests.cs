@@ -8,6 +8,7 @@ using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
@@ -60,6 +61,25 @@ file sealed class Task8ZeroSkillCard : CardModel
     protected override int CanonicalEnergyCost => 0;
 }
 
+file sealed class Task8ZeroStarSkillCard : CardModel
+{
+    public override CardType Type => CardType.Skill;
+    public override CardRarity Rarity => CardRarity.Token;
+    public override TargetType TargetType => TargetType.Self;
+    protected override int CanonicalEnergyCost => 0;
+    protected override int CanonicalStarCost => 0;
+}
+
+file sealed class Task8XStarSkillCard : CardModel
+{
+    public override CardType Type => CardType.Skill;
+    public override CardRarity Rarity => CardRarity.Token;
+    public override TargetType TargetType => TargetType.Self;
+    protected override int CanonicalEnergyCost => 0;
+    protected override int CanonicalStarCost => 0;
+    protected override bool IsXStarCost => true;
+}
+
 [Collection("ModelDb")]
 public sealed class RareRelicBatch2Tests : IDisposable
 {
@@ -72,7 +92,9 @@ public sealed class RareRelicBatch2Tests : IDisposable
                 .Append(typeof(Task8XEnergySkillCard))
                 .Append(typeof(Task8PowerCard))
                 .Append(typeof(Task8StarSkillCard))
-                .Append(typeof(Task8ZeroSkillCard)));
+                .Append(typeof(Task8ZeroSkillCard))
+                .Append(typeof(Task8ZeroStarSkillCard))
+                .Append(typeof(Task8XStarSkillCard)));
     }
 
     public void Dispose() => ModelDb.ResetForTests();
@@ -192,22 +214,85 @@ public sealed class RareRelicBatch2Tests : IDisposable
         Assert.Equal(1, new[] { first, second }.Count(card => card.EnergyCost == 0));
     }
 
-    [Fact]
-    public async Task MummifiedHand_PrefersACardThatStillCostsEnergyOrStarsOverAnAlreadyFreeOne()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public async Task MummifiedHand_PrefersACardThatStillCostsEnergyOrStarsOverAnAlreadyFreeOne(int tier)
     {
         (RunState runState, Player player) = CreateRun("mummified-priority");
         await Obtain<MummifiedHand>(player);
         CombatRoom room = CreateCombatRoom();
         await room.Enter(runState);
         ClearHand(player);
-        AddToHand<Task8ZeroSkillCard>(player);
-        Task8CostlySkillCard costly = AddToHand<Task8CostlySkillCard>(player);
+        CardModel expected;
+        switch (tier)
+        {
+            case 1:
+                AddToHand<Task8ZeroSkillCard>(player);
+                expected = AddToHand<Task8CostlySkillCard>(player);
+                break;
+            case 2:
+                // The global Corruption modifier makes the base-positive skill free;
+                // the base-zero attack's local +1 leaves it as the only effective-positive card.
+                Task8CostlySkillCard locallyFree = AddToHand<Task8CostlySkillCard>(player);
+                locallyFree.SetToFreeThisTurn();
+                Task8CostlySkillCard globallyFree = AddToHand<Task8CostlySkillCard>(player);
+                await PowerCmd.Apply<CorruptionPower>(room.Engine.State, player.Creature, 1m,
+                    player.Creature, null);
+                Assert.Equal(2, globallyFree.LocalEnergyCost);
+                Assert.Equal(0, globallyFree.EnergyCost);
+                expected = AddToHand<Shiv>(player);
+                expected.AddEnergyCostThisCombat(1);
+                Assert.Equal(1, expected.EnergyCost);
+                break;
+            case 3:
+                // Native KinglyKick draw reductions are local, retaining base energy 4.
+                expected = AddToHand<KinglyKick>(player);
+                for (int draw = 0; draw < 4; draw++)
+                {
+                    CardPileCmd.Add(expected, PileType.Draw, CardPilePosition.Top);
+                    IReadOnlyList<CardModel> drawn = await CardPileCmd.Draw(
+                        room.Engine.State, 1, player, fromHandDraw: false);
+                    Assert.Same(expected, Assert.Single(drawn));
+                }
+                Assert.Equal(0, expected.LocalEnergyCost);
+                WhiteNoise whiteNoise = AddToHand<WhiteNoise>(player);
+                whiteNoise.Upgrade();
+                Assert.Equal(0, whiteNoise.LocalEnergyCost);
+                break;
+            default:
+                expected = AddToHand<Task8ZeroSkillCard>(player);
+                break;
+        }
+        if (tier != 4)
+        {
+            AddToHand<Task8XEnergySkillCard>(player);
+            AddToHand<Task8XStarSkillCard>(player);
+            AddToHand<Task8ZeroStarSkillCard>(player);
+        }
+        var unselected = player.PlayerCombatState!.Hand.Cards.Where(card => card != expected)
+            .Select(card => (Card: card, Energy: card.LocalEnergyCost, Stars: card.LocalStarCost,
+                UntilPlayed: card.TemporaryCostOverrideThisTurnOrUntilPlayed,
+                StarOverride: card.TemporaryStarCostOverrideThisTurn,
+                TurnFree: card.TemporaryFreeThisTurn)).ToArray();
+        int counterBefore = runState.Rng.CombatCardSelection.Counter;
 
         await room.Engine.PlayCardAsync(player, AddToHand<Task8PowerCard>(player), player.Creature);
 
-        // 真实源码优先选"仍需要花费能量/星愿"的候选（偏离 #137）；候选池里只有 costly 符合条件，
-        // 所以结果是确定的——如果实现退化成对整手牌均匀随机选，这条断言会在 costly 未被选中的那次运行里失败。
-        Assert.Equal(0, costly.EnergyCost);
+        // Each row has one expected physical candidate in its first nonempty native tier.
+        Assert.Equal(0, expected.LocalEnergyCost);
+        Assert.Equal(0, expected.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        Assert.Equal(counterBefore + 1, runState.Rng.CombatCardSelection.Counter);
+        foreach (var other in unselected)
+        {
+            Assert.Equal(other.Energy, other.Card.LocalEnergyCost);
+            Assert.Equal(other.Stars, other.Card.LocalStarCost);
+            Assert.Equal(other.UntilPlayed, other.Card.TemporaryCostOverrideThisTurnOrUntilPlayed);
+            Assert.Equal(other.StarOverride, other.Card.TemporaryStarCostOverrideThisTurn);
+            Assert.Equal(other.TurnFree, other.Card.TemporaryFreeThisTurn);
+        }
     }
 
     [Fact]
@@ -226,7 +311,8 @@ public sealed class RareRelicBatch2Tests : IDisposable
 
         Assert.Equal(energyBefore, player.PlayerCombatState.Energy);
         Assert.Equal(PileType.Discard, candidate.Pile!.Type);
-        Assert.Equal(0, candidate.EnergyCost);
+        Assert.Equal(2, candidate.EnergyCost);
+        Assert.Null(candidate.TemporaryCostOverrideThisTurnOrUntilPlayed);
 
         await room.Engine.EndPlayerTurnAsync();
 

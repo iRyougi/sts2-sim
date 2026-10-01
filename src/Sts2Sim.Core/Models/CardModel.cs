@@ -92,6 +92,10 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     /// <summary>Energy cost after ordered card-local changes, before combat-wide cost hooks.</summary>
     public int LocalEnergyCost => ResolveLocalEnergyCost();
 
+    /// <summary>Upgraded base costs, excluding card-local changes and combat-wide hooks.</summary>
+    internal bool HasPositiveBaseEnergyOrStarCost =>
+        (!IsXEnergyCost && CanonicalEnergyCost - _energyCostUpgradeDelta > 0) || CanonicalStarCost > 0;
+
     private int ResolveEnergyCost(out bool hookModified)
     {
         hookModified = false;
