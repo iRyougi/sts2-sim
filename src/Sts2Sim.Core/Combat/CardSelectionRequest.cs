@@ -24,6 +24,13 @@ public interface ICardSelectionDecisionSource
     Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request);
 }
 
+/// <summary>Optional synchronous observation of an automatic result before the caller applies its effect.
+/// Observers must not choose cards, mutate card state, or consume RNG.</summary>
+public interface IAutomaticCardSelectionObserver
+{
+    void ObserveAutomaticSelection(CardSelectionRequest request, IReadOnlyList<CardModel> selected);
+}
+
 internal sealed class RejectingCardSelectionDecisionSource : ICardSelectionDecisionSource
 {
     public static RejectingCardSelectionDecisionSource Instance { get; } = new();

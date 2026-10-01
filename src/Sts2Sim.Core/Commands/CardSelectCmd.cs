@@ -103,17 +103,8 @@ public static class CardSelectCmd
         {
             throw new InvalidOperationException("Card selection candidates must be unique instances.");
         }
-        if (options.Count == 0)
-        {
-            return Array.Empty<CardModel>();
-        }
-
         int effectiveMax = Math.Min(maxCount, options.Count);
         int effectiveMin = Math.Min(minCount, effectiveMax);
-        if (options.Count <= minCount && !cancelable)
-        {
-            return options.AsReadOnly();
-        }
         var request = new CardSelectionRequest(
             player,
             options.AsReadOnly(),
@@ -121,6 +112,19 @@ public static class CardSelectCmd
             effectiveMax,
             source,
             cancelable);
+        if (options.Count == 0)
+        {
+            IReadOnlyList<CardModel> empty = Array.Empty<CardModel>();
+            if (decisionSource is IAutomaticCardSelectionObserver observer)
+                observer.ObserveAutomaticSelection(request, empty);
+            return empty;
+        }
+        if (options.Count <= minCount && !cancelable)
+        {
+            if (decisionSource is IAutomaticCardSelectionObserver observer)
+                observer.ObserveAutomaticSelection(request, request.Candidates);
+            return request.Candidates;
+        }
         IReadOnlyList<CardModel> selected =
             await decisionSource.ChooseCardsAsync(request);
         if ((!request.Cancelable && selected.Count < effectiveMin) ||

@@ -504,8 +504,13 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
         Task6ProbeA only = AddToPile<Task6ProbeA>(owner, PileType.Hand);
         await PowerCmd.Apply<TyrannyPower>(
             room.Engine.State, owner.Creature, 2m, owner.Creature, null);
-        room.Engine.State.CardSelectionSource =
-            new Task6SelectionSource(request => request.Candidates);
+        var source = new Task6SelectionSource(request => request.Candidates, (request, selected) =>
+        {
+            Assert.Same(owner, request.Player);
+            Assert.Same(only, Assert.Single(selected));
+            Assert.Equal(PileType.Hand, only.Pile!.Type);
+        });
+        room.Engine.State.CardSelectionSource = source;
 
         await Hook.AfterPlayerTurnStart(room.Engine.State, ally);
         Assert.Same(only, Assert.Single(owner.PlayerCombatState!.Hand.Cards));
@@ -513,6 +518,8 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
         await Hook.AfterPlayerTurnStart(room.Engine.State, owner);
         Assert.Empty(owner.PlayerCombatState.Hand.Cards);
         Assert.Same(only, Assert.Single(owner.PlayerCombatState.ExhaustPile.Cards));
+        Assert.Single(source.AutomaticSelections);
+        Assert.Empty(source.Requests);
     }
 
     [Fact]
@@ -560,6 +567,13 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
 
         Assert.Equal(candidateCount, selected.Count);
         Assert.Empty(source.Requests);
+        var observed = Assert.Single(source.AutomaticSelections);
+        Assert.Same(owner, observed.Request.Player);
+        Assert.Null(observed.Request.Source);
+        Assert.Equal(candidateCount, observed.Request.MinCount);
+        Assert.Equal(candidateCount, observed.Request.MaxCount);
+        Assert.True(candidates.SequenceEqual(observed.Request.Candidates, ReferenceEqualityComparer.Instance));
+        Assert.True(selected.SequenceEqual(observed.Selected, ReferenceEqualityComparer.Instance));
     }
 
     private static void AssertSpec<TCard>(GeneratedCardSpec expected)
@@ -648,9 +662,18 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
 }
 
 file sealed class Task6SelectionSource(
-    Func<CardSelectionRequest, IEnumerable<CardModel>> select) : ICardSelectionDecisionSource
+    Func<CardSelectionRequest, IEnumerable<CardModel>> select,
+    Action<CardSelectionRequest, IReadOnlyList<CardModel>>? observeAutomatic = null)
+    : ICardSelectionDecisionSource, IAutomaticCardSelectionObserver
 {
     public List<CardSelectionRequest> Requests { get; } = new();
+    public List<(CardSelectionRequest Request, IReadOnlyList<CardModel> Selected)> AutomaticSelections { get; } = new();
+
+    public void ObserveAutomaticSelection(CardSelectionRequest request, IReadOnlyList<CardModel> selected)
+    {
+        AutomaticSelections.Add((request, selected));
+        observeAutomatic?.Invoke(request, selected);
+    }
 
     public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request)
     {
