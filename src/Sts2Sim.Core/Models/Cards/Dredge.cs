@@ -23,12 +23,11 @@ public sealed class Dredge : CardModel, ICardChoiceBaseValueProvider
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         int count = Math.Min(Cards, CardPile.MaxCardsInHand - Owner.PlayerCombatState!.Hand.Cards.Count);
-        // 原版 CardSelectCmd.FromCombatPile 在战斗结束中直接返回空选择。
-        if (count <= 0 || CombatState!.IsOverOrEnding())
+        if (count <= 0)
             return;
 
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile.Cards, count, count, this);
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile, count, count, this);
         foreach (CardModel card in selected)
             CardPileCmd.Add(card, PileType.Hand);
     }

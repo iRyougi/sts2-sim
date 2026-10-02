@@ -23,8 +23,8 @@ public sealed class Headbutt : CardModel, ICardChoiceBaseValueProvider, ICardDam
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
         await DamageCmd.Attack(_damage).FromCard(this, cardPlay).Targeting(cardPlay.Target).Execute();
-        CardModel? chosen = (await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile.Cards,
+        CardModel? chosen = (await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile,
             1, 1, this)).FirstOrDefault();
         if (chosen is not null)
         {

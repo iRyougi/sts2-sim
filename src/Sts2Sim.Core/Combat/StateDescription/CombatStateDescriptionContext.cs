@@ -6,7 +6,9 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
 {
     public void AssertTransientEmpty(bool isEmpty, string fieldName)
     {
-        if (!isEmpty)
+        // Ending skips native cleanup hooks, so terminal snapshots may retain command
+        // state. Live and starting combat still require an empty node boundary.
+        if (!isEmpty && (!State.IsOverOrEnding() || State.IsStarting()))
         {
             throw new InvalidOperationException(
                 $"Combat search node boundary retained transient state {Model.GetType().Name}.{fieldName}.");

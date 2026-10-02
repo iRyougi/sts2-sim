@@ -360,6 +360,10 @@ public sealed partial class CombatState : ICombatState
 
     // 没有挂引擎的独立战斗状态（测试夹具）视为仍在进行，与 IsLiveCombat 的默认一致。
     public bool IsOverOrEnding() => _engine?.IsOverOrEnding ?? false;
+
+    public bool IsEnding() => _engine?.IsEnding ?? false;
+
+    public bool IsStarting() => _engine?.IsStarting ?? false;
     internal ICombatObserver? Observer => _engine?.Observer;
 
 

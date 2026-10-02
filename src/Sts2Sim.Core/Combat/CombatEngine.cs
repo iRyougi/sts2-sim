@@ -35,6 +35,7 @@ public sealed class CombatEngine
         var clone = new CombatEngine(state, observer: null)
         {
             IsInProgress = IsInProgress,
+            IsStarting = IsStarting,
             Won = Won,
         };
         return clone;
@@ -51,14 +52,19 @@ public sealed class CombatEngine
 
     public bool IsInProgress { get; private set; }
 
-    /// <summary><c>CombatManager.IsOverOrEnding</c>：战斗已结束，或胜负条件已经满足、只是还没结算。
-    /// 与 <see cref="CheckWinCondition"/> 判据相同但不改状态，供"战斗结束就跳过"的守卫在结算前查询。
-    /// 单人下原版的待定败北（<c>PendingLoss</c>）对应友方全灭，与 <see cref="CheckWinCondition"/> 的简化一致。</summary>
-    public bool IsOverOrEnding =>
-        !IsInProgress ||
-        !State.PlayerCreatures.Any(creature => creature.IsAlive) ||
-        (!State.Enemies.Any(enemy => enemy.IsAlive && enemy.IsPrimaryEnemy) &&
-         !Hook.ShouldStopCombatFromEnding(State));
+    /// <summary>Native setup window: combat hooks run before IsInProgress becomes true.</summary>
+    public bool IsStarting { get; private set; }
+
+    /// <summary>Native IsEnding: victory/pending loss while combat is still in progress.
+    /// Single-player pending loss uses the same all-player-dead condition as CheckWinCondition.</summary>
+    public bool IsEnding => IsInProgress && (HasLost || HasWon);
+
+    public bool IsOverOrEnding => IsEnding || !IsInProgress;
+
+    private bool HasLost => !State.PlayerCreatures.Any(creature => creature.IsAlive);
+
+    private bool HasWon => !State.Enemies.Any(enemy => enemy.IsAlive && enemy.IsPrimaryEnemy) &&
+        !Hook.ShouldStopCombatFromEnding(State);
 
     public bool Won { get; private set; }
 
@@ -68,6 +74,7 @@ public sealed class CombatEngine
     // Keep one combat_start RNG scope across setup, room-entry hooks and combat startup.
     internal async Task StartCombatAsync(Func<Task>? afterSetup)
     {
+        IsStarting = true;
         using IDisposable rngScope = State.BeginPhaseRngScope("combat_start");
         foreach (Player player in State.Players)
         {
@@ -95,6 +102,7 @@ public sealed class CombatEngine
         }
 
         IsInProgress = true;
+        IsStarting = false;
         await Hook.BeforeCombatStart(State);
         _observer?.CombatStarted(State);
         await StartTurnAsync();
@@ -396,19 +404,14 @@ public sealed class CombatEngine
             return true;
         }
 
-        if (!State.PlayerCreatures.Any(creature => creature.IsAlive))
+        if (HasLost)
         {
             IsInProgress = false;
             Won = false;
             return true;
         }
 
-        if (State.Enemies.Any(enemy => enemy.IsAlive && enemy.IsPrimaryEnemy))
-        {
-            return false;
-        }
-
-        if (Hook.ShouldStopCombatFromEnding(State))
+        if (!HasWon)
         {
             return false;
         }

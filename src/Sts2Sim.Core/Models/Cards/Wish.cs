@@ -15,10 +15,10 @@ public sealed class Wish : CardModel
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ICombatState combatState = CombatState!;
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
             combatState,
             Owner,
-            Owner.PlayerCombatState!.DrawPile.Cards,
+            Owner.PlayerCombatState!.DrawPile,
             minCount: 1,
             maxCount: 1,
             source: this);

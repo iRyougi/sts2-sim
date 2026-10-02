@@ -48,6 +48,10 @@ public sealed class Plan08b4HookRegressionTests : IDisposable
         var room = CreateRoom();
         await room.Enter(run);
         var enemy = room.Engine.State.Enemies.Single();
+        // Illusion's fake death makes it non-primary; another primary enemy keeps the
+        // combat active so the native ShouldAllowHitting iterator remains eligible.
+        room.Engine.State.AddMonster(
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
         await PowerCmd.Apply<IllusionPower>(room.Engine.State, enemy, 1m, null, null);
         await enemy.GetPower<IllusionPower>()!.AfterDeath(enemy);
         Assert.True(enemy.IsAlive);

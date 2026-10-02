@@ -22,12 +22,8 @@ public sealed class Cleanse : CardModel, ICardChoiceBaseValueProvider
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         await OstyCmd.Summon(Owner, Summon, this);
-        // 原版 CardSelectCmd.FromCombatPile 在战斗结束中直接返回空选择。
-        if (CombatState!.IsOverOrEnding())
-            return;
-
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DrawPile.Cards, 1, 1, this)).FirstOrDefault();
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DrawPile, 1, 1, this)).FirstOrDefault();
         if (selected is not null)
             await CardPileCmd.Exhaust(CombatState!, selected);
     }

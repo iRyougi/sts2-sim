@@ -64,6 +64,10 @@ public sealed class KinFollowerTests : IDisposable
         Assert.Same(dance, boomerang.FollowUpState);
         Assert.Same(quick, dance.FollowUpState);
 
+        // A minion alone is already in the ending window; retain its primary opponent.
+        room.Engine.State.AddMonster(
+            (WanderingGrunt)Sts2Sim.Core.Models.ModelDb.Monster<WanderingGrunt>().MutableClone(),
+            Sts2Sim.Core.Combat.CombatSide.Enemy);
         Task20BossTestFixture.ForceMove(follower, "POWER_DANCE_MOVE");
         await follower.PerformMove();
         Assert.Equal(expectedDanceStrength, Assert.IsType<StrengthPower>(

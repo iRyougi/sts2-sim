@@ -202,7 +202,7 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
     }
 
     [Fact]
-    public async Task PlayCountPostModifier_DispatchesRecordedModifierAfterItLeavesCombatHooks()
+    public async Task PlayCountPostModifier_SkipsRecordedModifierAfterItLeavesCombatHooks()
     {
         (IReadOnlyList<Player> players, CombatRoom room) =
             await CreateCombatAsync("play-count-recorded-modifier");
@@ -232,8 +232,9 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
 
         await Hook.AfterModifyingCardPlayCount(room.Engine.State, card, modifyingModels);
 
-        Assert.True(power.PostFoldCallbackReceived);
-        Assert.True(executionFinished);
+        // Native AfterModifyingCardPlayCount re-enumerates current combat listeners.
+        Assert.False(power.PostFoldCallbackReceived);
+        Assert.False(executionFinished);
     }
 
     [Fact]

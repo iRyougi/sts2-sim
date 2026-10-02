@@ -467,8 +467,20 @@ public static class Hook
     /// </summary>
     private static IEnumerable<AbstractModel> IterateCombatHookListeners(ICombatState combatState)
     {
-        return combatState.RunState.IterateHookListeners(combatState);
+        if (combatState.IsOverOrEnding() && !combatState.IsStarting())
+            yield break;
+        // Keep the simulator's existing run/combat composition here (deviation #31).
+        // This change adds the native lifecycle gate without expanding the listener-order audit.
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState))
+            yield return model;
     }
+
+    // Native combatState.IterateHookListeners includes relics and potions after each player's powers.
+    // The simulator's public iterator omits inventory for RunState's composition.
+    private static IEnumerable<AbstractModel> IterateDirectCombatHookListeners(ICombatState combatState) =>
+        combatState is CombatState concrete
+            ? concrete.IterateHookListeners(includePlayerInventory: true)
+            : combatState.IterateHookListeners();
 
     public static async Task AfterOrbChanneled(ICombatState combatState, Player player, OrbModel orb)
     {
@@ -532,12 +544,12 @@ public static class Hook
 
     public static async Task BeforeCombatStart(ICombatState combatState)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState))
         {
             await model.BeforeCombatStart();
             model.InvokeExecutionFinished();
         }
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState))
         {
             await model.BeforeCombatStartLate();
             model.InvokeExecutionFinished();
@@ -553,7 +565,7 @@ public static class Hook
 
     public static async Task AfterCreatureAddedToCombat(ICombatState combatState, Creature creature)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState).ToArray())
         {
             await model.AfterCreatureAddedToCombat(creature);
             model.InvokeExecutionFinished();
@@ -562,12 +574,12 @@ public static class Hook
 
     public static async Task AfterCombatVictory(ICombatState combatState)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState).ToArray())
         {
             await model.AfterCombatVictoryEarly();
             model.InvokeExecutionFinished();
         }
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState).ToArray())
         {
             await model.AfterCombatVictory();
             model.InvokeExecutionFinished();
@@ -576,7 +588,7 @@ public static class Hook
 
     public static async Task AfterCombatEnd(ICombatState combatState)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState).ToArray())
         {
             await model.AfterCombatEnd();
             model.InvokeExecutionFinished();
@@ -667,21 +679,18 @@ public static class Hook
     {
         // Native dispatches each phase from a fresh listener enumeration. The local listener
         // wrapper snapshots each phase before callbacks, preserving its existing same-phase order.
-        if (combatState.IsOverOrEnding()) return;
         foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
         {
             await model.AfterAutoPrePlayPhaseEnteredEarly(player);
             model.InvokeExecutionFinished();
         }
 
-        if (combatState.IsOverOrEnding()) return;
         foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
         {
             await model.AfterAutoPrePlayPhaseEntered(player);
             model.InvokeExecutionFinished();
         }
 
-        if (combatState.IsOverOrEnding()) return;
         foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
         {
             await model.AfterAutoPrePlayPhaseEnteredLate(player);
@@ -985,7 +994,7 @@ public static class Hook
     /// Global 关键字时调用，结果不写回卡牌。</summary>
     public static void ModifyKeywordsInCombat(ICombatState combatState, CardModel card, ISet<CardKeyword> keywords)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
         {
             model.TryModifyKeywordsInCombat(card, keywords);
         }
@@ -1103,8 +1112,9 @@ public static class Hook
         IEnumerable<AbstractModel> modifiers)
     {
         AbstractModel[] recordedModifiers = modifiers.ToArray();
-        foreach (AbstractModel model in recordedModifiers)
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (!recordedModifiers.Contains(model)) continue;
             await model.AfterModifyingCardPlayCount(card);
             model.InvokeExecutionFinished();
         }
@@ -1148,13 +1158,13 @@ public static class Hook
 
     public static async Task AfterCardPlayed(ICombatState combatState, CardPlay cardPlay)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
         {
             await model.AfterCardPlayed(cardPlay);
             model.InvokeExecutionFinished();
         }
 
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
         {
             await model.AfterCardPlayedLate(cardPlay);
             model.InvokeExecutionFinished();
@@ -1341,7 +1351,7 @@ public static class Hook
         Creature target,
         CardModel? cardSource)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
         {
             await model.AfterDamageGiven(dealer, result, props, target, cardSource);
             model.InvokeExecutionFinished();
@@ -1709,8 +1719,10 @@ public static class Hook
     {
         ArgumentNullException.ThrowIfNull(combatState);
         ArgumentNullException.ThrowIfNull(modifiers);
-        foreach (AbstractModel modifier in modifiers.ToArray())
+        AbstractModel[] recordedModifiers = modifiers.ToArray();
+        foreach (AbstractModel modifier in IterateCombatHookListeners(combatState))
         {
+            if (!recordedModifiers.Contains(modifier)) continue;
             await modifier.AfterModifyingBlockAmount(modifiedAmount, cardSource, cardPlay);
             modifier.InvokeExecutionFinished();
         }
@@ -1764,8 +1776,10 @@ public static class Hook
         IEnumerable<AbstractModel> modifiers,
         PowerModel modifiedPower)
     {
-        foreach (AbstractModel modifier in modifiers.ToArray())
+        AbstractModel[] recordedModifiers = modifiers.ToArray();
+        foreach (AbstractModel modifier in IterateCombatHookListeners(combatState))
         {
+            if (!recordedModifiers.Contains(modifier)) continue;
             await modifier.AfterModifyingPowerAmountReceived(modifiedPower);
             modifier.InvokeExecutionFinished();
         }
@@ -1790,11 +1804,14 @@ public static class Hook
         }
     }
 
-    private static IEnumerable<AbstractModel> IterateBlockClearListeners(ICombatState combatState) =>
-        !combatState.IsLiveCombat() ? Array.Empty<AbstractModel>() :
-        combatState is CombatState concrete
-            ? concrete.IterateHookListeners(includePlayerInventory: true)
-            : combatState.IterateHookListeners();
+    private static IEnumerable<AbstractModel> IterateBlockClearListeners(ICombatState combatState)
+    {
+        if (combatState.IsOverOrEnding() && !combatState.IsStarting())
+            yield break;
+        // Block retention already used native powers-before-inventory order.
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+            yield return model;
+    }
 
     public static bool ShouldClearBlock(ICombatState combatState, Creature creature) =>
         ShouldClearBlock(combatState, creature, out _);
@@ -1836,7 +1853,7 @@ public static class Hook
         Creature target,
         Creature? breaker)
     {
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState).ToArray())
         {
             await model.AfterBlockBroken(target, breaker);
             model.InvokeExecutionFinished();
@@ -1886,7 +1903,7 @@ public static class Hook
 
     public static bool ShouldStopCombatFromEnding(ICombatState combatState)
     {
-        foreach (AbstractModel item in IterateCombatHookListeners(combatState))
+        foreach (AbstractModel item in IterateDirectCombatHookListeners(combatState))
         {
             if (item.ShouldStopCombatFromEnding())
             {

@@ -22,10 +22,10 @@ public sealed class ForegoneConclusionPower : PowerModel
         }
 
         await CardPileCmd.ShuffleIfNecessary(Owner.CombatState!, player);
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
             Owner.CombatState!,
             player,
-            player.PlayerCombatState!.DrawPile.Cards,
+            player.PlayerCombatState!.DrawPile,
             Amount,
             Amount,
             this);

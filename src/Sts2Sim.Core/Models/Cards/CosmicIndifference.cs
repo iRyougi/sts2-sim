@@ -22,8 +22,8 @@ public sealed class CosmicIndifference : CardModel
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         await CreatureCmd.GainBlock(CombatState!, Owner.Creature, _block, ValueProp.Move, this, cardPlay);
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(CombatState!, Owner,
-            Owner.PlayerCombatState!.DiscardPile.Cards, 1, 1, this, cancelable: false)).FirstOrDefault();
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(CombatState!, Owner,
+            Owner.PlayerCombatState!.DiscardPile, 1, 1, this, cancelable: false)).FirstOrDefault();
         if (selected is not null)
         {
             CardPileCmd.Add(selected, PileType.Draw, CardPilePosition.Top);

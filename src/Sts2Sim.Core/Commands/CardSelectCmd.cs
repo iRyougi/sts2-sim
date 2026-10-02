@@ -88,7 +88,8 @@ public static class CardSelectCmd
         int minCount,
         int maxCount,
         AbstractModel? source,
-        bool cancelable)
+        bool cancelable,
+        bool? requireManualConfirmation = null)
     {
         ArgumentNullException.ThrowIfNull(decisionSource);
         ArgumentNullException.ThrowIfNull(player);
@@ -119,7 +120,7 @@ public static class CardSelectCmd
                 observer.ObserveAutomaticSelection(request, empty);
             return empty;
         }
-        if (options.Count <= minCount && !cancelable)
+        if (options.Count <= minCount && !(requireManualConfirmation ?? cancelable))
         {
             if (decisionSource is IAutomaticCardSelectionObserver observer)
                 observer.ObserveAutomaticSelection(request, request.Candidates);
@@ -149,6 +150,58 @@ public static class CardSelectCmd
         return selected.ToList().AsReadOnly();
     }
 
+    /// <summary>Native pile selection: only Draw's visible choice list is sorted; automatic
+    /// all-selection returns the filtered pile order and never changes the underlying pile.</summary>
+    public static Task<IReadOnlyList<CardModel>> FromCombatPile(
+        ICombatState combatState, Player player, CardPile pile,
+        int minCount, int maxCount, AbstractModel? source,
+        Func<CardModel, bool>? filter = null, bool cancelable = false,
+        bool? requireManualConfirmation = null)
+    {
+        if (combatState.IsEnding())
+            return Task.FromResult<IReadOnlyList<CardModel>>(Array.Empty<CardModel>());
+        IEnumerable<CardModel> candidates = pile.Cards.Where(filter ?? (_ => true));
+        List<CardModel> options = candidates.ToList();
+        bool manual = requireManualConfirmation ?? (minCount != maxCount);
+        if (pile.Type == PileType.Draw && (manual || options.Count > minCount))
+            candidates = options.OrderBy(card => card.Rarity).ThenBy(card => card.Id);
+        else
+            candidates = options;
+        return SelectCardsAsync(ResolveSelector(combatState.CardSelectionSource), player,
+            candidates, minCount, maxCount, source, cancelable, requireManualConfirmation ?? (minCount != maxCount));
+    }
+
+    public static Task<IReadOnlyList<CardModel>> FromSimpleGrid(
+        ICombatState combatState, Player player, IEnumerable<CardModel> candidates,
+        int minCount, int maxCount, AbstractModel? source,
+        bool cancelable = false, bool? requireManualConfirmation = null)
+    {
+        if (combatState.IsEnding())
+            return Task.FromResult<IReadOnlyList<CardModel>>(Array.Empty<CardModel>());
+        return SelectCardsAsync(ResolveSelector(combatState.CardSelectionSource), player,
+            candidates, minCount, maxCount, source, cancelable, requireManualConfirmation ?? (minCount != maxCount));
+    }
+
+    /// <summary>Reward grids also use IsEnding, allowing selection outside combat.</summary>
+    public static Task<IReadOnlyList<CardModel>> FromSimpleGridForRewards(
+        Player player, IEnumerable<CardModel> candidates, int minCount, int maxCount,
+        AbstractModel? source, bool cancelable = false, bool? requireManualConfirmation = null)
+    {
+        if (player.Creature.CombatState?.IsEnding() == true)
+            return Task.FromResult<IReadOnlyList<CardModel>>(Array.Empty<CardModel>());
+        return SelectCardsAsync(ResolveSelector(player.RunState.CardSelectionSource), player,
+            candidates, minCount, maxCount, source, cancelable, requireManualConfirmation ?? (minCount != maxCount));
+    }
+
+    public static async Task<CardModel?> FromHandForUpgrade(
+        ICombatState combatState, Player player, AbstractModel? source)
+    {
+        if (combatState.IsOverOrEnding()) return null;
+        return (await SelectCardsAsync(combatState, player,
+            player.PlayerCombatState!.Hand.Cards.Where(card => card.IsUpgradable),
+            1, 1, source)).FirstOrDefault();
+    }
+
     public static Task<IReadOnlyList<CardModel>> FromDeckForTransformation(Player player, int count, AbstractModel? source = null) =>
         SelectCardsAsync(player.RunState, player,
             player.Deck.Cards.Where(card => card.Type != CardType.Quest && card.IsTransformable),
@@ -169,6 +222,8 @@ public static class CardSelectCmd
     public static async Task<IReadOnlyList<CardModel>> FromChooseABundleScreen(
         Player player, IReadOnlyList<IReadOnlyList<CardModel>> bundles, AbstractModel source)
     {
+        if (player.Creature.CombatState?.IsEnding() == true)
+            return Array.Empty<CardModel>();
         if (bundles.Count == 0 || bundles.Any(bundle => bundle.Count == 0))
             throw new ArgumentException("Bundle selection requires nonempty bundles.", nameof(bundles));
         var options = bundles.Select(bundle => (IReadOnlyList<CardModel>)bundle.ToArray()).ToArray();
@@ -204,8 +259,8 @@ public static class CardSelectCmd
     }
 
     /// <summary>原版 <c>CardSelectCmd.FromHand</c>：从手牌选牌。战斗已结束或正在结束（例如这张牌刚打死
-    /// 最后一个敌人）时直接返回空，不产生选牌，调用方的后续效果也随之跳过。只有"从手牌选"的入口带这个守卫；
-    /// 原版的三选一、网格选牌等入口没有，不能把它加到 <see cref="SelectCardsAsync(ICombatState, Player, IEnumerable{CardModel}, int, int, AbstractModel?, bool)"/> 上。</summary>
+    /// 最后一个敌人）时直接返回空，不产生选牌，调用方的后续效果也随之跳过。
+    /// 牌堆/网格入口只检查 IsEnding；三选一没有结束守卫，不能把守卫加到 <see cref="SelectCardsAsync(ICombatState, Player, IEnumerable{CardModel}, int, int, AbstractModel?, bool)"/> 上。</summary>
     public static Task<IReadOnlyList<CardModel>> FromHand(
         ICombatState combatState,
         Player player,

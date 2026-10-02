@@ -14,10 +14,10 @@ public sealed class StratagemPower : GeneratedPowerModel
         }
         PlayerCombatState combat = player.PlayerCombatState!;
 
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
             Owner.CombatState!,
             player,
-            combat.DrawPile.Cards,
+            combat.DrawPile,
             Amount,
             Amount,
             this);

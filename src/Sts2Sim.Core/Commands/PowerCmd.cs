@@ -11,7 +11,8 @@ public static class PowerCmd
 {
     public static async Task<T?> Apply<T>(ICombatState combatState, Creature target, decimal amount, Creature? applier, CardModel? cardSource) where T : PowerModel
     {
-        return (T?)await Apply(combatState, typeof(T), target, amount, applier, cardSource);
+        if (combatState?.IsEnding() == true) return null;
+        return (T?)await Apply(combatState!, typeof(T), target, amount, applier, cardSource);
     }
 
     public static async Task<PowerModel?> Apply(
@@ -22,6 +23,7 @@ public static class PowerCmd
         Creature? applier,
         CardModel? cardSource)
     {
+        if (combatState?.IsEnding() == true) return null;
         ArgumentNullException.ThrowIfNull(powerType);
         if (!typeof(PowerModel).IsAssignableFrom(powerType))
         {
@@ -66,6 +68,7 @@ public static class PowerCmd
         Creature? applier,
         CardModel? cardSource)
     {
+        if (combatState?.IsEnding() == true) return;
         ArgumentNullException.ThrowIfNull(power);
         if (combatState is null || (combatState is CombatState &&
             !ReferenceEquals(target.CombatState, combatState)))
@@ -119,6 +122,7 @@ public static class PowerCmd
 
     public static async Task<int> ModifyAmount(ICombatState combatState, PowerModel power, decimal offset, Creature? applier, CardModel? cardSource)
     {
+        if (combatState?.IsEnding() == true) return 0;
         // Native PowerCmd.ModifyAmount returns before hooks when the power owner has left combat.
         // Command-only fake contexts have no attached creatures, as in Apply above.
         if (combatState is null || (combatState is CombatState &&

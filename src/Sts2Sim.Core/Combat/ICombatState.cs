@@ -72,4 +72,8 @@ public interface ICombatState
     /// <summary><c>CombatManager.IsOverOrEnding</c>：战斗已结束或正在结束（胜负已定但尚未结算）。
     /// 默认视为仍在进行；只有挂着引擎的 <see cref="CombatState"/> 会真正判定。</summary>
     bool IsOverOrEnding() => false;
+
+    bool IsEnding() => false;
+
+    bool IsStarting() => false;
 }

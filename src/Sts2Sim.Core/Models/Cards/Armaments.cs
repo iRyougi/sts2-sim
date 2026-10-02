@@ -23,10 +23,7 @@ public sealed class Armaments : CardModel, ICardChoiceBaseValueProvider
             return;
         }
 
-        CardModel? selected = (await CardSelectCmd.FromHand(
-            CombatState!, Owner,
-            Owner.PlayerCombatState!.Hand.Cards.Where(card => card.IsUpgradable),
-            1, 1, this)).FirstOrDefault();
+        CardModel? selected = await CardSelectCmd.FromHandForUpgrade(CombatState!, Owner, this);
         if (selected is not null) CardCmd.Upgrade(selected);
     }
 }

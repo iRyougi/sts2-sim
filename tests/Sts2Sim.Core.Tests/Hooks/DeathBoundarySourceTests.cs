@@ -56,6 +56,11 @@ public sealed class DeathBoundarySourceTests : IDisposable
         // A dead target retained in combat remains eligible: source does not reject IsDead alone.
         var (_, _, retainedRoom) = await CreateCombat();
         var retained = retainedRoom.Engine.State.Enemies.Single();
+        // Keep a primary enemy alive so this exercises detached/IsDead eligibility,
+        // rather than PowerCmd's independent IsEnding guard.
+        retainedRoom.Engine.State.AddMonster(
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
+            Sts2Sim.Core.Combat.CombatSide.Enemy);
         retained.SetCurrentHpInternal(0);
         Assert.NotNull(await PowerCmd.Apply<Sts2Sim.Core.Models.Powers.StrengthPower>(
             retainedRoom.Engine.State, retained, 1, null, null));

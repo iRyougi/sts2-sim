@@ -35,9 +35,8 @@ public sealed class SeekerStrike : CardModel, ICardDamageVariableProvider
 
         List<CardModel> drawPile = Owner.PlayerCombatState!.DrawPile.Cards.ToList();
         List<CardModel> cardOptions = drawPile.StableShuffle(Owner.RunState.Rng.CombatCardSelection).Take(CandidateCount).ToList();
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(CombatState!, Owner,
-            Owner.PlayerCombatState!.DrawPile.Cards.Where(card => cardOptions.Any(option => ReferenceEquals(option, card))),
-            1, 1, this, cancelable: false)).FirstOrDefault();
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(CombatState!, Owner,
+            Owner.PlayerCombatState!.DrawPile, 1, 1, this, filter: card => cardOptions.Any(option => ReferenceEquals(option, card)))).FirstOrDefault();
         if (selected is not null)
         {
             CardPileCmd.Add(selected, PileType.Hand);

@@ -23,10 +23,10 @@ public sealed class Tutor : GeneratedCardModel
             throw new InvalidOperationException("Tutor requires a player target.");
         }
 
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
             CombatState!,
             targetPlayer,
-            targetPlayer.PlayerCombatState!.DrawPile.Cards,
+            targetPlayer.PlayerCombatState!.DrawPile,
             1,
             1,
             this);

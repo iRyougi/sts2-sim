@@ -22,8 +22,8 @@ public sealed class Seance : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        IReadOnlyList<CardModel> selection = await CardSelectCmd.SelectCardsAsync(CombatState!, Owner,
-            Owner.PlayerCombatState!.DrawPile.Cards, CardCount, CardCount, this);
+        IReadOnlyList<CardModel> selection = await CardSelectCmd.FromCombatPile(CombatState!, Owner,
+            Owner.PlayerCombatState!.DrawPile, CardCount, CardCount, this);
         foreach (CardModel card in selection.ToList())
         {
             await CardCmd.TransformTo<Soul>(card, Owner.RunState);

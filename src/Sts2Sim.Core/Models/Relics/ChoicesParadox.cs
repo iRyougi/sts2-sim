@@ -29,7 +29,7 @@ public sealed class ChoicesParadox : RelicModel
             choice.AddKeywordInternal(CardKeyword.Retain);
         }
 
-        IReadOnlyList<CardModel> selected = await CardSelectCmd.SelectCardsAsync(
+        IReadOnlyList<CardModel> selected = await CardSelectCmd.FromSimpleGrid(
             combatState, Owner, choices, 1, 1, this);
         if (selected.FirstOrDefault() is { } card)
         {

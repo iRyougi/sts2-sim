@@ -16,8 +16,8 @@ public sealed class Charge : CardModel
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        IReadOnlyList<CardModel> selection = await CardSelectCmd.SelectCardsAsync(CombatState!, Owner,
-            Owner.PlayerCombatState!.DrawPile.Cards, 2, 2, this, cancelable: false);
+        IReadOnlyList<CardModel> selection = await CardSelectCmd.FromCombatPile(CombatState!, Owner,
+            Owner.PlayerCombatState!.DrawPile, 2, 2, this, cancelable: false);
         foreach (CardModel card in selection)
         {
             MinionDiveBomb replacement = await CardCmd.CreateAndTransform<MinionDiveBomb>(card);

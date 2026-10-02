@@ -19,8 +19,8 @@ public sealed class DropletOfPrecognition : PotionModel
         ArgumentNullException.ThrowIfNull(target);
         Player player = target.Player
             ?? throw new InvalidOperationException("Droplet of Precognition requires a player target.");
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
-            player.Creature.CombatState!, player, player.PlayerCombatState!.DrawPile.Cards,
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(
+            player.Creature.CombatState!, player, player.PlayerCombatState!.DrawPile,
             1, 1, this, cancelable: false)).FirstOrDefault();
         if (selected is not null)
         {

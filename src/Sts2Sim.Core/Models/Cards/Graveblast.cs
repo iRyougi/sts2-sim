@@ -30,11 +30,8 @@ public sealed class Graveblast : CardModel, ICardChoiceBaseValueProvider, ICardD
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
         await DamageCmd.Attack(Damage).FromCard(this, cardPlay).Targeting(cardPlay.Target).Execute();
-        // 原版 CardSelectCmd.FromCombatPile 在战斗正在结束时直接返回空选择。
-        if (CombatState!.IsOverOrEnding())
-            return;
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile.Cards, 1, 1, this)).FirstOrDefault();
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile, 1, 1, this)).FirstOrDefault();
         if (selected is not null)
             CardPileCmd.Add(selected, PileType.Hand);
     }

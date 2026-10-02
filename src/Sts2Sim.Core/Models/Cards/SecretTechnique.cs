@@ -21,9 +21,8 @@ public sealed class SecretTechnique : CardModel
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DrawPile.Cards.Where(c => c.Type == CardType.Skill),
-            1, 1, this, cancelable: false)).FirstOrDefault();
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DrawPile, 1, 1, this, filter: c => c.Type == CardType.Skill)).FirstOrDefault();
         if (selected is not null)
         {
             CardPileCmd.Add(selected, PileType.Hand);

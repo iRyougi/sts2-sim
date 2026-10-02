@@ -18,8 +18,8 @@ public sealed class Hologram : CardModel, ICardChoiceBaseValueProvider
     protected override async Task OnPlay(CardPlay play)
     {
         await CreatureCmd.GainBlock(CombatState!, Owner.Creature, _block, ValueProp.Move, this, play);
-        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
-            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile.Cards,
+        CardModel? selected = (await CardSelectCmd.FromCombatPile(
+            CombatState!, Owner, Owner.PlayerCombatState!.DiscardPile,
             1, 1, this)).FirstOrDefault();
         if (selected is not null)
             CardPileCmd.Add(selected, PileType.Hand);
