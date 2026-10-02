@@ -23,7 +23,7 @@ public sealed class DexterityPotion : PotionModel
             target.CombatState!,
             target,
             DexterityGranted,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

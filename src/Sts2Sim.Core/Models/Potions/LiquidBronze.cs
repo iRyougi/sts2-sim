@@ -23,7 +23,7 @@ public sealed class LiquidBronze : PotionModel
             target.CombatState!,
             target,
             ThornsGranted,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

@@ -23,7 +23,7 @@ public sealed class HeartOfIron : PotionModel
             target.CombatState!,
             target,
             PlatingGranted,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

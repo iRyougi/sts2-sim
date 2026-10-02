@@ -262,6 +262,8 @@ public sealed class RarePotionBatch2Tests : IDisposable
         Creature enemy = room.Engine.State.Enemies.Single();
         await UsePotion("GigantificationPotion", player, player.Creature);
         PowerModel power = RequirePower(player.Creature, "GigantificationPower");
+        Assert.Same(player.Creature, power.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
         CardModel claimedSource = AddCard<Task11AttackCard>(player, PileType.Hand);
         CardModel unrelatedSource = AddCard<Task11AttackCard>(player, PileType.Hand);
         CardModel laterSource = AddCard<Task11AttackCard>(player, PileType.Hand);
@@ -291,6 +293,18 @@ public sealed class RarePotionBatch2Tests : IDisposable
 
         await later.Execute();
         Assert.Equal(hpBefore - 22, enemy.CurrentHp);
+
+        (RunState sourceRun, Player donor) = CreateRun("gigantification-owner-source");
+        Player recipient = CreatePlayer(sourceRun);
+        sourceRun.AddPlayer(recipient);
+        var sourceRoom = new CombatRoom(
+            () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await sourceRoom.Enter(sourceRun);
+        await UsePotion("GigantificationPotion", donor, recipient.Creature);
+        PowerModel recipientPower = RequirePower(recipient.Creature, "GigantificationPower");
+        Assert.Equal(1, recipientPower.Amount);
+        Assert.Same(donor.Creature, recipientPower.Applier);
+        Assert.DoesNotContain(donor.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -379,6 +393,8 @@ public sealed class RarePotionBatch2Tests : IDisposable
         await UsePotion("LuckyTonic", player, player.Creature);
         await UsePotion("LuckyTonic", player, player.Creature);
         PowerModel buffer = RequirePower(player.Creature, "BufferPower");
+        Assert.Same(player.Creature, buffer.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
         int hpBefore = player.Creature.CurrentHp;
         player.Creature.GainBlockInternal(5m);
 
@@ -402,6 +418,18 @@ public sealed class RarePotionBatch2Tests : IDisposable
             await DamagePlayer(room, player, enemy, 3m, ValueProp.Unpowered));
         Assert.Equal(3, unbuffered.UnblockedDamage);
         Assert.Equal(hpBefore - 3, player.Creature.CurrentHp);
+
+        (RunState sourceRun, Player donor) = CreateRun("buffer-owner-source");
+        Player recipient = CreatePlayer(sourceRun);
+        sourceRun.AddPlayer(recipient);
+        var sourceRoom = new CombatRoom(
+            () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await sourceRoom.Enter(sourceRun);
+        await UsePotion("LuckyTonic", donor, recipient.Creature);
+        PowerModel recipientBuffer = RequirePower(recipient.Creature, "BufferPower");
+        Assert.Equal(1, recipientBuffer.Amount);
+        Assert.Same(donor.Creature, recipientBuffer.Applier);
+        Assert.DoesNotContain(donor.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -433,6 +461,8 @@ public sealed class RarePotionBatch2Tests : IDisposable
         (Player player, CombatRoom room) = await CreateCombatAsync("ritual-player");
         await UsePotion("MazalethsGift", player, player.Creature);
         PowerModel ritual = RequirePower(player.Creature, "RitualPower");
+        Assert.Same(player.Creature, ritual.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
 
         await Hook.AfterSideTurnEnd(
             room.Engine.State,
@@ -453,6 +483,18 @@ public sealed class RarePotionBatch2Tests : IDisposable
         Assert.Equal(2, Assert.Single(player.Creature.Powers.OfType<StrengthPower>()).Amount);
         Assert.Equal(1, ritual.Amount);
         Assert.Contains(ritual, player.Creature.Powers);
+
+        (RunState sourceRun, Player donor) = CreateRun("ritual-owner-source");
+        Player recipient = CreatePlayer(sourceRun);
+        sourceRun.AddPlayer(recipient);
+        var sourceRoom = new CombatRoom(
+            () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await sourceRoom.Enter(sourceRun);
+        await UsePotion("MazalethsGift", donor, recipient.Creature);
+        PowerModel recipientRitual = RequirePower(recipient.Creature, "RitualPower");
+        Assert.Equal(1, recipientRitual.Amount);
+        Assert.Same(donor.Creature, recipientRitual.Applier);
+        Assert.DoesNotContain(donor.PotionSlots, potion => potion is not null);
     }
 
     [Fact]

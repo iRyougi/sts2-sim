@@ -92,7 +92,8 @@ public sealed class CommonPotionBatch1Tests : IDisposable
         string effect,
         decimal expected)
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync($"direct-{effect}");
+        (Player player, CombatRoom room) =
+            await CreateCombatAsync($"direct-{effect}", playerCount: effect == "dexterity" ? 2 : 1);
         Creature enemy = room.Engine.State.HittableEnemies.Single();
 
         switch (effect)
@@ -110,6 +111,16 @@ public sealed class CommonPotionBatch1Tests : IDisposable
             case "dexterity":
                 await UsePotionAsync(potionType, player, player.Creature);
                 Assert.Equal(expected, Assert.Single(player.Creature.Powers.OfType<DexterityPower>()).Amount);
+                DexterityPower dexterity = Assert.Single(player.Creature.Powers.OfType<DexterityPower>());
+                Assert.Same(player.Creature, dexterity.Applier);
+                Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
+
+                Creature otherPlayer = room.Engine.State.Allies.Single(creature => creature != player.Creature);
+                await UsePotionAsync(potionType, player, otherPlayer);
+                DexterityPower otherDexterity = Assert.Single(otherPlayer.Powers.OfType<DexterityPower>());
+                Assert.Equal(expected, otherDexterity.Amount);
+                Assert.Same(player.Creature, otherDexterity.Applier);
+                Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
                 break;
             case "energy":
                 player.PlayerCombatState!.Energy = 0;
@@ -271,11 +282,17 @@ public sealed class CommonPotionBatch1Tests : IDisposable
         await PotionCmd.Use(potion, player, target);
     }
 
-    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed)
+    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(
+        string seed,
+        int playerCount = 1)
     {
         var runState = new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<PotionTestCharacter>(), runState);
         runState.AddPlayer(player);
+        for (int index = 1; index < playerCount; index++)
+        {
+            runState.AddPlayer(Player.CreateForNewRun(ModelDb.Character<PotionTestCharacter>(), runState));
+        }
         var room = new CombatRoom(
             () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);

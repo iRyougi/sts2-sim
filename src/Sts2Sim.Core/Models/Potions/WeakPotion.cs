@@ -23,7 +23,7 @@ public sealed class WeakPotion : PotionModel
             target.CombatState!,
             target,
             WeakApplied,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

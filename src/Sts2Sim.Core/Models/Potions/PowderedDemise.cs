@@ -23,7 +23,7 @@ public sealed class PowderedDemise : PotionModel
             target.CombatState!,
             target,
             DemiseApplied,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

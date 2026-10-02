@@ -155,6 +155,8 @@ public sealed class CommonPotionBatch2Tests : IDisposable
 
         PowerModel power = Assert.Single(target.Powers, candidate => candidate.GetType() == powerType);
         Assert.Equal(3m, power.Amount);
+        Assert.Same(player.Creature, power.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
 
         await Hook.AfterSideTurnEnd(room.Engine.State, CombatSide.Enemy, new[] { target });
         Assert.Equal(2m, power.Amount);

@@ -23,13 +23,13 @@ public sealed class FyshOil : PotionModel
             target.CombatState!,
             target,
             PowerGranted,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
         await PowerCmd.Apply<DexterityPower>(
             target.CombatState!,
             target,
             PowerGranted,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

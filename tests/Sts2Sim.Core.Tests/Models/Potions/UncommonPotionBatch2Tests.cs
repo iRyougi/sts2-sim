@@ -90,6 +90,8 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
 
         ThornsPower thorns = Assert.Single(targetPlayer.Creature.Powers.OfType<ThornsPower>());
         Assert.Equal(3, thorns.Amount);
+        Assert.Same(potionOwner.Creature, thorns.Applier);
+        Assert.DoesNotContain(potionOwner.PotionSlots, potion => potion is not null);
         Assert.Empty(potionOwner.Creature.Powers.OfType<ThornsPower>());
 
         await CreatureCmd.Damage(
@@ -155,6 +157,8 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
         Assert.Equal(PowerType.Debuff, demise.Type);
         Assert.Equal(PowerStackType.Counter, demise.StackType);
         Assert.Equal(9, demise.Amount);
+        Assert.Same(player.Creature, demise.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
         int hpBefore = owner.CurrentHp;
 
         await Hook.AfterSideTurnEnd(
@@ -208,6 +212,8 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
         Assert.Equal(PowerType.Buff, radiance.Type);
         Assert.Equal(PowerStackType.Counter, radiance.StackType);
         Assert.Equal(3, radiance.Amount);
+        Assert.Same(potionOwner.Creature, radiance.Applier);
+        Assert.DoesNotContain(potionOwner.PotionSlots, potion => potion is not null);
 
         await Hook.AfterEnergyReset(room.Engine.State, potionOwner);
         Assert.Equal(7, potionOwner.PlayerCombatState.Energy);

@@ -94,6 +94,8 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
             owner.Creature.Powers,
             power => power.GetType() == RequireTask7Type("ClarityPower"));
         Assert.Equal(3, clarity.Amount);
+        Assert.Same(owner.Creature, clarity.Applier);
+        Assert.DoesNotContain(owner.PotionSlots, potion => potion is not null);
         Assert.Equal(5m, Hook.ModifyHandDraw(room.Engine.State, otherPlayer, 5m));
 
         MoveHandToDiscard(owner);
@@ -128,6 +130,16 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
 
         Assert.DoesNotContain(clarity, owner.Creature.Powers);
         Assert.Equal(5m, Hook.ModifyHandDraw(room.Engine.State, owner, 5m));
+
+        AddCopiesToPile<UncommonPotionDrawCard>(otherPlayer, PileType.Draw, 1);
+        await UsePotionAsync("Clarity", owner, otherPlayer.Creature);
+        PowerModel otherClarity = Assert.Single(
+            otherPlayer.Creature.Powers,
+            power => power.GetType() == RequireTask7Type("ClarityPower"));
+        Assert.Equal(3, otherClarity.Amount);
+        Assert.Same(owner.Creature, otherClarity.Applier);
+        Assert.Single(otherPlayer.PlayerCombatState!.Hand.Cards);
+        Assert.DoesNotContain(owner.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -292,7 +304,8 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
     [Fact]
     public async Task FyshOil_AppliesOnePermanentStrengthAndDexterity()
     {
-        (IReadOnlyList<Player> players, CombatRoom room) = await CreateCombatAsync("fysh-oil");
+        (IReadOnlyList<Player> players, CombatRoom room) =
+            await CreateCombatAsync("fysh-oil", playerCount: 2);
         Player player = players[0];
 
         await UsePotionAsync("FyshOil", player, player.Creature);
@@ -301,6 +314,9 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
         DexterityPower dexterity = Assert.Single(player.Creature.Powers.OfType<DexterityPower>());
         Assert.Equal(1, strength.Amount);
         Assert.Equal(1, dexterity.Amount);
+        Assert.Same(player.Creature, strength.Applier);
+        Assert.Same(player.Creature, dexterity.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
 
         await Hook.AfterSideTurnEnd(
             room.Engine.State,
@@ -308,6 +324,16 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
             new[] { player.Creature });
         Assert.Equal(1, strength.Amount);
         Assert.Equal(1, dexterity.Amount);
+
+        Player recipient = players[1];
+        await UsePotionAsync("FyshOil", player, recipient.Creature);
+        StrengthPower recipientStrength = Assert.Single(recipient.Creature.Powers.OfType<StrengthPower>());
+        DexterityPower recipientDexterity = Assert.Single(recipient.Creature.Powers.OfType<DexterityPower>());
+        Assert.Equal(1, recipientStrength.Amount);
+        Assert.Equal(1, recipientDexterity.Amount);
+        Assert.Same(player.Creature, recipientStrength.Applier);
+        Assert.Same(player.Creature, recipientDexterity.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -376,12 +402,21 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
     [Fact]
     public async Task HeartOfIron_AppliesExactlySevenPlating()
     {
-        (IReadOnlyList<Player> players, _) = await CreateCombatAsync("heart-of-iron");
+        (IReadOnlyList<Player> players, _) = await CreateCombatAsync("heart-of-iron", playerCount: 2);
         Player player = players[0];
 
         await UsePotionAsync("HeartOfIron", player, player.Creature);
 
         Assert.Equal(7, Assert.Single(player.Creature.Powers.OfType<PlatingPower>()).Amount);
+        Assert.Same(player.Creature, Assert.Single(player.Creature.Powers.OfType<PlatingPower>()).Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
+
+        Player recipient = players[1];
+        await UsePotionAsync("HeartOfIron", player, recipient.Creature);
+        PlatingPower recipientPlating = Assert.Single(recipient.Creature.Powers.OfType<PlatingPower>());
+        Assert.Equal(7, recipientPlating.Amount);
+        Assert.Same(player.Creature, recipientPlating.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
     }
 
     private static PotionModel GetCanonicalPotion(string potionName)

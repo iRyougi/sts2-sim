@@ -23,7 +23,7 @@ public sealed class VulnerablePotion : PotionModel
             target.CombatState!,
             target,
             VulnerableApplied,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

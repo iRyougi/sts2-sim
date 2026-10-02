@@ -29,7 +29,7 @@ public sealed class Clarity : PotionModel
             target.CombatState!,
             target,
             Duration,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

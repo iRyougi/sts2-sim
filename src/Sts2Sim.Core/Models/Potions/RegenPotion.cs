@@ -28,7 +28,7 @@ public sealed class RegenPotion : PotionModel
             target.CombatState!,
             target,
             RegenApplied,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

@@ -113,6 +113,8 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
         Assert.Equal(PowerType.Buff, regen.Type);
         Assert.Equal(PowerStackType.Counter, regen.StackType);
         Assert.Equal(5, regen.Amount);
+        Assert.Same(player.Creature, regen.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
         Assert.Equal(45, player.Creature.CurrentHp);
 
         await Hook.BeforeSideTurnEndEarly(
@@ -141,6 +143,17 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
             CombatSide.Player,
             room.Engine.State.Allies);
         Assert.Equal(60, player.Creature.CurrentHp);
+
+        (Player donor, CombatRoom sourceRoom) =
+            await CreateCombatAsync("regen-owner-source", playerCount: 2);
+        Creature recipient = sourceRoom.Engine.State.Allies.Single(creature => creature != donor.Creature);
+        await UsePotionAsync("RegenPotion", donor, recipient);
+        PowerModel recipientRegen = Assert.Single(
+            recipient.Powers,
+            power => power.GetType() == RequireTask9Type("RegenPower"));
+        Assert.Equal(5, recipientRegen.Amount);
+        Assert.Same(donor.Creature, recipientRegen.Applier);
+        Assert.DoesNotContain(donor.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -174,6 +187,8 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
 
         RetainHandPower retain = Assert.Single(player.Creature.Powers.OfType<RetainHandPower>());
         Assert.Equal(2, retain.Amount);
+        Assert.Same(player.Creature, retain.Applier);
+        Assert.DoesNotContain(player.PotionSlots, potion => potion is not null);
 
         await room.Engine.EndPlayerTurnAsync();
         Assert.Contains(retained, player.PlayerCombatState!.Hand.Cards);
@@ -193,6 +208,15 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
         await room.Engine.EndPlayerTurnAsync();
         Assert.DoesNotContain(retained, player.PlayerCombatState.Hand.Cards);
         Assert.Contains(retained, player.PlayerCombatState.DiscardPile.Cards);
+
+        (Player donor, CombatRoom sourceRoom) =
+            await CreateCombatAsync("stable-serum-owner-source", playerCount: 2);
+        Creature recipient = sourceRoom.Engine.State.Allies.Single(creature => creature != donor.Creature);
+        await UsePotionAsync("StableSerum", donor, recipient);
+        RetainHandPower recipientRetain = Assert.Single(recipient.Powers.OfType<RetainHandPower>());
+        Assert.Equal(2, recipientRetain.Amount);
+        Assert.Same(donor.Creature, recipientRetain.Applier);
+        Assert.DoesNotContain(donor.PotionSlots, potion => potion is not null);
     }
 
     [Fact]
@@ -376,13 +400,21 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
         }
     }
 
-    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed)
+    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(
+        string seed,
+        int playerCount = 1)
     {
         var runState = new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(
             ModelDb.Character<UncommonPotionBatch3TestCharacter>(),
             runState);
         runState.AddPlayer(player);
+        for (int index = 1; index < playerCount; index++)
+        {
+            runState.AddPlayer(Player.CreateForNewRun(
+                ModelDb.Character<UncommonPotionBatch3TestCharacter>(),
+                runState));
+        }
         var room = new CombatRoom(
             () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);

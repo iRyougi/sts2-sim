@@ -15,6 +15,6 @@ public sealed class MazalethsGift : PotionModel
     protected override async Task OnUse(Creature? target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        await PowerCmd.Apply<RitualPower>(target.CombatState!, target, 1m, null, null);
+        await PowerCmd.Apply<RitualPower>(target.CombatState!, target, 1m, Owner.Creature, null);
     }
 }

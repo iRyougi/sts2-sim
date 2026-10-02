@@ -25,7 +25,7 @@ public sealed class RadiantTincture : PotionModel
             target.CombatState!,
             target,
             RadianceDuration,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }

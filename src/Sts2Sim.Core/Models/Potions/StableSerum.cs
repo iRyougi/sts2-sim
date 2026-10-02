@@ -23,7 +23,7 @@ public sealed class StableSerum : PotionModel
             target.CombatState!,
             target,
             RetainDuration,
-            applier: null,
+            applier: Owner.Creature,
             cardSource: null);
     }
 }
