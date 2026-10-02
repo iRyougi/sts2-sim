@@ -10,7 +10,6 @@ namespace Sts2Sim.Core.Models.Events
 
     /// <summary>
     /// Orobas Ancient reward selection.
-    /// Touch payload limitations are recorded in #213;
     /// event-pool eligibility and locked third-option semantics remain faithful.
     /// </summary>
     public sealed class Orobas : AncientEventModel
@@ -41,7 +40,7 @@ namespace Sts2Sim.Core.Models.Events
                 ? typeof(PrismaticGem)
                 : typeof(SeaGlass);
             Type[] firstCandidates = Pool1.Append(thirdPool1Candidate).ToArray();
-            Type[] pool3 = BuildPool3();
+            EventOption[] pool3 = BuildPool3();
 
             return new[]
             {
@@ -49,20 +48,21 @@ namespace Sts2Sim.Core.Models.Events
                 Option(Rng.NextItem(Pool2)!),
                 pool3.Length == 0
                     ? new EventOption("OPTION_POOL_3_LOCKED", null)
-                    : Option(Rng.NextItem(pool3)!),
+                    : Rng.NextItem(pool3)!,
             };
         }
 
-        private Type[] BuildPool3()
+        private EventOption[] BuildPool3()
         {
-            var result = new List<Type>();
-            if (Owner.Relics.Any(relic => relic.Rarity == RelicRarity.Starter))
+            var result = new List<EventOption>();
+            var touch = (TouchOfOrobas)ModelDb.Relic<TouchOfOrobas>().MutableClone();
+            if (touch.SetupForPlayer(Owner))
             {
-                result.Add(typeof(TouchOfOrobas));
+                result.Add(RelicOption(touch, nameof(TouchOfOrobas)));
             }
             if (Owner.Deck.Cards.Any(ArchaicTooth.IsTranscendenceStarter))
             {
-                result.Add(typeof(ArchaicTooth));
+                result.Add(Option(typeof(ArchaicTooth)));
             }
             return result.ToArray();
         }

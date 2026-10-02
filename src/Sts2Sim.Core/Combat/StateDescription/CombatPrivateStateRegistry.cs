@@ -109,6 +109,10 @@ internal static class CombatPrivateStateRegistry
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["TouchOfOrobas._starterRelic"] =
+                "Pickup replacement has already happened; this saved ID has no future combat read.",
+            ["TouchOfOrobas._upgradedRelic"] =
+                "Pickup replacement has already happened; this saved ID has no future combat read.",
             ["SeaGlass._characterId"] =
                 "The character choice is used only during the already-completed pickup effect and for presentation.",
             ["CeremonialBeast.<IsStunnedByPlowRemoval>k__BackingField"] =

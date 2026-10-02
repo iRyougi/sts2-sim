@@ -13,8 +13,10 @@ using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
+using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Tests.Models.Cards;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Tests.Models.Potions;
@@ -125,12 +127,53 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
 
         foreach (Creature enemy in new[] { firstLiving, secondLiving })
         {
-            Assert.Equal(1, Assert.Single(enemy.Powers.OfType<WeakPower>()).Amount);
-            Assert.Equal(1, Assert.Single(enemy.Powers.OfType<VulnerablePower>()).Amount);
+            WeakPower weak = Assert.Single(enemy.Powers.OfType<WeakPower>());
+            VulnerablePower vulnerable = Assert.Single(enemy.Powers.OfType<VulnerablePower>());
+            Assert.Equal(1, weak.Amount);
+            Assert.Equal(1, vulnerable.Amount);
+            Assert.Same(player.Creature, weak.Applier);
+            Assert.Same(player.Creature, vulnerable.Applier);
         }
 
         Assert.Empty(deadEnemy.Powers);
         Assert.Empty(player.Creature.Powers);
+
+        var consumerRun = new RunState("potion-of-binding-source-consumers", new Overgrowth());
+        Player potionOwner = Player.CreateForNewRun(ModelDb.Character<Necrobinder>(), consumerRun);
+        Player otherPlayer = Player.CreateForNewRun(ModelDb.Character<Necrobinder>(), consumerRun);
+        consumerRun.AddPlayer(potionOwner);
+        consumerRun.AddPlayer(otherPlayer);
+        var consumerRoom = new CombatRoom(
+            () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await consumerRoom.Enter(consumerRun);
+        Creature consumerFirst = consumerRoom.Engine.State.HittableEnemies.Single();
+        Creature consumerSecond = AddEnemy(consumerRoom);
+        Creature consumerDead = AddEnemy(consumerRoom);
+        consumerDead.LoseHpInternal(consumerDead.CurrentHp, ValueProp.Unpowered);
+        SleightOfFlesh ownerCard = Task11CombatTestSupport.AddToHand<SleightOfFlesh>(potionOwner);
+        SleightOfFlesh otherCard = Task11CombatTestSupport.AddToHand<SleightOfFlesh>(otherPlayer);
+        otherCard.Upgrade();
+        potionOwner.PlayerCombatState!.Energy = 3;
+        otherPlayer.PlayerCombatState!.Energy = 3;
+        await consumerRoom.Engine.PlayCardAsync(potionOwner, ownerCard, target: null);
+        await consumerRoom.Engine.PlayCardAsync(otherPlayer, otherCard, target: null);
+        int firstHpBefore = consumerFirst.CurrentHp;
+        int secondHpBefore = consumerSecond.CurrentHp;
+        PotionModel consumed = potionOwner.AddPotionInternal(ModelDb.Potion<PotionOfBinding>());
+        PotionModel otherPotion = otherPlayer.AddPotionInternal(ModelDb.Potion<BlockPotion>());
+
+        await PotionCmd.Use(consumed, potionOwner, target: null);
+
+        Assert.Equal(firstHpBefore - 18, consumerFirst.CurrentHp);
+        Assert.Equal(secondHpBefore - 18, consumerSecond.CurrentHp);
+        foreach (Creature enemy in new[] { consumerFirst, consumerSecond })
+        {
+            Assert.Same(potionOwner.Creature, Assert.Single(enemy.Powers.OfType<WeakPower>()).Applier);
+            Assert.Same(potionOwner.Creature, Assert.Single(enemy.Powers.OfType<VulnerablePower>()).Applier);
+        }
+        Assert.Empty(consumerDead.Powers);
+        Assert.DoesNotContain(consumed, potionOwner.PotionSlots);
+        Assert.Contains(otherPotion, otherPlayer.PotionSlots);
     }
 
     [Fact]

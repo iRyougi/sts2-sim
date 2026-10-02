@@ -68,8 +68,8 @@ public sealed class ContentRegistryTests : IDisposable
 
         RelicModel[] relics = ModelDb.All<RelicModel>().ToArray();
         // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, Task 3a
-        // relics, and the eight Necrobinder relics.
-        Assert.Equal(293, relics.Length);
+        // relics, the eight Necrobinder relics, and five Orobas upgraded starters.
+        Assert.Equal(298, relics.Length);
         Assert.Equal(
             137,
             relics.Count(relic =>

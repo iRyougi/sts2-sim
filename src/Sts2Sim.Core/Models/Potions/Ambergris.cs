@@ -25,7 +25,7 @@ public sealed class Ambergris : PotionModel
                 combatState,
                 target,
                 1m,
-                target,
+                Owner.Creature,
                 cardSource: null);
         }
     }

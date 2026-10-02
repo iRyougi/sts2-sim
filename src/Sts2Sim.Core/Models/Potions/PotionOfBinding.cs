@@ -29,13 +29,13 @@ public sealed class PotionOfBinding : PotionModel
                 combatState,
                 enemy,
                 WeakApplied,
-                applier: null,
+                applier: Owner.Creature,
                 cardSource: null);
             await PowerCmd.Apply<VulnerablePower>(
                 combatState,
                 enemy,
                 VulnerableApplied,
-                applier: null,
+                applier: Owner.Creature,
                 cardSource: null);
         }
     }

@@ -11,8 +11,9 @@ using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Enchantments;
-using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
+using Sts2Sim.Core.Models.Orbs;
+using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Rewards;
@@ -51,6 +52,66 @@ public sealed class HiveRelicContractTests : IDisposable
             Assert.Equal(typeof(RelicModel), type.BaseType);
             Assert.Equal(type == typeof(PollinousCore) || type == typeof(Sts2Sim.Core.Models.Relics.LostWisp)
                 ? RelicRarity.Event : RelicRarity.Ancient, relic.Rarity);
+        }
+    }
+
+    [Theory]
+    [InlineData(typeof(Ironclad), nameof(BurningBlood), "BlackBlood")]
+    [InlineData(typeof(Silent), nameof(RingOfTheSnake), "RingOfTheDrake")]
+    [InlineData(typeof(Defect), nameof(CrackedCore), "InfusedCore")]
+    [InlineData(typeof(Regent), nameof(DivineRight), "DivineDestiny")]
+    [InlineData(typeof(Necrobinder), nameof(BoundPhylactery), "PhylacteryUnbound")]
+    public async Task TouchOfOrobas_ReplacesEachStarterRelicInPlace(
+        Type characterType, string starterName, string upgradedName)
+    {
+        var run = new RunState($"touch-orobas-{characterType.Name}", new Overgrowth());
+        var character = (CharacterModel)ModelDb.Get(characterType);
+        Player player = Player.CreateForNewRun(character, run);
+        run.AddPlayer(player);
+        RelicModel starter = Assert.Single(player.Relics, relic => relic.Rarity == RelicRarity.Starter);
+        Assert.Equal(starterName, starter.GetType().Name);
+        int starterIndex = player.Relics.ToList().IndexOf(starter);
+
+        await RelicCmd.Obtain(ModelDb.Relic<TouchOfOrobas>(), player);
+
+        RelicModel upgraded = player.Relics[starterIndex];
+        Assert.Equal(upgradedName, upgraded.GetType().Name);
+        Assert.Equal(RelicRarity.Starter, upgraded.Rarity);
+        Assert.DoesNotContain(starter, player.Relics);
+        Assert.Single(player.Relics.OfType<TouchOfOrobas>());
+
+        var room = new CombatRoom(() => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await room.Enter(run);
+        switch (upgradedName)
+        {
+            case "BlackBlood":
+                player.Creature.SetCurrentHpInternal(player.Creature.MaxHp - 20m);
+                await Hook.AfterCombatVictory(room.Engine.State);
+                Assert.Equal(player.Creature.MaxHp - 8m, player.Creature.CurrentHp);
+                break;
+            case "RingOfTheDrake":
+                for (int turn = 1; turn <= 4; turn++)
+                {
+                    player.PlayerCombatState!.TurnNumber = turn;
+                    Assert.Equal(turn <= 3 ? 7m : 5m,
+                        Hook.ModifyHandDraw(room.Engine.State, player, 5m));
+                }
+                break;
+            case "InfusedCore":
+                Assert.Equal(3, player.PlayerCombatState!.OrbQueue.Orbs.Count);
+                Assert.All(player.PlayerCombatState.OrbQueue.Orbs,
+                    orb => Assert.IsType<LightningOrb>(orb));
+                Assert.Equal(4m, Hook.ModifyOrbValue(room.Engine.State,
+                    player.PlayerCombatState.OrbQueue.Orbs[0], 3m));
+                break;
+            case "DivineDestiny":
+                Assert.Equal(7, player.PlayerCombatState!.Stars);
+                break;
+            case "PhylacteryUnbound":
+                // v0.111.0 only overrides SpawnsPets; AddsPet would wrongly mark an event pet.
+                Assert.False(player.HasEventPet());
+                Assert.Equal(7m, player.Osty!.MaxHp);
+                break;
         }
     }
 

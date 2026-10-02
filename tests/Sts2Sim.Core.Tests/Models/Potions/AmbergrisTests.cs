@@ -9,8 +9,10 @@ using Sts2Sim.Core.Entities.Potions;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Cards;
+using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Models.Powers;
+using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Tests.Models.Cards;
 using Sts2Sim.Core.ValueProps;
@@ -61,6 +63,8 @@ public sealed class AmbergrisTests : IDisposable
         AmbergrisPower power = Assert.Single(player.Creature.Powers.OfType<AmbergrisPower>());
         Assert.Equal(30, player.Creature.CurrentHp - hpBeforePotion);
         Assert.Equal(1, power.Amount);
+        Assert.Same(player.Creature, power.Applier);
+        Assert.DoesNotContain(potion, player.PotionSlots);
 
         ToricToughness toric = Task11CombatTestSupport.AddToHand<ToricToughness>(player);
         await toric.PlayAsync(target: null);
@@ -84,6 +88,31 @@ public sealed class AmbergrisTests : IDisposable
         Assert.Equal(roundBefore + 1, room.Engine.State.RoundNumber);
         Assert.Equal(turnBefore + 2, player.PlayerCombatState.TurnNumber);
         Assert.True(player.Creature.CurrentHp < hpBeforeExtra);
+
+        var crossRun = new RunState("task11-ambergris-cross-source", new Overgrowth());
+        Player potionOwner = Player.CreateForNewRun(ModelDb.Character<Regent>(), crossRun);
+        Player targetPlayer = Player.CreateForNewRun(ModelDb.Character<Regent>(), crossRun);
+        crossRun.AddPlayer(potionOwner);
+        crossRun.AddPlayer(targetPlayer);
+        var crossRoom = new CombatRoom(
+            () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        await crossRoom.Enter(crossRun);
+        targetPlayer.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        int targetHpBefore = targetPlayer.Creature.CurrentHp;
+        int ownerHpBefore = potionOwner.Creature.CurrentHp;
+        PotionModel crossPotion = potionOwner.AddPotionInternal(ModelDb.Potion<Ambergris>());
+
+        await PotionCmd.Use(crossPotion, potionOwner, targetPlayer.Creature);
+
+        AmbergrisPower crossPower = Assert.Single(targetPlayer.Creature.Powers.OfType<AmbergrisPower>());
+        Assert.Equal(30, targetPlayer.Creature.CurrentHp - targetHpBefore);
+        Assert.Equal(ownerHpBefore, potionOwner.Creature.CurrentHp);
+        Assert.Equal(1, crossPower.Amount);
+        Assert.Same(potionOwner.Creature, crossPower.Applier);
+        Assert.Empty(potionOwner.Creature.Powers.OfType<AmbergrisPower>());
+        Assert.DoesNotContain(crossPotion, potionOwner.PotionSlots);
+        Assert.True(crossPower.ShouldTakeExtraTurn(targetPlayer));
+        Assert.False(crossPower.ShouldTakeExtraTurn(potionOwner));
     }
 
     [Fact]

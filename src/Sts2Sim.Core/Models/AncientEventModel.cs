@@ -31,6 +31,16 @@ public abstract class AncientEventModel : EventModel
         });
     }
 
+    /// <summary>Preserve an Ancient option's preconfigured relic state until the player chooses it.</summary>
+    protected EventOption RelicOption(RelicModel relic, string key)
+    {
+        return new EventOption(key, async () =>
+        {
+            await RelicCmd.Obtain(relic, Owner);
+            Finish();
+        });
+    }
+
     /// <summary>
     /// 偏离 #144：监听器否决时，仅提供用于完成事件的 PROCEED 选项。
     /// </summary>

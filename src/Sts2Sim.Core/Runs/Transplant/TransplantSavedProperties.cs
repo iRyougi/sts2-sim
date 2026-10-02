@@ -19,6 +19,8 @@ internal static class TransplantSavedProperties
             ["BoneTea.CombatsLeft"] = new("_combatsLeft", "ints"),
             ["BookOfFiveRings.CardsAdded"] = new("_cardsAdded", "ints"),
             ["DustyTome.AncientCard"] = new("_ancientCard", "model_ids"),
+            ["TouchOfOrobas.StarterRelic"] = new("_starterRelic", "model_ids"),
+            ["TouchOfOrobas.UpgradedRelic"] = new("_upgradedRelic", "model_ids"),
             ["EmberTea.CombatsLeft"] = new("_combatsLeft", "ints"),
             ["FakeHappyFlower.TurnsSeen"] = new("_turnsSeen", "ints"),
             ["FakeVenerableTeaSet.GainEnergyInNextCombat"] = new("_isArmed", "bools"),

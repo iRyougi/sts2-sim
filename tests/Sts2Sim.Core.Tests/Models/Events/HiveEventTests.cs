@@ -496,7 +496,7 @@ public sealed class HiveEventTests : IDisposable
         }
     }
     [Fact]
-    public void HiveAncients_RespectSourcePoolEligibilityGates()
+    public async Task HiveAncients_RespectSourcePoolEligibilityGates()
     {
         (RunState run, Player player) = CreateRun("orobas-locked-pool");
         foreach (RelicModel relic in player.Relics.ToList())
@@ -524,6 +524,19 @@ public sealed class HiveEventTests : IDisposable
             Assert.True(roleOrobas.CurrentOptions[2].Key == nameof(ArchaicTooth),
                 $"{character.Id.Entry}: Orobas did not offer ArchaicTooth for its native starter card.");
         }
+
+        (run, player) = CreateRun("orobas-touch-preconfigured");
+        foreach (CardModel card in player.Deck.Cards.Where(ArchaicTooth.IsTranscendenceStarter).ToList())
+        {
+            CardPileCmd.Remove(card);
+        }
+        var touchOrobas = Begin<Orobas>(run, player);
+        EventOption touchOption = touchOrobas.CurrentOptions[2];
+        Assert.Equal(nameof(TouchOfOrobas), touchOption.Key);
+        await touchOrobas.ChooseOption(touchOption);
+        TouchOfOrobas touch = Assert.Single(player.Relics.OfType<TouchOfOrobas>());
+        Assert.Equal(ModelDb.Relic<DivineRight>().Id, touch.StarterRelic);
+        Assert.Equal(ModelDb.Relic<DivineDestiny>().Id, touch.UpgradedRelic);
 
         (run, player) = CreateRun("pael-gated-pools");
         foreach (CardModel card in player.Deck.Cards.ToList())

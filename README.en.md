@@ -48,9 +48,6 @@ There are two RNG modes, and they are deliberately separate APIs:
 
 The following can be met in a single-player run but are missing or incomplete:
 
-- **Some ancient relics have no effect**: ToyBox, GoldenCompass, NutritiousSoup, Driftwood, TouchOfOrobas. Ancients offer them with the original odds, but picking one does nothing or only part of what it should.
-- **Upgraded starter relics** are not ported: BlackBlood, RingOfTheDrake, InfusedCore, DivineDestiny, PhylacteryUnbound (granted by TouchOfOrobas).
-- **Enchantment** TezcatarasEmber is not ported.
 - The victory event after the final boss (TheArchitect) is not modelled; the simulator declares the win when the final boss dies.
 
 Multiplayer-only content, and content that exists in the game but cannot be obtained, is out of scope.

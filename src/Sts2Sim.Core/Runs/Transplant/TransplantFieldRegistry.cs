@@ -17,6 +17,7 @@ public static class TransplantFieldRegistry
     [
         "SeaGlass._characterId",
         "BoneTea._combatsLeft", "BookOfFiveRings._cardsAdded", "DustyTome._ancientCard",
+        "TouchOfOrobas._starterRelic", "TouchOfOrobas._upgradedRelic",
         "EmberTea._combatsLeft", "FakeHappyFlower._turnsSeen", "FakeVenerableTeaSet._isArmed",
         "FurCoat._actIndex", "FurCoat._markedCoordinates", "GalacticDust._starsSpent",
         "Girya._timesLifted", "HappyFlower._turnCounter", "IronClub._cardsPlayed",
