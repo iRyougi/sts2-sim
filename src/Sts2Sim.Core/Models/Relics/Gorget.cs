@@ -17,7 +17,7 @@ public sealed class Gorget : RelicModel
                 combatRoom.Engine.State,
                 Owner.Creature,
                 4m,
-                null,
+                Owner.Creature,
                 null);
         }
     }

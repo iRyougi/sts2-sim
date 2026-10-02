@@ -41,5 +41,6 @@ public class VajraTests : IDisposable
         PowerModel? strength = player.Creature.Powers.FirstOrDefault(p => p is StrengthPower);
         Assert.NotNull(strength);
         Assert.Equal(1, strength!.Amount);
+        Assert.Same(player.Creature, strength.Applier);
     }
 }

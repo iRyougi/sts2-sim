@@ -23,7 +23,7 @@ public sealed class Duplicator : PotionModel
             target.CombatState!,
             target,
             DuplicationGranted,
-            applier: null,
+            applier: target,
             cardSource: null);
     }
 }

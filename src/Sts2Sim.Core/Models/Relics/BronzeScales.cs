@@ -17,7 +17,7 @@ public sealed class BronzeScales : RelicModel
                 combatRoom.Engine.State,
                 Owner.Creature,
                 3m,
-                null,
+                Owner.Creature,
                 null);
         }
     }

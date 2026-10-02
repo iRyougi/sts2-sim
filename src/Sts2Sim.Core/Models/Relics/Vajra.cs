@@ -14,7 +14,7 @@ public sealed class Vajra : RelicModel
     {
         if (room is CombatRoom combatRoom)
         {
-            await PowerCmd.Apply<StrengthPower>(combatRoom.Engine.State, Owner.Creature, 1m, applier: null, cardSource: null);
+            await PowerCmd.Apply<StrengthPower>(combatRoom.Engine.State, Owner.Creature, 1m, applier: Owner.Creature, cardSource: null);
         }
     }
 }

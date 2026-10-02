@@ -109,6 +109,7 @@ public sealed class CommonRelicBatch2Tests : IDisposable
 
         DexterityPower dexterity = Assert.Single(player.Creature.Powers.OfType<DexterityPower>());
         Assert.Equal(1, dexterity.Amount);
+        Assert.Same(player.Creature, dexterity.Applier);
     }
 
     [Fact]

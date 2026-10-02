@@ -156,6 +156,7 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
         PowerModel duplication = Assert.Single(
             owner.Creature.Powers,
             power => power.GetType() == RequireTask7Type("DuplicationPower"));
+        Assert.Same(owner.Creature, duplication.Applier);
 
         UncommonPotionPlayProbeCard otherCard =
             AddToPile<UncommonPotionPlayProbeCard>(otherPlayer, PileType.Hand);
@@ -179,6 +180,25 @@ public sealed class UncommonPotionBatch1Tests : IDisposable
         Assert.Equal(1, owner.PlayerCombatState.DiscardPile.Cards.Count(card => card == ownerCard));
         Assert.DoesNotContain(ownerCard, owner.PlayerCombatState.PlayPile.Cards);
         Assert.DoesNotContain(duplication, owner.Creature.Powers);
+
+        (IReadOnlyList<Player> crossPlayers, _) =
+            await CreateCombatAsync("duplicator-target-source", playerCount: 2);
+        Player donor = crossPlayers[0];
+        Player recipient = crossPlayers[1];
+        PotionModel crossPotion = donor.AddPotionInternal(GetCanonicalPotion("Duplicator"));
+
+        await PotionCmd.Use(crossPotion, donor, recipient.Creature);
+
+        PowerModel recipientDuplication = Assert.Single(
+            recipient.Creature.Powers,
+            power => power.GetType() == RequireTask7Type("DuplicationPower"));
+        Assert.Same(recipient.Creature, recipientDuplication.Applier);
+        Assert.Same(recipient.Creature, recipientDuplication.Owner);
+        Assert.Equal(1, recipientDuplication.Amount);
+        Assert.DoesNotContain(
+            donor.Creature.Powers,
+            power => power.GetType() == RequireTask7Type("DuplicationPower"));
+        Assert.DoesNotContain(crossPotion, donor.PotionSlots);
     }
 
     [Fact]

@@ -185,6 +185,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
             .Execute();
 
         Assert.Equal(enemyHpBefore - 3, room.Engine.State.Enemies[0].CurrentHp);
+        Assert.Same(player.Creature, thorns.Applier);
     }
 
     [Fact]
@@ -267,6 +268,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
         Assert.Equal(1, Assert.Single(room.Engine.State.Enemies[0].Powers.OfType<VulnerablePower>()).Amount);
         Assert.Equal(9, room.Engine.State.Enemies[0].MaxHp - room.Engine.State.Enemies[0].CurrentHp);
         Assert.Equal(4, Assert.Single(player.Creature.Powers.OfType<PlatingPower>()).Amount);
+        Assert.Same(player.Creature, player.Creature.GetPower<PlatingPower>()!.Applier);
     }
 
     [Fact]

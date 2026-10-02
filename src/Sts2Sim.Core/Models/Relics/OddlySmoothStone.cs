@@ -17,7 +17,7 @@ public sealed class OddlySmoothStone : RelicModel
                 combatRoom.Engine.State,
                 Owner.Creature,
                 1m,
-                null,
+                Owner.Creature,
                 null);
         }
     }
