@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
@@ -14,6 +15,7 @@ using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Runs.Transplant;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Tests.Models.Relics;
@@ -82,6 +84,40 @@ public sealed class CommonRelicBatch1Tests : IDisposable
         await merchant.Buy(merchant.Inventory.Cards[0], player);
 
         Assert.Equal(Math.Min(woundedHp + 20, player.Creature.MaxHp), player.Creature.CurrentHp);
+    }
+
+    [Fact]
+    public async Task BookOfFiveRings_ImportedTotalTen_HealsOnlyOnTheFifteenthCard()
+    {
+        (_, Player player) = CreateRun("book-of-five-rings-imported-ten");
+        await RelicCmd.Obtain(ModelDb.Relic<BookOfFiveRings>(), player);
+        BookOfFiveRings book = Assert.Single(player.Relics.OfType<BookOfFiveRings>());
+        var properties = new Dictionary<string, JsonElement>
+        {
+            ["props"] = JsonSerializer.SerializeToElement(new
+            {
+                ints = new[] { new { name = "CardsAdded", value = 10 } },
+            }),
+        };
+        TransplantSavedProperties.Apply(book, properties, "Player.Relics.BookOfFiveRings", relic: true);
+        Assert.Equal(0, book.DisplayAmount);
+        player.Creature.LoseHpInternal(40m, ValueProp.Unpowered);
+        int woundedHp = player.Creature.CurrentHp;
+
+        for (int total = 11; total <= 15; total++)
+        {
+            CardModel card = (CardModel)ModelDb.Card<StrikeRegent>().MutableClone();
+            card.AssignOwner(player);
+            await CardPileCmd.AddToDeck(card, ModelDb.Card<StrikeRegent>());
+
+            Assert.Equal(total == 15 ? woundedHp + 20 : woundedHp, player.Creature.CurrentHp);
+            Assert.Equal(total % 5, book.DisplayAmount);
+        }
+
+        JsonElement savedTotal = Assert.Single(
+            TransplantSavedProperties.Export(book, "Player.Relics.BookOfFiveRings")["props"]
+                .GetProperty("ints").EnumerateArray());
+        Assert.Equal(15, savedTotal.GetProperty("value").GetInt32());
     }
 
     [Fact]

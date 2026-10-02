@@ -10,6 +10,8 @@ public sealed class BookOfFiveRings : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Common;
 
+    public int DisplayAmount => _cardsAdded % 5;
+
     public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
 
     public override async Task AfterCardChangedPiles(
@@ -27,12 +29,11 @@ public sealed class BookOfFiveRings : RelicModel
         }
 
         _cardsAdded++;
-        if (_cardsAdded < 5)
+        if (DisplayAmount != 0)
         {
             return;
         }
 
-        _cardsAdded -= 5;
         await CreatureCmd.Heal(Owner.Creature, 20m);
     }
 
