@@ -252,10 +252,16 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
         Assert.Same(target, generated.Owner);
         Assert.Equal(upgraded, generated.IsUpgraded);
         Assert.DoesNotContain(target.PlayerCombatState.Hand.Cards, candidate => candidate is Task6OwnerColorless);
-        Assert.Equal(0, owner.PlayerCombatState.CardsGeneratedThisCombat);
-        Assert.Equal(1, target.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(1, owner.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(0, target.PlayerCombatState.CardsGeneratedThisCombat);
         Assert.Equal(2, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
         Assert.Equal(1, Assert.Single(owner.Creature.Powers.OfType<StrengthPower>()).Amount);
+        Creature enemy = room.Engine.State.HittableEnemies.Single();
+        int hpBefore = enemy.CurrentHp;
+        await AddToPile<Supermassive>(owner, PileType.Hand).PlayAsync(enemy);
+        Assert.Equal(hpBefore - 9, enemy.CurrentHp); // Eight from generation, plus the existing Arsenal Strength.
+        await AddToPile<Supermassive>(target, PileType.Hand).PlayAsync(enemy);
+        Assert.Equal(hpBefore - 14, enemy.CurrentHp);
     }
 
     [Fact]
@@ -278,9 +284,16 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
         Assert.Equal(CardPile.MaxCardsInHand, target.PlayerCombatState!.Hand.Cards.Count);
         CardModel generated = Assert.Single(target.PlayerCombatState.DiscardPile.Cards);
         Assert.Same(target, generated.Owner);
-        Assert.Equal(0, owner.PlayerCombatState!.CardsGeneratedThisCombat);
-        Assert.Equal(1, target.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(1, owner.PlayerCombatState!.CardsGeneratedThisCombat);
+        Assert.Equal(0, target.PlayerCombatState.CardsGeneratedThisCombat);
         Assert.Equal(1, Assert.Single(owner.Creature.Powers.OfType<StrengthPower>()).Amount);
+        CardPileCmd.Remove(target.PlayerCombatState.Hand.Cards[0]);
+        Creature enemy = room.Engine.State.HittableEnemies.Single();
+        int hpBefore = enemy.CurrentHp;
+        await AddToPile<Supermassive>(owner, PileType.Hand).PlayAsync(enemy);
+        Assert.Equal(hpBefore - 9, enemy.CurrentHp);
+        await AddToPile<Supermassive>(target, PileType.Hand).PlayAsync(enemy);
+        Assert.Equal(hpBefore - 14, enemy.CurrentHp);
     }
 
     [Fact]

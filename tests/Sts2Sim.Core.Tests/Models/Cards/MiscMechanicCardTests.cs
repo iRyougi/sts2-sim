@@ -217,20 +217,60 @@ public sealed class MiscMechanicCardTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task Supermassive_ScalesWithCardsGeneratedThisCombat()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Supermassive_ScalesWithCardsGeneratedThisCombat(bool explicitCreator)
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync("supermassive");
+        (Player player, CombatRoom room) = await CreateCombatAsync($"supermassive-{explicitCreator}");
         var generated = (StrikeRegent)ModelDb.Card<StrikeRegent>().MutableClone();
         generated.AssignOwner(player);
-        await CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand);
+        if (explicitCreator)
+            await CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand, player);
+        else
+            await CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand);
         Supermassive card = AddToHand<Supermassive>(player);
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hpBefore = enemy.CurrentHp;
 
-        await card.PlayAsync(enemy);
+        var clone = room.Engine.State.Clone();
+        Player clonePlayer = clone.Players.Single();
+        Assert.Equal(1, clonePlayer.PlayerCombatState!.CardsGeneratedThisCombat);
+        var branchGenerated = (StrikeRegent)ModelDb.Card<StrikeRegent>().MutableClone();
+        branchGenerated.AssignOwner(clonePlayer);
+        await CardPileCmd.Generate(clone, branchGenerated, PileType.Discard, clonePlayer);
+        Assert.Equal(2, clonePlayer.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(1, player.PlayerCombatState!.CardsGeneratedThisCombat);
+        Supermassive cloneCard = clonePlayer.PlayerCombatState.Hand.Cards.OfType<Supermassive>().Single();
+        Creature cloneEnemy = clone.HittableEnemies.Single();
+        await cloneCard.PlayAsync(cloneEnemy);
+        Assert.Equal(hpBefore - 11, cloneEnemy.CurrentHp);
+        Assert.Equal(hpBefore, enemy.CurrentHp);
 
+        await card.PlayAsync(enemy);
         Assert.Equal(hpBefore - 8, enemy.CurrentHp);
+        Supermassive upgraded = AddToHand<Supermassive>(player);
+        upgraded.Upgrade();
+        await upgraded.PlayAsync(enemy);
+        Assert.Equal(hpBefore - 17, enemy.CurrentHp);
+        await room.Engine.EndPlayerTurnAsync();
+        Assert.Equal(1, player.PlayerCombatState.CardsGeneratedThisCombat);
+
+        // Leave victory pending so the generation callbacks run without inserting or drawing RNG.
+        enemy.SetCurrentHpInternal(0);
+        Assert.True(room.Engine.State.IsLiveCombat());
+        Assert.True(room.Engine.State.IsOverOrEnding());
+        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+        var endingSelf = (StrikeRegent)ModelDb.Card<StrikeRegent>().MutableClone();
+        endingSelf.AssignOwner(player);
+        await CardPileCmd.Generate(room.Engine.State, endingSelf, PileType.Draw, player, CardPilePosition.Random);
+        var endingEnemy = (StrikeRegent)ModelDb.Card<StrikeRegent>().MutableClone();
+        endingEnemy.AssignOwner(player);
+        await CardPileCmd.Generate(room.Engine.State, endingEnemy, PileType.Draw, creator: null, CardPilePosition.Random);
+        Assert.Equal(2, player.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Null(endingSelf.Pile);
+        Assert.Null(endingEnemy.Pile);
+        Assert.Equal(shuffleBefore, player.RunState.Rng.Shuffle.Counter);
     }
 
     [Fact]

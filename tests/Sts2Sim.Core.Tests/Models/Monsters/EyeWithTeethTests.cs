@@ -70,7 +70,7 @@ public sealed class EyeWithTeethTests : IDisposable
                 Player player = players[playerIndex];
                 Dazed[] dazed = player.PlayerCombatState!.DiscardPile.Cards.OfType<Dazed>().ToArray();
                 Assert.Equal(cycle * 3, dazed.Length);
-                Assert.Equal(generatedBefore[playerIndex] + (cycle * 3), player.PlayerCombatState.CardsGeneratedThisCombat);
+                Assert.Equal(generatedBefore[playerIndex], player.PlayerCombatState.CardsGeneratedThisCombat);
                 Assert.All(dazed, card =>
                 {
                     Assert.Same(player, card.Owner);

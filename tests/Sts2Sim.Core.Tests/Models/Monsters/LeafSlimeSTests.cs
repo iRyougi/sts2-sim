@@ -57,7 +57,7 @@ public sealed class LeafSlimeSTests : IDisposable
         {
             Player player = players[index];
             Slimed generated = Assert.Single(player.PlayerCombatState!.DiscardPile.Cards.OfType<Slimed>());
-            Assert.Equal(generatedBefore[index] + 1, player.PlayerCombatState.CardsGeneratedThisCombat);
+            Assert.Equal(generatedBefore[index], player.PlayerCombatState.CardsGeneratedThisCombat);
             Assert.Same(player, generated.Owner);
             Assert.Same(player.PlayerCombatState.DiscardPile, generated.Pile);
             Assert.Same(room.Engine.State, generated.CombatState);
@@ -73,7 +73,7 @@ public sealed class LeafSlimeSTests : IDisposable
         Assert.Equal("GOOP_MOVE", monster.NextMove!.StateId);
         Assert.Equal(hpBefore.Select(hp => hp - expectedDamage), players.Select(player => player.Creature.CurrentHp));
         Assert.Equal(
-            players.Select((player, index) => generatedBefore[index] + 1),
+            generatedBefore,
             players.Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat));
     }
 

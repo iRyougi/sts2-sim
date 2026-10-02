@@ -24,10 +24,12 @@ public sealed class MyteCreatorTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
-    [Fact]
-    public async Task EnemyToxicHasNoCreatorForRegentRelicAndArsenal()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EnemyToxicHasNoCreatorForRegentRelicAndArsenal(bool upgraded)
     {
-        const string seed = "09-s7-131c-myte-creator";
+        string seed = $"09-s7-219-myte-creator-{upgraded}";
         var run = new RunState(seed, new Overgrowth(), 10);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
@@ -38,6 +40,11 @@ public sealed class MyteCreatorTests : IDisposable
         await PowerCmd.Apply<ArsenalPower>(room.Engine.State, player.Creature, 1m, player.Creature, null);
         Myte myte = Assert.IsType<Myte>(Assert.Single(room.Engine.State.Enemies).Monster);
         Assert.Equal("TOXIC_MOVE", myte.NextMove?.StateId);
+        int generatedBefore = player.PlayerCombatState!.CardsGeneratedThisCombat;
+        var supermassive = (Supermassive)ModelDb.Card<Supermassive>().MutableClone();
+        supermassive.AssignOwner(player);
+        if (upgraded) supermassive.Upgrade();
+        CardPileCmd.Add(supermassive, Sts2Sim.Core.Entities.Cards.PileType.Hand);
 
         await myte.PerformMove();
 
@@ -46,5 +53,10 @@ public sealed class MyteCreatorTests : IDisposable
         int strength = player.Creature.GetPower<StrengthPower>()?.Amount ?? 0;
         Assert.True(toxicCount == 2 && block == 0 && strength == 0,
             $"seed={seed}; Toxic={toxicCount}, Block={block}, Strength={strength}; expected 2,0,0 for null creator");
+        Assert.Equal(generatedBefore, player.PlayerCombatState.CardsGeneratedThisCombat);
+        int hpBefore = myte.Creature.CurrentHp;
+        await supermassive.PlayAsync(myte.Creature);
+        Assert.True(myte.Creature.CurrentHp == hpBefore - 5,
+            $"seed={seed}; null-creator Toxic must leave Supermassive at 5 damage");
     }
 }

@@ -31,10 +31,14 @@ public sealed class CardEntryAtomicityTests : IDisposable
 
         public CardModel[] ObservedPileCards { get; private set; } = [];
 
+        public int[] ObservedGeneratedCounts { get; private set; } = [];
+
         public override Task AfterCardEnteredCombat(CardModel card)
         {
             ObservedCard = card;
             ObservedPileCards = card.Pile?.Cards.ToArray() ?? [];
+            ObservedGeneratedCounts = card.CombatState!.Players
+                .Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat).ToArray();
             throw new InvalidOperationException(EntryFailureMessage);
         }
     }
@@ -76,23 +80,42 @@ public sealed class CardEntryAtomicityTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
-    [Fact]
-    public async Task Generate_WhenEntryHookThrows_RollsBackPileCounterAndTangledMark()
+    [Theory]
+    [InlineData("implicit")]
+    [InlineData("self")]
+    [InlineData("null")]
+    [InlineData("other")]
+    public async Task Generate_WhenEntryHookThrows_RollsBackPileCounterAndTangledMark(string mode)
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync("entry-rollback-generate");
+        (Player player, CombatRoom room) = await CreateCombatAsync(
+            $"entry-rollback-generate-{mode}", playerCount: mode == "other" ? 2 : 1);
+        Player? creator = mode == "null" ? null : mode == "other" ? room.Engine.State.Players[1] : player;
+        foreach (Player participant in room.Engine.State.Players)
+        {
+            int priorContributions = ReferenceEquals(participant, player) ? 1 : 2;
+            for (int index = 0; index < priorContributions; index++)
+                await CardPileCmd.Generate(room.Engine.State, CreateOwned<DefendRegent>(participant), PileType.Hand);
+        }
+        int[] before = room.Engine.State.Players
+            .Select(participant => participant.PlayerCombatState!.CardsGeneratedThisCombat).ToArray();
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         await PowerCmd.Apply<TangledPower>(room.Engine.State, player.Creature, 1m, enemy, null);
-        await PowerCmd.Apply<ThrowingEntryPower>(room.Engine.State, player.Creature, 1m, enemy, null);
+        ThrowingEntryPower throwing = Assert.IsType<ThrowingEntryPower>(await PowerCmd.Apply<ThrowingEntryPower>(
+            room.Engine.State, player.Creature, 1m, enemy, null));
         SovereignBlade generated = CreateOwned<SovereignBlade>(player);
-        Dictionary<CardPile, CardModel[]> pilesBefore = SnapshotPiles(player);
-        int generatedBefore = player.PlayerCombatState!.CardsGeneratedThisCombat;
+        Dictionary<CardPile, CardModel[]> pilesBefore = room.Engine.State.Players
+            .SelectMany(participant => SnapshotPiles(participant)).ToDictionary(pair => pair.Key, pair => pair.Value);
 
-        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => mode == "implicit"
+            ? CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand)
+            : CardPileCmd.Generate(room.Engine.State, generated, PileType.Hand, creator));
 
-        Assert.Equal(EntryFailureMessage, exception.Message);
+        int[] expectedDuringEntry = room.Engine.State.Players.Select((participant, index) =>
+            before[index] + (ReferenceEquals(participant, creator) ? 1 : 0)).ToArray();
+        Assert.Equal(expectedDuringEntry, throwing.ObservedGeneratedCounts);
         AssertPilesEqual(pilesBefore);
-        Assert.Equal(generatedBefore, player.PlayerCombatState.CardsGeneratedThisCombat);
+        Assert.Equal(before, room.Engine.State.Players
+            .Select(participant => participant.PlayerCombatState!.CardsGeneratedThisCombat));
         Assert.Null(generated.Pile);
         Assert.Equal(2, generated.EnergyCost);
     }
@@ -237,13 +260,14 @@ public sealed class CardEntryAtomicityTests : IDisposable
         return card;
     }
 
-    private static async Task<(Player Player, CombatRoom Room)> CreateCombatAsync(string seed)
+    private static async Task<(Player Player, CombatRoom Room)> CreateCombatAsync(string seed, int playerCount = 1)
     {
         var runState = new RunState(seed, new Overgrowth());
-        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
-        runState.AddPlayer(player);
+        Player[] players = Enumerable.Range(0, playerCount)
+            .Select(_ => Player.CreateForNewRun(ModelDb.Character<Regent>(), runState)).ToArray();
+        foreach (Player participant in players) runState.AddPlayer(participant);
         var room = new CombatRoom(() => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);
-        return (player, room);
+        return (players[0], room);
     }
 }

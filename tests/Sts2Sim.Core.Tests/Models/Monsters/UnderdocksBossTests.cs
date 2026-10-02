@@ -92,7 +92,7 @@ public sealed class UnderdocksBossTests : IDisposable
 
             Assert.Equal(drawCountBefore + 1, soulCombat.DrawPile.Cards.Count);
             Assert.Equal(discardCountBefore + 1, soulCombat.DiscardPile.Cards.Count);
-            Assert.Equal(generatedCountBefore + 2, soulCombat.CardsGeneratedThisCombat);
+            Assert.Equal(generatedCountBefore, soulCombat.CardsGeneratedThisCombat);
             Beckon drawBeckon = Assert.Single(soulCombat.DrawPile.Cards.OfType<Beckon>());
             Beckon discardBeckon = Assert.Single(soulCombat.DiscardPile.Cards.OfType<Beckon>());
             Assert.Same(soulPlayer, drawBeckon.Owner);

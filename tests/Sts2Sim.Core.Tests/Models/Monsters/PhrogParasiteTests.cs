@@ -105,7 +105,7 @@ public sealed class PhrogParasiteTests : IDisposable
                 Assert.Same(room.Engine.State, infection.CombatState);
             });
             Assert.Equal(
-                generatedBefore[playerIndex] + 3,
+                generatedBefore[playerIndex],
                 player.PlayerCombatState.CardsGeneratedThisCombat);
         }
     }
@@ -195,7 +195,7 @@ public sealed class PhrogParasiteTests : IDisposable
 
         Assert.Equal(hpBeforeNaturalTurn - 12, player.Creature.CurrentHp);
         Assert.Equal(
-            generatedBeforeNaturalTurn + 2,
+            generatedBeforeNaturalTurn,
             player.PlayerCombatState.CardsGeneratedThisCombat);
         Assert.Equal(2, wrigglerCreatures[1].GetPower<StrengthPower>()!.Amount);
         Assert.Equal(2, wrigglerCreatures[3].GetPower<StrengthPower>()!.Amount);

@@ -353,11 +353,13 @@ public static class CardPileCmd
             position,
             () =>
             {
-                generationState = card.Owner.PlayerCombatState
+                if (creator is null)
+                    return;
+                generationState = creator.PlayerCombatState
                     ?? throw new InvalidOperationException("Generated cards require player combat state.");
                 generationState.RecordCardGenerated();
             },
-            () => generationState!.RollbackCardGenerated());
+            () => generationState?.RollbackCardGenerated());
         await Hook.AfterCardGenerated(combatState, card, creator);
         await Hook.AfterCardGeneratedForCombat(combatState, card, creator);
     }

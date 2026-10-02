@@ -232,7 +232,7 @@ public sealed class FogmogTests : IDisposable
             hpBeforeSwipe.Select(hp => hp - 8),
             players.Select(player => player.Creature.CurrentHp));
         Assert.Equal(
-            generatedBefore.Select(count => count + 3),
+            generatedBefore,
             players.Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat));
 
         IllusionPower illusion = Assert.IsType<IllusionPower>(eye.Creature.GetPower<IllusionPower>());
@@ -255,14 +255,14 @@ public sealed class FogmogTests : IDisposable
         Assert.False(illusion.IsReviving);
         Assert.Equal("DISTRACT_MOVE", eye.NextMove!.StateId);
         Assert.Equal(
-            generatedBefore.Select(count => count + 3),
+            generatedBefore,
             players.Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat));
 
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Equal(2, room.Engine.State.Enemies.Count);
         Assert.Equal(
-            generatedBefore.Select(count => count + 6),
+            generatedBefore,
             players.Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat));
         Assert.Equal("DISTRACT_MOVE", eye.NextMove!.StateId);
         Assert.NotEqual("ILLUSION_MOVE", fogmog.NextMove!.StateId);

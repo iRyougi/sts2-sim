@@ -58,7 +58,7 @@ public sealed class LeafSlimeMTests : IDisposable
             Player player = players[index];
             Slimed[] generated = player.PlayerCombatState!.DiscardPile.Cards.OfType<Slimed>().ToArray();
             Assert.Equal(2, generated.Length);
-            Assert.Equal(generatedBefore[index] + 2, player.PlayerCombatState.CardsGeneratedThisCombat);
+            Assert.Equal(generatedBefore[index], player.PlayerCombatState.CardsGeneratedThisCombat);
             Assert.All(generated, card =>
             {
                 Assert.Same(player, card.Owner);
@@ -77,7 +77,7 @@ public sealed class LeafSlimeMTests : IDisposable
         Assert.Equal("STICKY_SHOT", monster.NextMove!.StateId);
         Assert.Equal(hpBefore.Select(hp => hp - expectedDamage), players.Select(player => player.Creature.CurrentHp));
         Assert.Equal(
-            players.Select((player, index) => generatedBefore[index] + 2),
+            generatedBefore,
             players.Select(player => player.PlayerCombatState!.CardsGeneratedThisCombat));
     }
 }
