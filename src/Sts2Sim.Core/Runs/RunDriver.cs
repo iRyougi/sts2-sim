@@ -589,6 +589,7 @@ public sealed class RunDriver
             }
         }
 
+        (_decisionSource as ICombatCompletionValidator)?.ValidateCompletedCombat(engine.State);
         await combatRoom.ResolveOutcomeAsync(generateRewards);
         if (forcedEnemies is not null)
             _runState.ForcedCombatResumeOutcome = new ForcedCombatOutcome(engine.Won,

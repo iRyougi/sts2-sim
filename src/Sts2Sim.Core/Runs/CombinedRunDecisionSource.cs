@@ -9,7 +9,7 @@ using Sts2Sim.Core.Rewards;
 namespace Sts2Sim.Core.Runs;
 
 /// <summary>战斗与战斗内选牌交给搜索，其余全部交给战略决策源。</summary>
-public sealed class CombinedRunDecisionSource : IRunDecisionSource
+public sealed class CombinedRunDecisionSource : IRunDecisionSource, ICombatCompletionValidator
 {
     private readonly IRunDecisionSource _combatSource;
     private readonly IRunDecisionSource _strategySource;
@@ -27,6 +27,9 @@ public sealed class CombinedRunDecisionSource : IRunDecisionSource
 
     public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) =>
         _combatSource.ChooseCombatActionAsync(state);
+
+    public void ValidateCompletedCombat(CombatState state) =>
+        (_combatSource as ICombatCompletionValidator)?.ValidateCompletedCombat(state);
 
     public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request) =>
         request.Player.Creature.CombatState is CombatState { IsProjection: false }
