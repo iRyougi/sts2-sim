@@ -108,13 +108,9 @@ public sealed class EyeWithTeethTests : IDisposable
                 ascensionLevel: 0,
                 seed: "eye-revive-production-path",
                 playerCount: 2,
-                slotName: "illusion");
+                slotName: "illusion",
+                primaryCompanion: ((MonsterModel)ModelDb.Monster<TrainingDummy>().MutableClone(), "primary"));
         IllusionPower illusion = Assert.IsType<IllusionPower>(eye.Creature.GetPower<IllusionPower>());
-        await CreatureCmd.Add(
-            (TrainingDummy)ModelDb.Monster<TrainingDummy>().MutableClone(),
-            room.Engine.State,
-            Sts2Sim.Core.Combat.CombatSide.Enemy,
-            "primary");
 
         await CreatureCmd.Damage(
             room.Engine.State,
