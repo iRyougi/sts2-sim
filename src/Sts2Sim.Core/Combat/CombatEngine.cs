@@ -210,7 +210,8 @@ public sealed class CombatEngine
                 // Native StartTurn settles the combat after the auto pre-play phase, so a turn-start
                 // kill (e.g. MercuryHourglass on the last enemy) never opens a play phase in IsEnding.
                 CheckWinCondition();
-                _observer?.PlayerTurnStarted(State);
+                if (IsInProgress)
+                    _observer?.PlayerTurnStarted(State);
                 return true;
             });
         }
@@ -218,7 +219,9 @@ public sealed class CombatEngine
         if (State.CurrentSide == CombatSide.Enemy)
         {
             await Hook.AfterSideTurnStart(State, State.CurrentSide, participants);
-            await ExecuteEnemyTurnAsync();
+            CheckWinCondition();
+            if (IsInProgress)
+                await ExecuteEnemyTurnAsync();
         }
     }
 
