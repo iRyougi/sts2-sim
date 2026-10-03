@@ -55,6 +55,8 @@ internal static class CombatPrivateStateRegistry
         "PaleBlueDotPower._alreadyActivatedThisTurn",
         "PanachePower._alreadyApplied", "PanachePower._cardsLeft",
         "MonologuePower._strengthApplied",
+        "MonologuePower._strength",
+        "Monologue._power",
         "RitualPower._skipFirstEnemyTurnEnd", "SlowPower._cardsPlayedSinceOwnerTurnStart",
         "SwordSagePower._grantedReplays",
         "ReattachPower._isReviving", "TenderPower._cardsPlayedThisTurn",
