@@ -13,6 +13,22 @@ public sealed class MapPoint : IComparable<MapPoint>
     public void AddQuest(Models.AbstractModel model) => _quests.Add(model);
     public void RemoveQuest(Models.AbstractModel model) => _quests.Remove(model);
 
+    internal MapPoint CloneForRun(IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap)
+    {
+        var clone = new MapPoint(coord.col, coord.row)
+        {
+            PointType = PointType,
+            CanBeModified = CanBeModified,
+        };
+        foreach (Models.AbstractModel quest in _quests)
+        {
+            if (!modelMap.TryGetValue(quest, out Models.AbstractModel? clonedQuest))
+                throw new InvalidOperationException($"Cannot clone map quest {quest.GetType().Name} without an owned model mapping.");
+            clone._quests.Add(clonedQuest);
+        }
+        return clone;
+    }
+
     public readonly HashSet<MapPoint> parents = new();
 
     public MapCoord coord;

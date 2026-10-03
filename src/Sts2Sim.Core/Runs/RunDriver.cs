@@ -6,6 +6,7 @@ using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Map;
+using Sts2Sim.Core.Odds;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Reporting;
@@ -106,7 +107,13 @@ public sealed class RunDriver
 
     public event Action<MapPoint, RoomType>? OnRoomResolved;
 
-    public async Task<Result> RunAsync(int maxFloors)
+    public Task<Result> RunAsync(int maxFloors) => RunCoreAsync(maxFloors, continueFromCurrentState: false);
+
+    /// <summary>Continue the current displayed state without re-entering a completed Starting/Ancient room.</summary>
+    public Task<Result> ContinueAsync(int maxFloors = int.MaxValue) =>
+        RunCoreAsync(maxFloors, continueFromCurrentState: true);
+
+    private async Task<Result> RunCoreAsync(int maxFloors, bool continueFromCurrentState)
     {
         _recorder?.BeginRun(_runState);
 
@@ -117,30 +124,35 @@ public sealed class RunDriver
                 outcome: RunOutcome.AlreadyOver);
         }
 
-        MapPoint startingPoint = _runState.Map.StartingMapPoint;
-        _runState.AddVisitedMapCoord(startingPoint.coord);
-        if (startingPoint.PointType == MapPointType.Ancient)
+        bool startingAlreadyEntered = continueFromCurrentState && _runState.VisitedMapCoords.Count > 0;
+        if (!startingAlreadyEntered)
         {
-            _recorder?.EnterFloor(startingPoint, RoomType.Event);
-            bool ancientProcessed = false;
-            try
+            MapPoint startingPoint = _runState.Map.StartingMapPoint;
+            _runState.AddVisitedMapCoord(startingPoint.coord);
+            if (startingPoint.PointType == MapPointType.Ancient)
+            {
+                _recorder?.EnterFloor(startingPoint, RoomType.Event);
+                bool ancientProcessed = false;
+                try
+                {
+                    await DriveAncientStartingRoomAsync();
+                    ancientProcessed = true;
+                }
+                finally
+                {
+                    if (ancientProcessed)
+                    {
+                        _recorder?.ExitFloor();
+                    }
+                }
+
+                recorderFloorsVisited++;
+            }
+            else
             {
                 await DriveAncientStartingRoomAsync();
-                ancientProcessed = true;
-            }
-            finally
-            {
-                if (ancientProcessed)
-                {
-                    _recorder?.ExitFloor();
-                }
             }
 
-            recorderFloorsVisited++;
-        }
-        else
-        {
-            await DriveAncientStartingRoomAsync();
         }
 
         if (_runState.IsGameOver)
@@ -153,55 +165,97 @@ public sealed class RunDriver
         int actsCleared = 0;
         bool exhaustedMap = false;
         bool exhaustedWithReachableChildren = false;
-        MapPoint current = _runState.Map.StartingMapPoint;
+        MapPoint current = continueFromCurrentState
+            ? _runState.CurrentMapPoint ?? _runState.Map.StartingMapPoint
+            : _runState.Map.StartingMapPoint;
+        AbstractRoom? resumedRoom = continueFromCurrentState ? _runState.CurrentRoom : null;
 
         while (floorsVisited < maxFloors)
         {
-            IReadOnlyList<MapPoint> travelable = MapTravel.GetTravelablePointsFrom(_runState, current).ToList();
-            if (travelable.Count == 0)
+            MapPoint chosen;
+            RoomType roomType;
+            AbstractRoom room;
+            NonCombatPlayerSnapshot? eventBefore = null;
+            CombatRecordingObserver? combatObserver = null;
+            bool resumingRoom = resumedRoom is not null;
+            if (resumingRoom)
             {
-                exhaustedMap = true;
-                // 取点入口给了空集合，但当前点可能其实还连着子节点——那是取点逻辑的缺陷
-                // 而不是真的走到头（偏离 #320）。在这里留证据，供探针机器判定。
-                exhaustedWithReachableChildren = current.Children.Count > 0;
-                break;
-            }
-
-            MapPoint chosen = await _decisionSource.ChooseMapPointAsync(travelable);
-            if (!travelable.Contains(chosen))
-            {
-                throw new InvalidOperationException("Decision source returned a point outside the current map options.");
-            }
-
-            _runState.AddVisitedMapCoord(chosen.coord);
-            floorsVisited++;
-
-            RoomType roomType = RoomFactory.ResolveRoomType(_runState, chosen);
-            _recorder?.EnterFloor(chosen, roomType);
-            NonCombatPlayerSnapshot? eventBefore = _recorder is not null && roomType == RoomType.Event
-                ? NonCombatPlayerSnapshot.Capture(_runState.Players[0])
-                : null;
-            AbstractRoom room = roomType == RoomType.Event
-                ? _createEventRoom(_runState)
-                : RoomFactory.CreateRoom(_runState, roomType);
-            CombatRecordingObserver? combatObserver = room is CombatRoom combatToObserve
-                ? ConfigureCombatObserver(combatToObserve)
-                : null;
-            _runState.PushRoom(room);
-            try { await room.Enter(_runState); }
-            catch
-            {
-                if (room is EventRoom failedEventRoom)
+                chosen = current;
+                room = resumedRoom!;
+                resumedRoom = null;
+                roomType = room.RoomType;
+                _recorder?.EnterFloor(chosen, roomType);
+                floorsVisited++;
+                await ResumeActiveRewardOffersAsync();
+                if (room is CombatRoom completedCombat)
                 {
-                    await failedEventRoom.Exit(_runState);
-                    _runState.PopCurrentRoom();
+                    foreach (RewardsSet rewards in completedCombat.GeneratedRewards)
+                        if (HasUnresolvedRewards(rewards)) await ResolveRewardsAsync(rewards);
+                    if (_runState.CurrentRoomCount > 1 && _runState.BaseRoom is EventRoom parentEvent)
+                    {
+                        await room.Exit(_runState);
+                        _runState.PopCurrentRoom();
+                        if (_runState.ForcedCombatResumeOutcome is { } outcome)
+                            parentEvent.Event.ResumeAfterForcedCombat(outcome);
+                        _runState.ForcedCombatResumeOutcome = null;
+                        room = parentEvent;
+                        roomType = room.RoomType;
+                    }
                 }
-                throw;
+            }
+            else
+            {
+                IReadOnlyList<MapPoint> travelable = MapTravel.GetTravelablePointsFrom(_runState, current).ToList();
+                if (travelable.Count == 0)
+                {
+                    exhaustedMap = true;
+                    // 取点入口给了空集合，但当前点可能其实还连着子节点——那是取点逻辑的缺陷
+                    // 而不是真的走到头（偏离 #320）。在这里留证据，供探针机器判定。
+                    exhaustedWithReachableChildren = current.Children.Count > 0;
+                    break;
+                }
+
+                chosen = await _decisionSource.ChooseMapPointAsync(travelable);
+                if (!travelable.Contains(chosen))
+                {
+                    throw new InvalidOperationException("Decision source returned a point outside the current map options.");
+                }
+
+                _runState.AddVisitedMapCoord(chosen.coord);
+                floorsVisited++;
+
+                UnknownMapPointPublicRules? visibleUnknownRules = chosen.PointType == MapPointType.Unknown
+                    ? _runState.CaptureVisibleUnknownMapPointRules(chosen) : null;
+                roomType = RoomFactory.ResolveRoomType(_runState, chosen);
+                _recorder?.EnterFloor(chosen, roomType);
+                eventBefore = _recorder is not null && roomType == RoomType.Event
+                    ? NonCombatPlayerSnapshot.Capture(_runState.Players[0])
+                    : null;
+                room = roomType == RoomType.Event
+                    ? _createEventRoom(_runState)
+                    : RoomFactory.CreateRoom(_runState, roomType);
+                combatObserver = room is CombatRoom combatToObserve
+                    ? ConfigureCombatObserver(combatToObserve)
+                    : null;
+                _runState.PushRoom(room);
+                try { await room.Enter(_runState); }
+                catch
+                {
+                    if (room is EventRoom failedEventRoom)
+                    {
+                        await failedEventRoom.Exit(_runState);
+                        _runState.PopCurrentRoom();
+                    }
+                    throw;
+                }
+                if (visibleUnknownRules is { } rules)
+                    _runState.RecordVisibleUnknownMapPointEntry(roomType, rules);
             }
             FloorDetail? floorDetail = null;
             if (room is CombatRoom combatRoom)
             {
-                await DriveCombatAsync(combatRoom, combatObserver: combatObserver);
+                if (!resumingRoom)
+                    await DriveCombatAsync(combatRoom, combatObserver: combatObserver);
             }
             else if (room is MerchantRoom merchantRoom)
             {
@@ -484,7 +538,9 @@ public sealed class RunDriver
         CombatRoom combatRoom,
         bool generateRewards = true,
         bool resolveRewards = true,
-        CombatRecordingObserver? combatObserver = null)
+        CombatRecordingObserver? combatObserver = null,
+        IReadOnlySet<Sts2Sim.Core.Entities.Creatures.Creature>? forcedEnemies = null,
+        IReadOnlyList<BattlewornDummyTimeLimitPower>? forcedTimeoutPowers = null)
     {
         CombatEngine engine = combatRoom.Engine;
         Player player = engine.State.Players[0];
@@ -534,6 +590,10 @@ public sealed class RunDriver
         }
 
         await combatRoom.ResolveOutcomeAsync(generateRewards);
+        if (forcedEnemies is not null)
+            _runState.ForcedCombatResumeOutcome = new ForcedCombatOutcome(engine.Won,
+                engine.State.EscapedCreatures.Any(forcedEnemies.Contains) ||
+                (forcedTimeoutPowers?.Any(power => power.HasExpired) ?? false));
         combatObserver?.CaptureFinalState();
         if (resolveRewards)
         {
@@ -697,7 +757,9 @@ public sealed class RunDriver
                 combatRoom,
                 generateRewards: eventRoom.Event.GenerateForcedCombatRewards,
                 resolveRewards: eventRoom.Event.GenerateForcedCombatRewards,
-                combatObserver: combatObserver);
+                combatObserver: combatObserver,
+                forcedEnemies: forcedEnemies,
+                forcedTimeoutPowers: forcedTimeoutPowers);
             bool timedOut = combatRoom.Engine.State.EscapedCreatures.Any(forcedEnemies.Contains)
                 || forcedTimeoutPowers.Any(power => power.HasExpired);
             outcome = new ForcedCombatOutcome(Victory: combatRoom.Won, TimedOut: timedOut);
@@ -721,6 +783,7 @@ public sealed class RunDriver
             }
         }
 
+        _runState.ForcedCombatResumeOutcome = null;
         return outcome;
     }
 
@@ -814,74 +877,95 @@ public sealed class RunDriver
         }
     }
 
-    private async Task ResolveRewardsAsync(RewardsSet rewards)
+    private async Task ResolveRewardsAsync(RewardsSet rewards, bool resumeFrame = false)
     {
         EventRoom? eventRoom = _runState.CurrentRoom as EventRoom;
-        using IDisposable? nestedOffers = eventRoom?.Event.BeginNestedRewardOffers();
-        while (true)
+        if (!resumeFrame) _runState.BeginActiveRewardOffer(rewards);
+        try
         {
-            RewardDecision decision = await _decisionSource.ChooseRewardActionAsync(rewards);
-            switch (decision)
+            using IDisposable? nestedOffers = eventRoom is null ? null
+                : resumeFrame ? eventRoom.Event.ResumeNestedRewardOffers()
+                : eventRoom.Event.BeginNestedRewardOffers();
+            while (true)
             {
-                case RewardDecision.TakeGold:
-                    if (rewards.Gold.IsResolved)
-                    {
-                        throw new InvalidOperationException("Gold reward has already been resolved.");
-                    }
-                    await rewards.Gold.Take();
-                    break;
-                case RewardDecision.TakePotion:
-                    if (rewards.Potion is null || rewards.Potion.IsResolved)
-                    {
-                        throw new InvalidOperationException("No unresolved potion reward is available.");
-                    }
-                    await rewards.Potion.Take();
-                    break;
-                case RewardDecision.TakeRelic:
-                    if (rewards.Relic is null || rewards.Relic.IsResolved)
-                    {
-                        throw new InvalidOperationException("No unresolved relic reward is available.");
-                    }
-                    await rewards.Relic.Take();
-                    break;
-                case RewardDecision.TakeCard takeCard:
-                    if (rewards.Card.IsResolved)
-                    {
-                        throw new InvalidOperationException("Card reward has already been resolved.");
-                    }
-                    if (!rewards.Card.Options.Any(option => ReferenceEquals(option, takeCard.Card)))
-                    {
-                        throw new InvalidOperationException("Decision source returned a card outside the current reward options.");
-                    }
-                    await rewards.Card.SelectOption(takeCard.Card);
-                    break;
-                case RewardDecision.SkipCard:
-                    if (rewards.Card.IsResolved)
-                    {
-                        throw new InvalidOperationException("Card reward has already been resolved.");
-                    }
-                    await rewards.Card.Skip();
-                    break;
-                case RewardDecision.SelectCardAlternative alternative:
-                    if ((!ReferenceEquals(rewards.Card, alternative.Reward) &&
-                         !rewards.ExtraRewards.Any(reward => ReferenceEquals(reward, alternative.Reward))) ||
-                        alternative.Reward.IsResolved)
-                        throw new InvalidOperationException("No matching unresolved card reward is available.");
-                    await alternative.Reward.SelectAlternative(alternative.Alternative);
-                    break;
-                case RewardDecision.ResolveExtra resolveExtra:
-                    await ResolveExtraRewardAsync(rewards, resolveExtra);
-                    break;
-                case RewardDecision.Done:
-                    if (HasUnresolvedRewards(rewards))
-                    {
-                        throw new InvalidOperationException("Cannot finish reward selection while unresolved rewards remain.");
-                    }
-                    return;
-                default:
-                    throw new InvalidOperationException($"Unhandled reward decision: {decision}");
+                RewardDecision decision = await _decisionSource.ChooseRewardActionAsync(rewards);
+                switch (decision)
+                {
+                    case RewardDecision.TakeGold:
+                        if (rewards.Gold.IsResolved)
+                        {
+                            throw new InvalidOperationException("Gold reward has already been resolved.");
+                        }
+                        await rewards.Gold.Take();
+                        break;
+                    case RewardDecision.TakePotion:
+                        if (rewards.Potion is null || rewards.Potion.IsResolved)
+                        {
+                            throw new InvalidOperationException("No unresolved potion reward is available.");
+                        }
+                        await rewards.Potion.Take();
+                        break;
+                    case RewardDecision.TakeRelic:
+                        if (rewards.Relic is null || rewards.Relic.IsResolved)
+                        {
+                            throw new InvalidOperationException("No unresolved relic reward is available.");
+                        }
+                        await rewards.Relic.Take();
+                        break;
+                    case RewardDecision.TakeCard takeCard:
+                        if (rewards.Card.IsResolved)
+                        {
+                            throw new InvalidOperationException("Card reward has already been resolved.");
+                        }
+                        if (!rewards.Card.Options.Any(option => ReferenceEquals(option, takeCard.Card)))
+                        {
+                            throw new InvalidOperationException("Decision source returned a card outside the current reward options.");
+                        }
+                        await rewards.Card.SelectOption(takeCard.Card);
+                        break;
+                    case RewardDecision.SkipCard:
+                        if (rewards.Card.IsResolved)
+                        {
+                            throw new InvalidOperationException("Card reward has already been resolved.");
+                        }
+                        await rewards.Card.Skip();
+                        break;
+                    case RewardDecision.SelectCardAlternative alternative:
+                        if ((!ReferenceEquals(rewards.Card, alternative.Reward) &&
+                             !rewards.ExtraRewards.Any(reward => ReferenceEquals(reward, alternative.Reward))) ||
+                            alternative.Reward.IsResolved)
+                            throw new InvalidOperationException("No matching unresolved card reward is available.");
+                        await alternative.Reward.SelectAlternative(alternative.Alternative);
+                        break;
+                    case RewardDecision.ResolveExtra resolveExtra:
+                        await ResolveExtraRewardAsync(rewards, resolveExtra);
+                        break;
+                    case RewardDecision.Done:
+                        if (HasUnresolvedRewards(rewards))
+                        {
+                            throw new InvalidOperationException("Cannot finish reward selection while unresolved rewards remain.");
+                        }
+                        return;
+                    default:
+                        throw new InvalidOperationException($"Unhandled reward decision: {decision}");
+                }
+                if (eventRoom is not null)
+                    await DrainEventRewardOffersAsync(eventRoom);
             }
-            if (eventRoom is not null)
+        }
+        finally
+        {
+            _runState.EndActiveRewardOffer();
+        }
+    }
+
+    private async Task ResumeActiveRewardOffersAsync()
+    {
+        while (_runState.ActiveRewardOffers.Count > 0)
+        {
+            RewardsSet offer = _runState.ActiveRewardOffers[^1];
+            await ResolveRewardsAsync(offer, resumeFrame: true);
+            if (_runState.CurrentRoom is EventRoom eventRoom)
                 await DrainEventRewardOffersAsync(eventRoom);
         }
     }

@@ -52,145 +52,235 @@ public sealed partial class CombatState
             runState.AddPlayer(clonedPlayer);
         }
 
-        // Powers can retain cards that have left every pile (for example Dampen
-        // remembers a played Power card). Add those roots before closing CloneOf
-        // provenance and rebinding card references, preserving shared identities.
-        foreach (Creature creature in _allies.Concat(_enemies)
-                     .Concat(_escapedCreatures).Concat(_removedCreatures))
+        CombatState clone = NewCloneState(runState, projection: true);
+        var states = new CloneStates(this, clone);
+        var creatures = new Dictionary<Creature, Creature>(ReferenceEqualityComparer.Instance);
+        CloneGraph(runState, playerMap, cardMap, states, creatures, powerMap: null, projection: true);
+        map = new CombatCloneMap(cardMap, playerMap, creatures);
+        return clone;
+    }
+
+    // One context per run graph, constructed after every room/offer/private-card data root is mapped.
+    internal sealed class RunCloneContext
+    {
+        internal readonly RunState TargetRun;
+        internal readonly IReadOnlyDictionary<Player, Player> Players;
+        internal readonly Dictionary<CardModel, CardModel> Cards;
+        internal readonly Dictionary<CombatState, CombatState> States = new(ReferenceEqualityComparer.Instance);
+        internal readonly Dictionary<Creature, Creature> Creatures = new(ReferenceEqualityComparer.Instance);
+        internal readonly Dictionary<PowerModel, PowerModel> Powers = new(ReferenceEqualityComparer.Instance);
+        internal readonly CombatCloneMap Map;
+
+        internal RunCloneContext(RunState targetRun,
+            IReadOnlyDictionary<Player, Player> mappedPlayers,
+            Dictionary<CardModel, CardModel> existingCardMap,
+            IEnumerable<CombatState> sourceStates)
         {
-            foreach (CardModel card in creature.Powers.SelectMany(power => power.EnumerateCombatCloneCards()))
+            TargetRun = targetRun;
+            Players = mappedPlayers;
+            Cards = existingCardMap;
+            var pending = new Queue<CombatState>(sourceStates);
+            while (pending.TryDequeue(out CombatState? source))
             {
-                if (!cardMap.ContainsKey(card))
-                {
-                    cardMap.Add(card, card.CloneForCombat(playerMap[card.Owner]));
-                }
+                if (States.ContainsKey(source)) continue;
+                if (source._engine?.IsInProgress == true)
+                    throw new RunCloneNotSupportedException(RunCloneRejectionReason.ActiveCombat,
+                        "An active combat cannot be part of a stable run clone.");
+                if (source._engine?.IsStarting == true)
+                    throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                        "Combat setup is still executing.");
+                States.Add(source, source.NewCloneState(targetRun, projection: false));
+                foreach (Creature creature in source.EnumerateCloneCreatures())
+                    if (creature.CombatState is CombatState bound) pending.Enqueue(bound);
+            }
+            // Forward state references are now complete; no last-state-wins player binding.
+            CloneGraph(targetRun, mappedPlayers, existingCardMap, new CloneStates(States), Creatures, Powers, projection: false);
+            Map = new CombatCloneMap(existingCardMap, mappedPlayers, Creatures);
+        }
+    }
+
+    internal CombatState CloneForRun(RunState targetRun,
+        IReadOnlyDictionary<Player, Player> mappedPlayers,
+        Dictionary<CardModel, CardModel> existingCardMap,
+        out CombatCloneMap map, RunCloneContext context)
+    {
+        if (!ReferenceEquals(targetRun, context.TargetRun)
+            || !ReferenceEquals(mappedPlayers, context.Players)
+            || !ReferenceEquals(existingCardMap, context.Cards))
+            throw new InvalidOperationException("Stable combat roots must use the same run clone context.");
+        map = context.Map;
+        return context.States[this];
+    }
+
+    private IEnumerable<Creature> EnumerateCloneCreatures() =>
+        _allies.Concat(_enemies).Concat(_escapedCreatures).Concat(_removedCreatures);
+
+    private CombatState NewCloneState(IRunState runState, bool projection) => new(runState, _encounterSlots)
+    {
+        CurrentSide = CurrentSide,
+        RoundNumber = RoundNumber,
+        IsPlayerExtraTurn = IsPlayerExtraTurn,
+        GoldWasStolen = GoldWasStolen,
+        _nextCreatureId = _nextCreatureId,
+        _shuffleOrdinal = _shuffleOrdinal,
+        _potionUseOrdinal = _potionUseOrdinal,
+        _semanticCombatKey = _semanticCombatKey,
+        CardSelectionSource = projection ? RejectingCardSelectionDecisionSource.Instance
+            : ((RunState)runState).CardSelectionSource,
+        IsProjection = projection || IsProjection,
+    };
+
+    private static void CloneGraph(IRunState runState,
+        IReadOnlyDictionary<Player, Player> playerMap,
+        Dictionary<CardModel, CardModel> cardMap,
+        CloneStates states,
+        Dictionary<Creature, Creature> creatureMap,
+        Dictionary<PowerModel, PowerModel>? powerMap, bool projection)
+    {
+        foreach ((CombatState sourceState, _) in states)
+        {
+            foreach (Creature creature in sourceState.EnumerateCloneCreatures())
+            {
+                foreach (CardModel card in creature.Powers.SelectMany(power => power.EnumerateCombatCloneCards()))
+                    if (!cardMap.ContainsKey(card))
+                        cardMap.Add(card, card.CloneForCombat(playerMap[card.Owner]));
             }
         }
-
-        // A clone can outlive its source's combat pile (for example a played Power card).
-        // Include all reachable origins before rebinding, so projections never share mutable provenance.
         var origins = new Queue<CardModel>(cardMap.Keys);
         while (origins.TryDequeue(out CardModel? card))
         {
             if (card.CloneOf is not { } origin || cardMap.ContainsKey(origin)) continue;
-            CardModel clonedOrigin = origin.CloneForCombat(playerMap[origin.Owner]);
-            cardMap.Add(origin, clonedOrigin);
+            cardMap.Add(origin, origin.CloneForCombat(playerMap[origin.Owner]));
             origins.Enqueue(origin);
         }
-
         foreach ((CardModel source, CardModel target) in cardMap)
-        {
             target.RestoreCombatCloneReferencesFrom(source, cardMap);
-        }
-
         foreach ((Player source, Player target) in playerMap)
-        {
-            foreach ((RelicModel sourceRelic, RelicModel targetRelic) in
-                     source.Relics.Zip(target.Relics))
-            {
+            foreach ((RelicModel sourceRelic, RelicModel targetRelic) in source.Relics.Zip(target.Relics))
                 targetRelic.RestoreCombatCloneReferencesFrom(sourceRelic, cardMap);
-            }
-        }
 
-        var clone = new CombatState(runState, _encounterSlots)
+        foreach ((CombatState source, CombatState target) in states)
         {
-            CurrentSide = CurrentSide,
-            RoundNumber = RoundNumber,
-            IsPlayerExtraTurn = IsPlayerExtraTurn,
-            GoldWasStolen = GoldWasStolen,
-            _nextCreatureId = _nextCreatureId,
-            _shuffleOrdinal = _shuffleOrdinal,
-            _potionUseOrdinal = _potionUseOrdinal,
-            _semanticCombatKey = _semanticCombatKey,
-            CardSelectionSource = RejectingCardSelectionDecisionSource.Instance,
-        };
-        var creatureMap = new Dictionary<Creature, Creature>(ReferenceEqualityComparer.Instance);
-
-        foreach (Creature ally in _allies)
-        {
-            Creature clonedAlly = CloneCreature(ally, clone, runState, playerMap);
-            clone._allies.Add(clonedAlly);
-            creatureMap.Add(ally, clonedAlly);
+            CopyCreatures(source._allies, target._allies, target, false, false);
+            CopyCreatures(source._enemies, target._enemies, target, false, false);
+            CopyCreatures(source._escapedCreatures, target._escapedCreatures, target, true, false);
+            CopyCreatures(source._removedCreatures, target._removedCreatures, target, false, true);
+            target._spawnedEnemies.AddRange(source._spawnedEnemies.Select(creature => creatureMap[creature]));
         }
-
-        foreach (Creature enemy in _enemies)
-        {
-            Creature clonedEnemy = CloneCreature(enemy, clone, runState, playerMap);
-            clone._enemies.Add(clonedEnemy);
-            creatureMap.Add(enemy, clonedEnemy);
-        }
-
-        foreach (Creature escaped in _escapedCreatures)
-        {
-            Creature clonedEscaped = CloneCreature(escaped, clone, runState, playerMap);
-            clonedEscaped.CombatState = null;
-            clone._escapedCreatures.Add(clonedEscaped);
-            creatureMap.Add(escaped, clonedEscaped);
-        }
-
-        foreach (Creature removed in _removedCreatures)
-        {
-            Creature clonedRemoved = CloneCreature(removed, clone, runState, playerMap);
-            clonedRemoved.CombatState = removed.CombatState is null ? null : clone;
-            clone._removedCreatures.Add(clonedRemoved);
-            creatureMap.Add(removed, clonedRemoved);
-        }
-
-        // Rebind pet ownership only after the complete creature graph exists. A dead pet can retain
-        // PetOwner after it has been removed from PlayerCombatState.Pets, so restore the two relations separately.
         foreach ((Creature source, Creature target) in creatureMap)
         {
-            if (source.PetOwner is not { } sourceOwner)
+            if (source.PetOwner is { } sourceOwner)
             {
-                continue;
+                Player clonedOwner = playerMap[sourceOwner];
+                target.PetOwner = clonedOwner;
+                if (sourceOwner.PlayerCombatState?.Pets.Contains(source) == true)
+                    clonedOwner.PlayerCombatState!.AddPetInternal(target);
             }
-
-            Player clonedOwner = playerMap[sourceOwner];
-            target.PetOwner = clonedOwner;
-            if (sourceOwner.PlayerCombatState?.Pets.Contains(source) == true)
-            {
-                clonedOwner.PlayerCombatState!.AddPetInternal(target);
-            }
-        }
-
-        clone._spawnedEnemies.AddRange(_spawnedEnemies.Select(creature => creatureMap[creature]));
-
-        foreach ((Creature source, Creature target) in creatureMap)
-        {
             foreach (PowerModel sourcePower in source.Powers)
             {
+                if (powerMap?.ContainsKey(sourcePower) == true) continue;
                 var clonedPower = (PowerModel)sourcePower.MutableClone();
                 clonedPower.ApplyInternal(target, sourcePower.Amount);
-                clonedPower.RestoreCombatCloneReferencesFrom(sourcePower, cardMap, creatureMap);
+                if (powerMap is null)
+                    clonedPower.RestoreCombatCloneReferencesFrom(sourcePower, cardMap, creatureMap);
+                else
+                    powerMap.Add(sourcePower, clonedPower);
             }
         }
-
-        // Transient moves can bind callbacks to powers, so restore the move graph only after powers exist.
+        // Every creature and power identity exists before reference and callback rebinding.
+        if (powerMap is not null)
+            foreach ((PowerModel source, PowerModel target) in powerMap)
+                target.RestoreCombatCloneReferencesFrom(source, cardMap, creatureMap);
         foreach ((Creature source, Creature target) in creatureMap)
-        {
             if (source.Monster is { } sourceMonster)
-            {
                 target.Monster!.RestoreCombatCloneMoveStateFrom(sourceMonster);
+        foreach ((CombatState source, CombatState target) in states)
+        {
+            target.DamageHistory = source.DamageHistory.Clone(creatureMap, cardMap);
+            target.SemanticHistory = source.SemanticHistory.Clone();
+            source._engine?.CloneFor(target);
+        }
+        foreach ((Player source, Player target) in playerMap)
+            creatureMap.TryAdd(source.Creature, target.Creature);
+
+        void CopyCreatures(List<Creature> sources, List<Creature> targets,
+            CombatState targetState, bool detachedInProjection, bool preserveDetachedInProjection)
+        {
+            foreach (Creature source in sources)
+            {
+                if (!creatureMap.TryGetValue(source, out Creature? target))
+                {
+                    target = CloneCreature(source, targetState, runState, playerMap);
+                    if (!projection)
+                        target.CombatState = source.CombatState is { } bound ? states[bound] : null;
+                    else if (detachedInProjection)
+                        target.CombatState = null;
+                    else if (preserveDetachedInProjection && source.CombatState is null)
+                        target.CombatState = null;
+                    creatureMap.Add(source, target);
+                }
+                targets.Add(target);
             }
         }
+    }
 
-        clone.DamageHistory = DamageHistory.Clone(creatureMap, cardMap);
-        clone.SemanticHistory = SemanticHistory.Clone();
-
-        _engine?.CloneFor(clone);
-        clone.IsProjection = true;
-        foreach ((Player source, Player target) in playerMap)
+    // Value-type singleton view keeps public combat search free of a new state-map allocation.
+    private readonly struct CloneStates
+    {
+        private readonly CombatState? _source;
+        private readonly CombatState? _target;
+        private readonly Dictionary<CombatState, CombatState>? _many;
+        internal CloneStates(CombatState source, CombatState target)
         {
-            creatureMap.TryAdd(source.Creature, target.Creature);
+            _source = source;
+            _target = target;
+            _many = null;
         }
-        map = new CombatCloneMap(cardMap, playerMap, creatureMap);
-        return clone;
+        internal CloneStates(Dictionary<CombatState, CombatState> many)
+        {
+            _source = null;
+            _target = null;
+            _many = many;
+        }
+        internal CombatState this[ICombatState source] => _many is not null
+            ? source is CombatState concrete ? _many[concrete]
+                : throw new InvalidOperationException("A stable run root has a non-concrete combat state.")
+            : ReferenceEquals(source, _source) ? _target!
+                : throw new KeyNotFoundException("Combat state is outside the cloned world.");
+        public Enumerator GetEnumerator() => new(_source, _target, _many);
+        public struct Enumerator
+        {
+            private readonly CombatState? _source;
+            private readonly CombatState? _target;
+            private readonly bool _many;
+            private bool _singlePending;
+            private Dictionary<CombatState, CombatState>.Enumerator _items;
+            internal Enumerator(CombatState? source, CombatState? target,
+                Dictionary<CombatState, CombatState>? many)
+            {
+                _source = source;
+                _target = target;
+                _many = many is not null;
+                _singlePending = !_many;
+                _items = many is null ? default : many.GetEnumerator();
+            }
+            public KeyValuePair<CombatState, CombatState> Current => _many ? _items.Current
+                : new(_source!, _target!);
+            public bool MoveNext()
+            {
+                if (_many) return _items.MoveNext();
+                if (!_singlePending) return false;
+                _singlePending = false;
+                return true;
+            }
+            public void Dispose() => _items.Dispose();
+        }
     }
 
     private static Creature CloneCreature(
         Creature source,
         CombatState combatState,
-        CombatRunStateSnapshot runState,
+        IRunState runState,
         IReadOnlyDictionary<Player, Player> playerMap)
     {
         Creature clone;

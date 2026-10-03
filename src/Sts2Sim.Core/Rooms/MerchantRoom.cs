@@ -74,6 +74,32 @@ public sealed class MerchantRoom : AbstractRoom
             ?? throw new InvalidOperationException("Merchant inventory has not been generated for this player.");
     }
 
+    internal MerchantRoom CloneForRun(
+        RunState runState, Func<Player, Player> mapPlayer,
+        Func<MerchantInventory, MerchantInventory> mapInventory,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Action<AbstractRoom, AbstractRoom> registerRoom)
+    {
+        if (_purchaseGate.CurrentCount != 1)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "Merchant purchase is still executing.");
+        var clone = new MerchantRoom
+        {
+            _inventoryRunState = _inventoryRunState is null ? null : runState,
+            _displayPlayer = _displayPlayer is null ? null : mapPlayer(_displayPlayer),
+            _isActive = _isActive,
+            IsInventoryOpen = IsInventoryOpen,
+        };
+        registerRoom(this, clone);
+        clone.CopyEntryStateFrom(this);
+        foreach ((Player player, MerchantInventory inventory) in _inventories)
+            clone._inventories.Add(mapPlayer(player), mapInventory(inventory));
+        lock (_rewardLock)
+            foreach (RewardsSet offer in _rewardOffers)
+                clone._rewardOffers.Enqueue(mapOffer(offer));
+        return clone;
+    }
+
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);

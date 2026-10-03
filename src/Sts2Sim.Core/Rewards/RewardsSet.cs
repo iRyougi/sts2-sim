@@ -36,6 +36,13 @@ public sealed class RewardsSet
         ExtraRewards = extraRewards;
     }
 
+    internal RewardsSet CloneForRun(Func<Reward, Reward> mapReward) =>
+        new((GoldReward)mapReward(Gold),
+            Potion is null ? null : (PotionReward)mapReward(Potion),
+            (CardReward)mapReward(Card),
+            Relic is null ? null : (RelicReward)mapReward(Relic),
+            Array.AsReadOnly(ExtraRewards.Select(mapReward).ToArray()));
+
     public static RewardsSet GenerateFor(
         Player player,
         RoomType roomType,

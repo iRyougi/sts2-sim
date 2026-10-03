@@ -23,6 +23,16 @@ public sealed class MapPointTypeCounts
 
     public int NumOfRests { get; }
 
+    private MapPointTypeCounts(MapPointTypeCounts source)
+    {
+        NumOfElites = source.NumOfElites;
+        NumOfShops = source.NumOfShops;
+        NumOfUnknowns = source.NumOfUnknowns;
+        NumOfRests = source.NumOfRests;
+        PointTypesThatIgnoreRules = new HashSet<MapPointType>(source.PointTypesThatIgnoreRules);
+    }
+
+    internal MapPointTypeCounts CloneForRun() => new(this);
     public bool ShouldIgnoreMapPointRulesForMapPointType(MapPointType pointType) =>
         PointTypesThatIgnoreRules.Contains(pointType);
 

@@ -106,5 +106,22 @@ public sealed class RestSiteRoom : AbstractRoom
         }
     }
 
+    internal RestSiteRoom CloneForRun(
+        Func<Player, Player> mapPlayer,
+        Func<RestSiteDecision, RestSiteDecision> mapDecision,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Action<AbstractRoom, AbstractRoom> registerRoom)
+    {
+        var clone = new RestSiteRoom();
+        registerRoom(this, clone);
+        clone.CopyEntryStateFrom(this);
+        foreach ((Player player, List<RestSiteDecision> remaining) in _remainingDecisions)
+            clone._remainingDecisions.Add(mapPlayer(player), remaining.Select(mapDecision).ToList());
+        lock (_rewardLock)
+            foreach (RewardsSet offer in _pendingRewardOffers)
+                clone._pendingRewardOffers.Enqueue(mapOffer(offer));
+        return clone;
+    }
+
     public override Task Exit(RunState? runState) { _remainingDecisions.Clear(); return Task.CompletedTask; }
 }

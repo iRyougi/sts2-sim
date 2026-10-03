@@ -17,7 +17,60 @@ public abstract class ActDefinition
     private EncounterBagState? _regularMonsterEncounterState;
     private EncounterBagState? _eliteEncounterState;
     private EncounterDefinition? _lastMonsterEncounter;
+    internal ActDefinition CloneForVisibleHistory()
+    {
+        var clone = (ActDefinition)MemberwiseClone();
+        clone._weakMonsterEncounterState = null;
+        clone._regularMonsterEncounterState = null;
+        clone._eliteEncounterState = null;
+        clone._lastMonsterEncounter = null;
+        clone._monsterEncountersPicked = 0;
+        return clone;
+    }
+
     private int _monsterEncountersPicked;
+
+    internal void RebuildEncounterBagsFromHistory(
+        IReadOnlyList<EncounterDefinition> visitedMonsterEncounters,
+        IReadOnlyList<EncounterDefinition> visitedEliteEncounters)
+    {
+        _weakMonsterEncounterState = null;
+        _regularMonsterEncounterState = null;
+        _eliteEncounterState = null;
+        _lastMonsterEncounter = null;
+        _monsterEncountersPicked = 0;
+        foreach (EncounterDefinition encounter in visitedMonsterEncounters)
+        {
+            bool weak = _monsterEncountersPicked < NumberOfWeakEncounters;
+            EncounterDefinition[] pool = MonsterEncounters.Where(e => e.IsWeak == weak).ToArray();
+            ref EncounterBagState? state = ref (weak
+                ? ref _weakMonsterEncounterState : ref _regularMonsterEncounterState);
+            ConsumeObserved(ref state, pool, encounter);
+            _lastMonsterEncounter = encounter;
+            _monsterEncountersPicked++;
+        }
+        foreach (EncounterDefinition encounter in visitedEliteEncounters)
+            ConsumeObserved(ref _eliteEncounterState, EliteEncounters, encounter);
+    }
+
+    private static void ConsumeObserved(ref EncounterBagState? state,
+        IReadOnlyList<EncounterDefinition> pool, EncounterDefinition observed)
+    {
+        state ??= new EncounterBagState();
+        if (!state.Bag.Any())
+            foreach (EncounterDefinition entry in pool) state.Bag.Add(entry, 1.0);
+        if (!state.Bag.Remove(observed))
+            throw new InvalidOperationException($"Observed encounter {observed.Name} is not in its native draw bag.");
+        state.LastPicked = observed;
+    }
+    internal ActDefinition CloneForRun()
+    {
+        var clone = (ActDefinition)MemberwiseClone();
+        clone._weakMonsterEncounterState = _weakMonsterEncounterState?.Clone();
+        clone._regularMonsterEncounterState = _regularMonsterEncounterState?.Clone();
+        clone._eliteEncounterState = _eliteEncounterState?.Clone();
+        return clone;
+    }
 
     /// <summary>幕序号，0 起。对应真实游戏 ActModel.Index。</summary>
     public abstract int Index { get; }
@@ -208,8 +261,15 @@ public abstract class ActDefinition
 
     private sealed class EncounterBagState
     {
-        public GrabBag<EncounterDefinition> Bag { get; } = new();
+        public GrabBag<EncounterDefinition> Bag { get; private set; } = new();
 
         public EncounterDefinition? LastPicked { get; set; }
+
+        internal EncounterBagState Clone()
+        {
+            var clone = new EncounterBagState { LastPicked = LastPicked };
+            clone.Bag = Bag.Clone();
+            return clone;
+        }
     }
 }

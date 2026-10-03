@@ -19,6 +19,22 @@ public sealed class GoldenPathActMap : ActMap
     public override MapPoint StartingMapPoint { get; }
     protected override MapPoint?[,] Grid { get; }
 
+    private GoldenPathActMap(
+        GoldenPathActMap source,
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap)
+    {
+        (MapPoint?[,] grid, Dictionary<MapPoint, MapPoint> points) = source.ClonePointGraph(modelMap);
+        Grid = grid;
+        StartingMapPoint = points[source.StartingMapPoint];
+        BossMapPoint = points[source.BossMapPoint];
+        foreach (MapPoint point in source.startMapPoints)
+            startMapPoints.Add(points[point]);
+    }
+
+    internal override ActMap CloneForRun(
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Random.Rng? replacementRng = null) => new GoldenPathActMap(this, modelMap);
+
     public GoldenPathActMap(IRunState runState)
     {
         List<MapPointType> pointTypes = DefaultPointTypes.ToList();

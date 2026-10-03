@@ -25,6 +25,7 @@ public abstract class EventModel : AbstractModel
     private bool _hasBegun;
     private bool _isAwaitingForcedCombat;
     private Queue<RewardsSet> _pendingRewardOffers = new();
+    private Stack<Queue<RewardsSet>> _suspendedRewardOffers = new();
     private Func<MonsterModel>? _pendingForcedCombatFactory;
     private Func<IReadOnlyList<MonsterModel>>? _pendingForcedCombatBatchFactory;
     private Func<IReadOnlyList<(MonsterModel Monster, string? SlotName)>>? _pendingForcedCombatSlottedBatchFactory;
@@ -242,6 +243,11 @@ public abstract class EventModel : AbstractModel
             if (!_isAwaitingForcedCombat) throw new InvalidOperationException("Event is not awaiting a forced combat.");
             _isAwaitingForcedCombat = false;
         }
+        string continuationKey = _owner is not null
+            ? $"{_owner.CurrentSemanticLocationKey}/event={Id.Entry}/page={_pageVersion}/after-forced-combat"
+            : $"floor={RunState.TotalFloor}/event={Id.Entry}/page={_pageVersion}/after-forced-combat";
+        using IDisposable runRngScope = RunState.Rng.BeginSemanticScope(continuationKey);
+        using IDisposable? playerRngScope = _owner?.PlayerRng.BeginSemanticScope(continuationKey);
         AfterForcedCombat(outcome);
     }
 
@@ -377,26 +383,32 @@ public abstract class EventModel : AbstractModel
         AssertMutable();
         lock (_stateLock)
         {
-            var scope = new NestedRewardOfferScope(this, _pendingRewardOffers);
+            _suspendedRewardOffers.Push(_pendingRewardOffers);
             _pendingRewardOffers = new Queue<RewardsSet>();
-            return scope;
+            return new NestedRewardOfferScope(this);
         }
     }
 
-    private sealed class NestedRewardOfferScope(EventModel owner, Queue<RewardsSet> parent) : IDisposable
+    // A fork resumes a cloned data frame, not the source using/async state machine.
+    internal IDisposable ResumeNestedRewardOffers() => new NestedRewardOfferScope(this);
+
+    private void EndNestedRewardOffers()
     {
-        public void Dispose()
+        lock (_stateLock)
         {
-            lock (owner._stateLock)
-            {
-                // Preserve any undrained child offers if reward resolution throws.
-                if (owner._pendingRewardOffers.Count == 0)
-                    owner._pendingRewardOffers = parent;
-                else
-                    foreach (RewardsSet offer in parent)
-                        owner._pendingRewardOffers.Enqueue(offer);
-            }
+            Queue<RewardsSet> parent = _suspendedRewardOffers.Pop();
+            // Preserve any undrained child offers if reward resolution throws.
+            if (_pendingRewardOffers.Count == 0)
+                _pendingRewardOffers = parent;
+            else
+                foreach (RewardsSet offer in parent)
+                    _pendingRewardOffers.Enqueue(offer);
         }
+    }
+
+    private sealed class NestedRewardOfferScope(EventModel owner) : IDisposable
+    {
+        public void Dispose() => owner.EndNestedRewardOffers();
     }
 
     internal bool TryDequeuePendingRewardOffer([NotNullWhen(true)] out RewardsSet? rewards)
@@ -406,6 +418,49 @@ public abstract class EventModel : AbstractModel
         {
             return _pendingRewardOffers.TryDequeue(out rewards);
         }
+    }
+
+    internal void AssertRunCloneBoundary()
+    {
+        lock (_stateLock)
+        {
+            if (_activeChoiceTask is { IsCompleted: false })
+                throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                    $"Event {Id} still has an executing option callback.");
+        }
+    }
+
+    internal void RestoreRunCloneStateFrom(
+        EventModel source, Player owner, IRunState runState, Rng rng,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Func<Delegate, Delegate> mapCallback)
+    {
+        source.AssertRunCloneBoundary();
+        // Preserve logical progress; never run BeginEvent/CalculateVars/options again.
+        // Callback descriptors are rebound only after all mutable roots are mapped.
+        _stateLock = new object();
+        _owner = owner;
+        _runState = runState;
+        _rng = rng;
+        _activeChoiceTask = null;
+        _activeChoiceOption = null;
+        _activeChoicePageVersion = 0;
+        _pageVersion = source._pageVersion;
+        _hasBegun = source._hasBegun;
+        _isAwaitingForcedCombat = source._isAwaitingForcedCombat;
+        IsFinished = source.IsFinished;
+        CurrentOptions = Array.AsReadOnly(source.CurrentOptions
+            .Select(option => option.RebindForRun(mapCallback)).ToArray());
+        _pendingRewardOffers = new Queue<RewardsSet>(source._pendingRewardOffers.Select(mapOffer));
+        // Stack enumeration is top-first. Reverse before constructing the clone stack.
+        _suspendedRewardOffers = new Stack<Queue<RewardsSet>>(source._suspendedRewardOffers
+            .Reverse().Select(queue => new Queue<RewardsSet>(queue.Select(mapOffer))));
+        _pendingForcedCombatFactory = source._pendingForcedCombatFactory is { } factory
+            ? (Func<MonsterModel>)mapCallback(factory) : null;
+        _pendingForcedCombatBatchFactory = source._pendingForcedCombatBatchFactory is { } batch
+            ? (Func<IReadOnlyList<MonsterModel>>)mapCallback(batch) : null;
+        _pendingForcedCombatSlottedBatchFactory = source._pendingForcedCombatSlottedBatchFactory is { } slotted
+            ? (Func<IReadOnlyList<(MonsterModel Monster, string? SlotName)>>)mapCallback(slotted) : null;
     }
 
     protected override void AfterCloned()
@@ -422,6 +477,7 @@ public abstract class EventModel : AbstractModel
         _hasBegun = false;
         _isAwaitingForcedCombat = false;
         _pendingRewardOffers = new Queue<RewardsSet>();
+        _suspendedRewardOffers = new Stack<Queue<RewardsSet>>();
         _pendingForcedCombatFactory = null;
         _pendingForcedCombatBatchFactory = null;
         CurrentOptions = EmptyOptions();

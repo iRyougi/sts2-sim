@@ -4,12 +4,14 @@ using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
+using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.RelicPools;
 using Sts2Sim.Core.Odds;
 using Sts2Sim.Core.Random;
+using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 
 namespace Sts2Sim.Core.Runs;
@@ -36,13 +38,24 @@ public sealed partial class RunState : IRunState
     private readonly ReadOnlyCollection<ActDefinition> _readOnlyActs;
     private GeneratedActRooms[]? _generatedRooms;
     private readonly List<MapCoord> _visitedMapCoords = new();
+    private readonly List<UnknownMapPointVisit> _visibleMapVisits = new();
+    private int _unknownMapPointEntriesThisAct;
+    public IReadOnlyList<UnknownMapPointVisit> VisibleUnknownMapPointVisits => _visibleMapVisits;
     private int _completedActFloors;
     private bool _selectingMapEventBeforeHistoryAppend;
     private bool _currentMapPointHasShop;
     internal bool PreviousMapPointHasShop { get; private set; }
     private readonly List<AbstractRoom> _currentRooms = new();
+    private readonly List<RewardsSet> _activeRewardOffers = new();
+    internal ForcedCombatOutcome? ForcedCombatResumeOutcome { get; set; }
+    internal IReadOnlyList<RewardsSet> ActiveRewardOffers => _activeRewardOffers;
+    internal void BeginActiveRewardOffer(RewardsSet offer) => _activeRewardOffers.Add(offer);
+    internal void EndActiveRewardOffer() => _activeRewardOffers.RemoveAt(_activeRewardOffers.Count - 1);
     private List<Type> _eventSequence = null!;
     private readonly HashSet<ModelId> _visitedEventIds = new();
+    // Actual Ancient entries are visible history, unlike pre-generated future rooms.
+    private readonly Dictionary<int, Type> _visitedAncientTypes = new();
+    private bool _hasVisibleAncientHistory = true;
     private List<EncounterDefinition> _normalEncounterSequence = null!;
     private List<EncounterDefinition> _eliteEncounterSequence = null!;
     private EncounterDefinition _bossEncounter = null!;
@@ -211,6 +224,8 @@ public sealed partial class RunState : IRunState
         _eliteEncountersVisited = 0;
         _nextRoomId = 0;
         Odds.UnknownMapPoint.ResetToBase();
+        _visibleMapVisits.Clear();
+        _unknownMapPointEntriesThisAct = 0;
         InitializeCurrentAct();
         GenerateCurrentMap();
     }
@@ -270,7 +285,13 @@ public sealed partial class RunState : IRunState
 
     private GeneratedActRooms[] GenerateAllActRooms()
     {
-        List<Type> remaining = SharedAncientPool.All.ToList().UnstableShuffle(
+        var remaining = new List<Type>(SharedAncientPool.All.Count);
+        for (int index = 0; index < SharedAncientPool.All.Count; index++)
+        {
+            Type ancient = SharedAncientPool.All[index];
+            if (!_visitedAncientTypes.ContainsValue(ancient)) remaining.Add(ancient);
+        }
+        remaining.UnstableShuffle(
             Rng.ForSemanticKey(RunRngType.UpFront, "run_setup/shared_ancients/shuffle"));
         var subsets = new IReadOnlyList<Type>[_acts.Length];
         subsets[0] = Array.Empty<Type>();
@@ -330,11 +351,13 @@ public sealed partial class RunState : IRunState
 
         // The game immediately selects and stores an Ancient from the act candidates on UpFront.
         // NextItem consumes UpFront even for one candidate; drawing again on room entry would shift the stream.
-        Type ancient = Rng.ForSemanticKey(
+        Type ancient = _visitedAncientTypes.TryGetValue(actIndex, out Type? visitedAncient)
+            ? visitedAncient
+            : Rng.ForSemanticKey(
                 RunRngType.UpFront,
                 $"run_setup/act={actIndex}/ancient/slot=0")
-            .NextItem(act.AncientPool.Concat(sharedAncients))
-            ?? throw new InvalidOperationException($"Ancient pool for act {actIndex} cannot be empty.");
+                .NextItem(act.AncientPool.Concat(sharedAncients))
+                ?? throw new InvalidOperationException($"Ancient pool for act {actIndex} cannot be empty.");
 
         // A10 DoubleBoss 只作用于最终幕，对照 RunManager.GenerateRooms。
         // ActModel.GenerateRooms 先抽 Boss、再抽 Ancient；返回后才从排除首个 Boss 的候选里抽第二个。
@@ -411,6 +434,41 @@ public sealed partial class RunState : IRunState
 
     public void AddPlayer(Player player) => _players.Add(player);
 
+    internal UnknownMapPointPublicRules CaptureVisibleUnknownMapPointRules(MapPoint point)
+    {
+        bool hasJuzu = false;
+        bool goldenPath = false;
+        bool lanternKey = false;
+        foreach (AbstractModel listener in IterateHookListeners(null))
+        {
+            if (listener is Models.Relics.JuzuBracelet) hasJuzu = true;
+            if (listener is Models.Relics.GoldenCompass compass && compass.GoldenPathAct == CurrentActIndex)
+                goldenPath = true;
+            if (listener is Models.Cards.LanternKey && CurrentActIndex == 2) lanternKey = true;
+        }
+        // Capturing public increases invokes ModifyOddsIncreaseForUnrolledRoomType once
+        // before the actual roll. No current listener overrides it with stateful effects;
+        // a future stateful override requires a side-effect-free public-rule capture path.
+        return new(
+            Odds.UnknownMapPoint.PublicBaseRules,
+            Odds.UnknownMapPoint.CapturePublicUnrolledIncreases(),
+            PreviousMapPointHasShop,
+            point.Children.Count > 0 && point.Children.All(child => child.PointType == MapPointType.Shop),
+            hasJuzu, goldenPath, lanternKey);
+    }
+
+    internal void RecordVisibleUnknownMapPointEntry(RoomType actualType, UnknownMapPointPublicRules rules)
+    {
+        _unknownMapPointEntriesThisAct++;
+        _visibleMapVisits.Add(new(actualType, rules));
+    }
+
+    private void RequireVisibleUnknownMapPointHistory()
+    {
+        if (_unknownMapPointEntriesThisAct != _visibleMapVisits.Count)
+            throw new MissingVisibleUnknownHistoryException();
+    }
+
     public bool AddVisitedMapCoord(MapCoord coord)
     {
         if (_visitedMapCoords.Contains(coord))
@@ -431,9 +489,10 @@ public sealed partial class RunState : IRunState
             _currentMapPointHasShop = true;
     }
 
-    internal void RecordAncientRoomVisit()
+    internal void RecordAncientRoomVisit(Type ancientType)
     {
         EnsureRoomsGenerated();
+        _visitedAncientTypes[CurrentActIndex] = ancientType;
         _eventsVisited++;
     }
 

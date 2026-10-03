@@ -99,6 +99,27 @@ public sealed class SpoilsActMap : ActMap
         MapPathPruning.PruneAndRepair(Grid, startMapPoints, this, _pointTypeCounts, _rng, IsValidPointType);
     }
 
+    private SpoilsActMap(
+        SpoilsActMap source,
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Rng? replacementRng)
+    {
+        _mapLength = source._mapLength;
+        _rng = replacementRng ?? source._rng.CloneExact();
+        _treasureRow = source._treasureRow;
+        _pointTypeCounts = source._pointTypeCounts.CloneForRun();
+        (MapPoint?[,] grid, Dictionary<MapPoint, MapPoint> points) = source.ClonePointGraph(modelMap);
+        Grid = grid;
+        StartingMapPoint = points[source.StartingMapPoint];
+        BossMapPoint = points[source.BossMapPoint];
+        foreach (MapPoint point in source.startMapPoints)
+            startMapPoints.Add(points[point]);
+    }
+
+    internal override ActMap CloneForRun(
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Rng? replacementRng = null) => new SpoilsActMap(this, modelMap, replacementRng);
+
     private MapPoint GetOrCreatePoint(int col, int row)
     {
         if (col >= 0 && col < GetColumnCount() && row >= 0 && row < GetRowCount())

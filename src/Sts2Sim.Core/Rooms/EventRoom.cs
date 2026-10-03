@@ -24,6 +24,62 @@ public sealed class EventRoom : AbstractRoom
         _eventFactory = eventFactory ?? throw new ArgumentNullException(nameof(eventFactory));
     }
 
+    internal EventRoom CloneForRun(RunState targetRun, bool reseeded,
+        Func<EventModel, EventModel> mapEvent,
+        Func<CombatRoom, CombatRoom> mapCombatRoom,
+        Func<Delegate, Delegate> mapCallback,
+        Action<object, object> registerRoot) =>
+        new(this, targetRun, reseeded, mapEvent, mapCombatRoom, mapCallback, registerRoot);
+
+    private EventRoom(EventRoom source, RunState targetRun, bool reseeded,
+        Func<EventModel, EventModel> mapEvent,
+        Func<CombatRoom, CombatRoom> mapCombatRoom,
+        Func<Delegate, Delegate> mapCallback,
+        Action<object, object> registerRoot)
+    {
+        source.Event?.AssertRunCloneBoundary();
+        registerRoot(source, this);
+        CopyEntryStateFrom(source);
+        Event = source.Event is null ? null! : mapEvent(source.Event);
+        _eventFactory = (Func<EventModel>)mapCallback(source._eventFactory);
+        if (source._preparedCombatRoom is null) return;
+        if (!reseeded)
+        {
+            _preparedCombatRoom = mapCombatRoom(source._preparedCombatRoom);
+            return;
+        }
+
+        source._preparedCombatRoom.AssertRunCloneBoundary();
+        if (source._preparedCombatRoom.Engine is not null)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "An event's concealed prepared room must not have entered combat.");
+        EncounterDefinition encounter = Event.CanonicalEncounter
+            ?? throw new InvalidOperationException("A prepared event has no public canonical encounter.");
+        var fresh = new CombatRoom(
+            () => (encounter, encounter.CreateMonsters(new Rng(
+                RoomFactory.EncounterMonsterSeed(targetRun.Rng.Seed, targetRun.TotalFloor, encounter)))),
+            RoomType.Monster)
+        {
+            FixedGoldAmount = Event.ForcedCombatGold,
+        };
+        fresh.CopyEntryStateFrom(source._preparedCombatRoom);
+        fresh.Prepare(targetRun);
+        _preparedCombatRoom = fresh;
+        registerRoot(source._preparedCombatRoom, fresh);
+        // Only state-root identity is paired. Old monsters, their catalogue and prerolls
+        // never enter the clone queue or drive the native new-seed generation.
+        using var oldStates = source._preparedCombatRoom.EnumerateRunCloneStates().GetEnumerator();
+        using var newStates = fresh.EnumerateRunCloneStates().GetEnumerator();
+        while (oldStates.MoveNext())
+        {
+            if (!newStates.MoveNext())
+                throw new InvalidOperationException("Prepared combat state roots do not match.");
+            registerRoot(oldStates.Current, newStates.Current);
+        }
+        if (newStates.MoveNext())
+            throw new InvalidOperationException("Prepared combat state roots do not match.");
+    }
+
     public override Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);

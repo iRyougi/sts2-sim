@@ -424,7 +424,13 @@ public sealed class Player
 
     internal Player CloneForCombat(
         IRunState runState,
-        IDictionary<CardModel, CardModel> cardMap)
+        IDictionary<CardModel, CardModel> cardMap) =>
+        CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.Clone());
+
+    private Player CloneOwnedState(
+        IRunState runState,
+        IDictionary<CardModel, CardModel> cardMap,
+        PlayerRngSet clonedRng, RelicGrabBag clonedRelicBag)
     {
         // Character is a canonical ModelDb instance and therefore deliberately shared.
         var clone = new Player(Character, Creature.CurrentHp, Creature.MaxHp, MaxEnergy, Gold, UnlockState)
@@ -432,15 +438,16 @@ public sealed class Player
             RunState = runState,
             IsActiveForHooks = IsActiveForHooks,
             CardRemovalsUsed = CardRemovalsUsed,
+            CanUseOrRemovePotions = CanUseOrRemovePotions,
             BaseOrbSlotCount = BaseOrbSlotCount,
-            PlayerRng = PlayerRng.CloneExact(),
+            PlayerRng = clonedRng,
         };
         clone.Odds = PlayerOddsSet.FromSerializable(
             Odds.ToSerializable(),
             clone.PlayerRng,
             runState.Ascension,
             new HookOddsAdapter(runState));
-        clone.RelicGrabBag = RelicGrabBag.Clone();
+        clone.RelicGrabBag = clonedRelicBag;
 
         clone._potionSlots.Clear();
         foreach (PotionModel? potion in _potionSlots)
@@ -473,6 +480,27 @@ public sealed class Player
         clone.PlayerCombatState = PlayerCombatState?.CloneForCombat(clone, cardMap);
         return clone;
     }
+    internal Player CloneForRun(RunState runState, IDictionary<CardModel, CardModel> cardMap)
+    {
+        Player clone = CloneForCombat(runState, cardMap);
+        clone.Creature.RestoreCumulativeHpLostFrom(Creature);
+        clone.Creature.CombatId = Creature.CombatId;
+        return clone;
+    }
+
+    internal Player CloneReseededForRun(RunState runState, IDictionary<CardModel, CardModel> cardMap)
+    {
+        PlayerRngSet fresh = PlayerRng.UsesSemanticKeys
+            ? PlayerRngSet.CreateKeyed(runState.Rng.Seed) : new PlayerRngSet(runState.Rng.Seed);
+        RelicGrabBag bag = RelicGrabBag.CloneReshuffled(runState.Rng.ForSemanticKey(
+            Sts2Sim.Core.Entities.Rngs.RunRngType.UpFront,
+            $"imagination/relic_bag/player={runState.Players.Count}"));
+        Player clone = CloneOwnedState(runState, cardMap, fresh, bag);
+        clone.Creature.RestoreCumulativeHpLostFrom(Creature);
+        clone.Creature.CombatId = Creature.CombatId;
+        return clone;
+    }
+
 
     internal async Task RollbackCombatStartAsync()
     {

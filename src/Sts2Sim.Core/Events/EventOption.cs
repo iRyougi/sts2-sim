@@ -20,6 +20,14 @@ public sealed class EventOption
         _onChosen = onChosen;
     }
 
+    internal EventOption RebindForRun(Func<Delegate, Delegate> mapCallback)
+    {
+        // One graph mapper owns all Method/Target and invocation-list reconstruction.
+        Func<Task>? rebound = _onChosen is null
+            ? null : (Func<Task>)mapCallback(_onChosen);
+        return new EventOption(Key, rebound);
+    }
+
     public Task Invoke() => _onChosen?.Invoke()
         ?? throw new InvalidOperationException("Locked event options cannot be chosen.");
 }

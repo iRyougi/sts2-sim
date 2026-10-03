@@ -27,6 +27,9 @@ public sealed class CombatRoom : AbstractRoom
     private Task? _outcomeTask;
     private Task? _exitTask;
     private Task? _completionTask;
+    private bool _outcomeCompleted;
+    private bool _exitCompleted;
+    private bool _completionCompleted;
     internal int? FixedGoldAmount { get; init; }
     public const string CustomEncounterName = "custom-combat";
 
@@ -128,6 +131,77 @@ public sealed class CombatRoom : AbstractRoom
         EncounterName = EncounterDefinition.DefaultName;
         ModelId = null;
     }
+
+    internal IEnumerable<CombatState> EnumerateRunCloneStates()
+    {
+        if (_preparedCombatState is not null) yield return _preparedCombatState;
+        if (Engine is not null && !ReferenceEquals(Engine.State, _preparedCombatState))
+            yield return Engine.State;
+    }
+
+    internal void AssertRunCloneBoundary()
+    {
+        if (Engine?.IsInProgress == true)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.ActiveCombat,
+                "The combat room is still active.");
+        if (_insideLifecycle.Value || Engine?.IsStarting == true
+            || _outcomeTask is { IsCompletedSuccessfully: false }
+            || _exitTask is { IsCompletedSuccessfully: false }
+            || _completionTask is { IsCompletedSuccessfully: false })
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "The combat room has no successful stable lifecycle boundary.");
+    }
+
+    internal CombatRoom CloneForRun(RunState targetRun,
+        Func<Player, Player> mapPlayer,
+        Func<Reward, Reward> mapReward,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Func<CombatState, CombatState> mapState,
+        Func<Delegate, Delegate> mapCallback,
+        Action<CombatRoom, CombatRoom> registerRoom)
+    {
+        AssertRunCloneBoundary();
+        return new CombatRoom(this, targetRun, mapPlayer, mapReward,
+            mapOffer, mapState, mapCallback, registerRoom);
+    }
+
+    private CombatRoom(CombatRoom source, RunState targetRun,
+        Func<Player, Player> mapPlayer,
+        Func<Reward, Reward> mapReward,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Func<CombatState, CombatState> mapState,
+        Func<Delegate, Delegate> mapCallback,
+        Action<CombatRoom, CombatRoom> registerRoom)
+    {
+        // Publish the shell before mapping a closure that refers back to this room.
+        registerRoom(source, this);
+        RoomType = source.RoomType;
+        ModelId = source.ModelId;
+        Encounter = source.Encounter;
+        EncounterName = source.EncounterName;
+        FixedGoldAmount = source.FixedGoldAmount;
+        Won = source.Won;
+        GoldProportion = source.GoldProportion;
+        _outcomeCompleted = source._outcomeCompleted;
+        _exitCompleted = source._exitCompleted;
+        _completionCompleted = source._completionCompleted;
+        CopyEntryStateFrom(source);
+        _preparedCombatState = source._preparedCombatState is null ? null : mapState(source._preparedCombatState);
+        Engine = source.Engine is null ? null! : mapState(source.Engine.State).Engine!;
+        _cardSelectionSource = targetRun.CardSelectionSource;
+        _monsterFactory = source._monsterFactory is null ? null : (Func<MonsterModel>)mapCallback(source._monsterFactory);
+        _monsterBatchFactory = source._monsterBatchFactory is null ? null : (Func<IReadOnlyList<MonsterModel>>)mapCallback(source._monsterBatchFactory);
+        _encounterFactory = source._encounterFactory is null ? null : (Func<(EncounterDefinition Encounter, IReadOnlyList<(MonsterModel Monster, string? SlotName)> Monsters)>)mapCallback(source._encounterFactory);
+        _slottedMonsterBatchFactory = source._slottedMonsterBatchFactory is null ? null : (Func<IReadOnlyList<(MonsterModel Monster, string? SlotName)>>)mapCallback(source._slottedMonsterBatchFactory);
+        _beforeSetupDiagnostic = source._beforeSetupDiagnostic is null ? null : (Action<CombatRoom, CombatState>)mapCallback(source._beforeSetupDiagnostic);
+        foreach ((Player player, List<Reward> rewards) in source._pendingExtraRewards)
+            _pendingExtraRewards.Add(mapPlayer(player), rewards.Select(mapReward).ToList());
+        foreach (Reward reward in source._unpopulatedExtraRewards)
+            _unpopulatedExtraRewards.Add(mapReward(reward));
+        GeneratedRewards = Array.AsReadOnly(source.GeneratedRewards.Select(mapOffer).ToArray());
+        // Tasks, the lifecycle lock, AsyncLocal and observer are not copied.
+    }
+
 
     internal void ConfigureObserver(ICombatObserver observer)
     {
@@ -314,6 +388,7 @@ public sealed class CombatRoom : AbstractRoom
         RejectLifecycleReentry();
         lock (_lifecycleLock)
         {
+            if (_outcomeCompleted) return _outcomeTask ??= Task.CompletedTask;
             if (_outcomeTask is not null) return _outcomeTask;
             if (_exitTask is not null)
                 throw new InvalidOperationException("Cannot resolve an outcome after room exit has started.");
@@ -345,6 +420,9 @@ public sealed class CombatRoom : AbstractRoom
         try
         {
             await operation();
+            if (ReferenceEquals(_outcomeTask, completion.Task)) _outcomeCompleted = true;
+            if (ReferenceEquals(_exitTask, completion.Task)) _exitCompleted = true;
+            if (ReferenceEquals(_completionTask, completion.Task)) _completionCompleted = true;
             completion.TrySetResult();
         }
         catch (OperationCanceledException exception)
@@ -404,6 +482,7 @@ public sealed class CombatRoom : AbstractRoom
         RejectLifecycleReentry();
         lock (_lifecycleLock)
         {
+            if (_exitCompleted) return _exitTask ??= Task.CompletedTask;
             return PublishLifecycleTask(ref _exitTask, ExitOnceAsync);
         }
     }
@@ -412,6 +491,7 @@ public sealed class CombatRoom : AbstractRoom
     {
         lock (_lifecycleLock)
         {
+            if (_completionCompleted) return _completionTask ??= Task.CompletedTask;
             return PublishLifecycleTask(ref _completionTask, CompleteCombatOnceAsync);
         }
     }

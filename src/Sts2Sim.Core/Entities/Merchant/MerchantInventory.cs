@@ -49,6 +49,16 @@ public sealed class MerchantInventory
         CardRemoval = cardRemoval;
     }
 
+    internal MerchantInventory CloneForRun(
+        Player player,
+        Func<MerchantCardEntry, MerchantCardEntry> mapCardEntry,
+        Func<MerchantRelicEntry, MerchantRelicEntry> mapRelicEntry,
+        Func<MerchantPotionEntry, MerchantPotionEntry> mapPotionEntry,
+        Func<MerchantCardRemovalEntry, MerchantCardRemovalEntry> mapRemovalEntry) =>
+        new(player, _cards.Select(mapCardEntry).ToList(),
+            _relics.Select(mapRelicEntry).ToList(),
+            _potions.Select(mapPotionEntry).ToList(), mapRemovalEntry(CardRemoval));
+
     public static MerchantInventory Generate(Player player)
     {
         ArgumentNullException.ThrowIfNull(player);

@@ -10,6 +10,23 @@ public sealed class GrabBag<T>
 
     public bool Any() => _entries.Count > 0;
 
+    internal GrabBag<T> Clone()
+    {
+        var clone = new GrabBag<T>();
+        clone._entries.AddRange(_entries);
+        clone._totalWeight = _totalWeight;
+        return clone;
+    }
+
+    internal bool Remove(T item)
+    {
+        int index = _entries.FindIndex(entry => EqualityComparer<T>.Default.Equals(entry.Item, item));
+        if (index < 0) return false;
+        _totalWeight -= _entries[index].Weight;
+        _entries.RemoveAt(index);
+        return true;
+    }
+
     public void Add(T item, double weight)
     {
         _entries.Add((item, weight));

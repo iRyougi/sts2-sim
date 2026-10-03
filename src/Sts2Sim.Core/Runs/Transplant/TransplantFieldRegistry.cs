@@ -136,6 +136,7 @@ public static class TransplantFieldRegistry
     private static readonly string[] RunBoundaryFields =
     [
         "_selectingMapEventBeforeHistoryAppend", "_currentRooms", "_nextEncounterForTransplant",
+        "_activeRewardOffers", "<ForcedCombatResumeOutcome>k__BackingField",
     ];
 
     private static readonly string[] PlayerSnapshotFields =
@@ -169,6 +170,15 @@ public static class TransplantFieldRegistry
             "Regenerated from the seed and ordered act definitions before RNG state is restored.");
         AddDeclaredFields(result, typeof(RunState), RunBoundaryFields, TransplantFieldClass.ResetAtCombatStart,
             "No active room or pending transition exists at the export boundary.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["_visibleMapVisits", "_unknownMapPointEntriesThisAct"], TransplantFieldClass.Derived,
+            "Legacy imports leave Unknown result history empty and derive the entered count from map visits; reseeding explicitly rejects missing history.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["_visitedAncientTypes", "_hasVisibleAncientHistory"], TransplantFieldClass.Derived,
+            "Legacy imports have no visible Ancient type history; types remain empty, completeness is false, and reseeding explicitly rejects it.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["<IsImaginationClone>k__BackingField"], TransplantFieldClass.Ignored,
+            "Clone provenance marker has no simulator consumer; imports construct a new non-imagination run.");
         AddDeclaredFields(result, typeof(Player), PlayerSnapshotFields, TransplantFieldClass.Snapshot,
             "Preserved in PlayerSnapshot or explicitly validated before export.");
         AddDeclaredFields(result, typeof(Player), PlayerDerivedFields, TransplantFieldClass.Derived,

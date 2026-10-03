@@ -79,6 +79,138 @@ public sealed class CrystalSphereMinigame
         finally { _revealGate.Release(); }
     }
 
+    internal CrystalSphereMinigame CloneExactForRun(
+        Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        if (_revealGate.CurrentCount != 1)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "A sphere reveal is still executing.");
+        return new CrystalSphereMinigame(this, owner, rng, mapItem, mapReward, registerGame);
+    }
+
+    private CrystalSphereMinigame(CrystalSphereMinigame source, Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        _owner = owner;
+        _rng = rng;
+        // Publish before reward/card closures can point back to this same game.
+        registerGame(source, this);
+        Array.Copy(source._hidden, _hidden, source._hidden.Length);
+        DivinationCount = source.DivinationCount;
+        PlacedAllItems = source.PlacedAllItems;
+        _items.AddRange(source._items.Select(mapItem));
+        _revealed.AddRange(source._revealed.Select(mapItem));
+        for (int x = 0; x < Width; x++)
+            for (int y = 0; y < Height; y++)
+                _occupants[x, y] = source._occupants[x, y] is { } item ? mapItem(item) : null;
+        Rewards = Array.AsReadOnly(source.Rewards.Select(mapReward).ToArray());
+        // Fresh reveal gate; no RevealAsync/Clear/CreateReward/curse or RNG draws.
+    }
+
+    internal CrystalSphereMinigame CloneReseededForRun(
+        Player owner, Rng rng, Func<CrystalSphereItem, CrystalSphereItem> mapVisibleItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame,
+        Action<CrystalSphereItem, CrystalSphereItem> registerVisibleItem)
+    {
+        if (_revealGate.CurrentCount != 1)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "A sphere reveal is still executing.");
+        if (DivinationCount == 0)
+        {
+            // No board outcome can be consumed after the final divination. Retain only
+            // public items and frozen rewards, not the old concealed item catalogue.
+            return CloneResolvedVisibleForRun(owner, rng, mapVisibleItem, mapReward, registerGame);
+        }
+
+        var observed = new Dictionary<CrystalSphereItem, int>(ReferenceEqualityComparer.Instance);
+        foreach (CrystalSphereItem item in _revealed)
+            observed[item] = observed.GetValueOrDefault(item) + 1;
+        while (true)
+        {
+            // A fresh native constructor determines its own placements, short-circuit
+            // failures, ten-batch limit and accumulated subscriptions. Never read the
+            // source's _items, _occupants, batch count or RNG state to drive generation.
+            var candidate = new CrystalSphereMinigame(owner, rng, DivinationCount);
+            if (candidate.PlacedAllItems != PlacedAllItems) continue;
+            var visible = new Dictionary<CrystalSphereItem, CrystalSphereItem>(ReferenceEqualityComparer.Instance);
+            bool matches = true;
+            foreach (CrystalSphereItem item in candidate._items)
+            {
+                if (item.Position is not { } position) continue;
+                bool fullyVisible = true;
+                for (int dx = 0; dx < item.Width; dx++)
+                    for (int dy = 0; dy < item.Height; dy++)
+                        if (_hidden[position.X + dx, position.Y + dy]) fullyVisible = false;
+                if (!fullyVisible) continue;
+                CrystalSphereItem? prior = null;
+                foreach (var observation in observed)
+                {
+                    CrystalSphereItem known = observation.Key;
+                    if (known.Position != item.Position || known.Kind != item.Kind ||
+                        known.CardRarity != item.CardRarity || known.PotionRarity != item.PotionRarity ||
+                        known.IsBigGold != item.IsBigGold || known.Width != item.Width ||
+                        known.Height != item.Height || observation.Value != item.RevealSubscriptions) continue;
+                    prior = known;
+                    break;
+                }
+                if (prior is null || !visible.TryAdd(prior, item)) { matches = false; break; }
+            }
+            if (!matches || visible.Count != observed.Count) continue;
+
+            registerGame(this, candidate);
+            Array.Copy(_hidden, candidate._hidden, _hidden.Length);
+            foreach (var pair in visible)
+            {
+                pair.Value.IsRevealed = true;
+                registerVisibleItem(pair.Key, pair.Value);
+            }
+            foreach (CrystalSphereItem item in _revealed) candidate._revealed.Add(visible[item]);
+            candidate.Rewards = Array.AsReadOnly(Rewards.Select(mapReward).ToArray());
+            // No Clear/RevealAsync/CreateReward is invoked: visible curse/card side effects
+            // already occurred in the source and must not execute again in the branch.
+            return candidate;
+        }
+    }
+
+    private CrystalSphereMinigame(Player owner, Rng rng)
+    {
+        _owner = owner;
+        _rng = rng;
+    }
+
+    private CrystalSphereMinigame CloneResolvedVisibleForRun(Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapVisibleItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        var target = new CrystalSphereMinigame(owner, rng);
+        registerGame(this, target);
+        Array.Copy(_hidden, target._hidden, _hidden.Length);
+        target.DivinationCount = DivinationCount;
+        target.PlacedAllItems = PlacedAllItems;
+        var included = new HashSet<CrystalSphereItem>(ReferenceEqualityComparer.Instance);
+        foreach (CrystalSphereItem known in _revealed)
+        {
+            CrystalSphereItem copied = mapVisibleItem(known);
+            target._revealed.Add(copied);
+            if (!included.Add(known)) continue;
+            target._items.Add(copied);
+            if (copied.Position is not { } position) continue;
+            for (int dx = 0; dx < copied.Width; dx++)
+                for (int dy = 0; dy < copied.Height; dy++)
+                    target._occupants[position.X + dx, position.Y + dy] = copied;
+        }
+        target.Rewards = Array.AsReadOnly(Rewards.Select(mapReward).ToArray());
+        return target;
+    }
+
+
     private bool PopulateItems()
     {
         List<CrystalSphereItem> batch = [new(CrystalSphereItemKind.Relic),

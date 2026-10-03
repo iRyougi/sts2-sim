@@ -34,6 +34,15 @@ public sealed class TreasureRoom : AbstractRoom
         _goldAmount = goldAmount;
     }
 
+    internal TreasureRoom CloneForRun(Func<Player, Player> mapPlayer)
+    {
+        TreasureRoom clone = _goldAmount is { } gold ? new TreasureRoom(gold) : new TreasureRoom();
+        clone.CopyEntryStateFrom(this);
+        clone._resolutions = Array.AsReadOnly(_resolutions
+            .Select(result => result with { Player = mapPlayer(result.Player) }).ToArray());
+        return clone;
+    }
+
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
