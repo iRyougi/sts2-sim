@@ -13,8 +13,11 @@ public sealed class LivingShield : MonsterModel
     public override int MaxInitialHp => MinInitialHp;
     private int Smash => Value(AscensionLevel.DeadlyEnemies, 18, 16);
 
-    public override Task BeforeCombatStart() =>
-        PowerCmd.Apply<RampartPower>(Creature.CombatState!, Creature, 25m, Creature, null);
+    public override async Task AfterAddedToRoom()
+    {
+        await base.AfterAddedToRoom();
+        await PowerCmd.Apply<RampartPower>(Creature.CombatState!, Creature, 25m, Creature, null);
+    }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {

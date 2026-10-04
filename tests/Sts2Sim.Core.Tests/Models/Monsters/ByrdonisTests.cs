@@ -56,12 +56,12 @@ public sealed class ByrdonisTests : IDisposable
     }
 
     [Fact]
-    public async Task BeforeCombatStart_InstallsTerritorialAndEnemyTurnEndGrantsStrength()
+    public async Task AfterAddedToRoom_InstallsTerritorialAndEnemyTurnEndGrantsStrength()
     {
         (CombatState combatState, Byrdonis monster, _) =
             Task14MonsterTestFixture.CreateCombat<Byrdonis>(0);
 
-        await Hook.BeforeCombatStart(combatState);
+        await monster.AfterAddedToRoom();
 
         TerritorialPower territorial = Assert.IsType<TerritorialPower>(monster.Creature.GetPower<TerritorialPower>());
         Assert.Equal(1, territorial.Amount);

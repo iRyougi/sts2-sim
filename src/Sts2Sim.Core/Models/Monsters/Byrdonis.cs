@@ -19,9 +19,9 @@ public sealed class Byrdonis : MonsterModel
 
     private int SwoopDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 19, 17);
 
-    public override async Task BeforeCombatStart()
+    public override async Task AfterAddedToRoom()
     {
-        await base.BeforeCombatStart();
+        await base.AfterAddedToRoom();
         await PowerCmd.Apply<TerritorialPower>(
             Creature.CombatState!,
             Creature,

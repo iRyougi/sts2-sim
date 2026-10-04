@@ -1,7 +1,6 @@
 namespace Sts2Sim.Core.Tests.Models.Monsters;
 
 using Sts2Sim.Core.Entities.Ascension;
-using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves.Intents;
@@ -26,12 +25,12 @@ public sealed class BygoneEffigyTests : IDisposable
     }
 
     [Fact]
-    public async Task BeforeCombatStart_InstallsOneSlow()
+    public async Task AfterAddedToRoom_InstallsOneSlow()
     {
-        (var combatState, BygoneEffigy monster, _) =
+        (_, BygoneEffigy monster, _) =
             Task14MonsterTestFixture.CreateCombat<BygoneEffigy>(0);
 
-        await Hook.BeforeCombatStart(combatState);
+        await monster.AfterAddedToRoom();
 
         Assert.Equal(1, Assert.IsType<SlowPower>(monster.Creature.GetPower<SlowPower>()).Amount);
     }
