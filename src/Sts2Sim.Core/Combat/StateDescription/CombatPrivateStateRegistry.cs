@@ -85,7 +85,7 @@ internal static class CombatPrivateStateRegistry
         "ChainsOfBindingPower._boundCardPlayedThisTurn", "NemesisPower._shouldApplyIntangible",
         "WitheringPresencePower._cardsPlayed", "WitheringPresencePower.<Target>k__BackingField",
         "Aeonglass.<AdditionalStrength>k__BackingField",
-        "Aeonglass.<WitherUpgradeCount>k__BackingField", "Queen._hasAmalgamDied",
+        "Aeonglass.<WitherUpgradeCount>k__BackingField", "Queen._hasAmalgamDied", "Queen._amalgam",
         "TestSubject._respawns", "TestSubject._extraMultiClawCount",
         "Wither._fakeUpgradeLevel",
         "MawBank._hasItemBeenBought",
@@ -171,6 +171,7 @@ internal static class CombatPrivateStateRegistry
 
     private static readonly HashSet<string> DerivedFields =
     [
+        "Queen._burnBrightForMeState", "Queen._enragedState",
         "Alignment.<Spec>k__BackingField",
         "Arsenal.<Spec>k__BackingField",
         "AstralPulse.<Spec>k__BackingField",

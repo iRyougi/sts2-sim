@@ -193,7 +193,10 @@ public sealed partial class CombatState
                 target.RestoreCombatCloneReferencesFrom(source, cardMap, creatureMap);
         foreach ((Creature source, Creature target) in creatureMap)
             if (source.Monster is { } sourceMonster)
+            {
+                target.Monster!.RestoreCombatCloneReferencesFrom(sourceMonster, creatureMap);
                 target.Monster!.RestoreCombatCloneMoveStateFrom(sourceMonster);
+            }
         foreach ((CombatState source, CombatState target) in states)
         {
             target.DamageHistory = source.DamageHistory.Clone(creatureMap, cardMap);

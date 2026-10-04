@@ -152,6 +152,12 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
             this);
     }
 
+    internal virtual void RestoreCombatCloneReferencesFrom(
+        MonsterModel source,
+        IReadOnlyDictionary<Creature, Creature> creatureMap)
+    {
+    }
+
     internal virtual void AppendCombatStateDescription(
         ref CombatStateDescriptionBuilder builder,
         CombatStateDescriptionContext context)
