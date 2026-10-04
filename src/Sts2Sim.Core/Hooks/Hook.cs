@@ -1014,12 +1014,14 @@ public static class Hook
     {
         decimal modifiedCost = originalCost;
         wasModified = false;
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
+                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Energy)).ToArray())
         {
             wasModified |= model.TryModifyEnergyCostInCombat(card, modifiedCost, out modifiedCost);
         }
 
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
+                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.EnergyLate)).ToArray())
         {
             wasModified |= model.TryModifyEnergyCostInCombatLate(card, modifiedCost, out modifiedCost);
         }
@@ -1041,7 +1043,8 @@ public static class Hook
     {
         decimal modifiedCost = originalCost;
         wasModified = false;
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
+                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Star)).ToArray())
         {
             wasModified |= model.TryModifyStarCostInCombat(card, modifiedCost, out modifiedCost);
         }
