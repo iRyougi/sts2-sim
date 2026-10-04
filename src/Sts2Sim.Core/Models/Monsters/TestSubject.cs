@@ -22,6 +22,36 @@ public sealed class TestSubject : MonsterModel
     private int _respawns;
     private int _extraMultiClawCount;
 
+    private MoveState DeadState
+    {
+        get => _deadState;
+        set
+        {
+            AssertMutable();
+            _deadState = value;
+        }
+    }
+
+    private int Respawns
+    {
+        get => _respawns;
+        set
+        {
+            AssertMutable();
+            _respawns = value;
+        }
+    }
+
+    private int ExtraMultiClawCount
+    {
+        get => _extraMultiClawCount;
+        set
+        {
+            AssertMutable();
+            _extraMultiClawCount = value;
+        }
+    }
+
     public int FirstFormHp => Ascension(AscensionLevel.ToughEnemies, 111, 100);
     public int SecondFormHp => Ascension(AscensionLevel.ToughEnemies, 212, 200);
     public int ThirdFormHp => Ascension(AscensionLevel.ToughEnemies, 313, 300);
@@ -33,13 +63,13 @@ public sealed class TestSubject : MonsterModel
     private int BiteDamage => Ascension(AscensionLevel.DeadlyEnemies, 22, 20);
     private int SkullBashDamage => Ascension(AscensionLevel.DeadlyEnemies, 16, 14);
     private int MultiClawDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
-    private int MultiClawTotalCount => 3 + _extraMultiClawCount;
+    private int MultiClawTotalCount => 3 + ExtraMultiClawCount;
     private int Phase3LacerateDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
     private const int BigPounceDamage = 45;
     private int BurningGrowlBurnCount => Ascension(AscensionLevel.DeadlyEnemies, 5, 3);
     private int BurningGrowlStrengthGain => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
 
-    public override bool ShouldDisappearFromDoom() => _respawns >= 2;
+    public override bool ShouldDisappearFromDoom() => Respawns >= 2;
 
     public override async Task AfterAddedToRoom()
     {
@@ -50,13 +80,14 @@ public sealed class TestSubject : MonsterModel
 
     public Task TriggerDeadState()
     {
-        SetMoveImmediate(_deadState, forceTransition: true);
+        SetMoveImmediate(DeadState, forceTransition: true);
         return Task.CompletedTask;
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
-        _deadState = new MoveState("RESPAWN_MOVE", RespawnMove, new HealIntent(), new BuffIntent())
+        var states = new List<MonsterState>();
+        DeadState = new MoveState("RESPAWN_MOVE", RespawnMove, new HealIntent(), new BuffIntent())
         {
             MustPerformOnceBeforeTransitioning = true,
         };
@@ -81,8 +112,8 @@ public sealed class TestSubject : MonsterModel
             new StatusIntent(BurningGrowlBurnCount),
             new BuffIntent());
         var reviveBranch = new ConditionalBranchState("REVIVE_BRANCH")
-            .AddBranch(_ => _respawns < 2, "MULTI_CLAW_MOVE")
-            .AddBranch(_ => _respawns >= 2, "PHASE3_LACERATE_MOVE");
+            .AddBranch(_ => Respawns < 2, "MULTI_CLAW_MOVE")
+            .AddBranch(_ => Respawns >= 2, "PHASE3_LACERATE_MOVE");
 
         bite.FollowUpState = skullBash;
         skullBash.FollowUpState = bite;
@@ -90,36 +121,41 @@ public sealed class TestSubject : MonsterModel
         lacerate.FollowUpState = bigPounce;
         bigPounce.FollowUpState = burningGrowl;
         burningGrowl.FollowUpState = lacerate;
-        _deadState.FollowUpState = reviveBranch;
+        DeadState.FollowUpState = reviveBranch;
 
-        return new MonsterMoveStateMachine(
-            [_deadState, bite, skullBash, multiClaw, lacerate, bigPounce, burningGrowl, reviveBranch],
-            bite);
+        states.Add(DeadState);
+        states.Add(bite);
+        states.Add(skullBash);
+        states.Add(multiClaw);
+        states.Add(lacerate);
+        states.Add(bigPounce);
+        states.Add(burningGrowl);
+        states.Add(reviveBranch);
+        return new MonsterMoveStateMachine(states, bite);
     }
 
     private async Task RespawnMove(IReadOnlyList<Creature> targets)
     {
-        _respawns++;
+        Respawns++;
         Creature.GetPower<AdaptablePower>()?.DoRevive();
-        if (_respawns == 1)
+        switch (Respawns)
         {
-            await Revive(SecondFormHp);
-            await PowerCmd.Apply<PainfulStabsPower>(Creature.CombatState!, Creature, 1m, Creature, null);
-            return;
-        }
-
-        if (_respawns == 2)
-        {
-            await Revive(ThirdFormHp);
-            await PowerCmd.Apply<NemesisPower>(Creature.CombatState!, Creature, 1m, Creature, null);
-            if (Creature.GetPower<AdaptablePower>() is { } adaptable)
-            {
-                await PowerCmd.Remove(adaptable);
-            }
-            if (Creature.GetPower<PainfulStabsPower>() is { } painfulStabs)
-            {
-                await PowerCmd.Remove(painfulStabs);
-            }
+            case 1:
+                await Revive(SecondFormHp);
+                await PowerCmd.Apply<PainfulStabsPower>(Creature.CombatState!, Creature, 1m, Creature, null);
+                break;
+            case 2:
+                await Revive(ThirdFormHp);
+                await PowerCmd.Apply<NemesisPower>(Creature.CombatState!, Creature, 1m, Creature, null);
+                if (Creature.GetPower<AdaptablePower>() is { } adaptable)
+                {
+                    await PowerCmd.Remove(adaptable);
+                }
+                if (Creature.GetPower<PainfulStabsPower>() is { } painfulStabs)
+                {
+                    await PowerCmd.Remove(painfulStabs);
+                }
+                break;
         }
     }
 
@@ -138,7 +174,7 @@ public sealed class TestSubject : MonsterModel
     private async Task MultiClawMove(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(MultiClawDamage).WithHitCount(MultiClawTotalCount).FromMonster(this).Execute();
-        _extraMultiClawCount++;
+        ExtraMultiClawCount++;
     }
 
     private Task Phase3LacerateMove(IReadOnlyList<Creature> targets) =>
@@ -162,10 +198,12 @@ public sealed class TestSubject : MonsterModel
             Creature.CombatState!, Creature, BurningGrowlStrengthGain, Creature, null);
     }
 
-    private async Task Revive(int hp)
+    private async Task Revive(int baseRespawnHp)
     {
-        Creature.SetMaxHpInternal(hp);
-        await CreatureCmd.Heal(Creature, hp);
+        AssertMutable();
+        decimal scaledHp = baseRespawnHp;
+        await CreatureCmd.SetMaxHp(Creature, scaledHp);
+        await CreatureCmd.Heal(Creature, scaledHp);
     }
 
     private int Ascension(AscensionLevel level, int high, int low) =>
