@@ -178,6 +178,158 @@ public class CardPileCmdTests
         Assert.DoesNotContain(player.PlayerCombatState.DrawPile.Cards, c => ReferenceEquals(c, card));
         Assert.Contains(player.PlayerCombatState.ExhaustPile.Cards, c => ReferenceEquals(c, card));
     }
+
+    [Theory]
+    [InlineData("single")]
+    [InlineData("batch")]
+    [InlineData("reorder")]
+    [InlineData("full-hand")]
+    [InlineData("partly-removed")]
+    [InlineData("ending")]
+    public async Task AddAsync_ReportsOnlyActualPileChanges(string scenario)
+    {
+        (Player player, CombatState combat, PileObserverCard observer) = await MakeSemanticContext(scenario);
+        var piles = player.PlayerCombatState!;
+        CardModel first = AddSemanticCard<StrikeRegent>(player,
+            scenario is "reorder" or "full-hand" ? PileType.Discard : PileType.Hand);
+        CardModel? second = null;
+        if (scenario is "batch" or "partly-removed" or "reorder")
+            second = AddSemanticCard<DefendRegent>(player,
+                scenario == "reorder" ? PileType.Discard : PileType.Hand);
+        if (scenario == "partly-removed") second!.Pile!.RemoveInternal(second);
+        if (scenario == "full-hand")
+            for (int i = 0; i < CardPile.MaxCardsInHand; i++) AddSemanticCard<StrikeRegent>(player, PileType.Hand);
+        if (scenario == "ending") player.Creature.SetCurrentHpInternal(0);
+        int rngBefore = player.RunState.Rng.Shuffle.Counter;
+        PileType destination = scenario == "full-hand" ? PileType.Hand : PileType.Discard;
+        CardPilePosition position = scenario is "single" or "ending" ? CardPilePosition.Random : CardPilePosition.Bottom;
+
+        IReadOnlyList<CardPileAddResult> results = scenario is "batch" or "partly-removed"
+            ? await CardPileCmd.AddAsync(combat, new[] { first, second! }, destination, position)
+            : new[] { await CardPileCmd.AddAsync(combat, first, destination, position) };
+
+        Assert.Equal(rngBefore + (scenario == "single" ? 1 : 0), player.RunState.Rng.Shuffle.Counter);
+        Assert.Equal(scenario != "ending", results[0].Success);
+        Assert.Same(scenario == "ending" ? piles.Hand : piles.DiscardPile, first.Pile);
+        bool notified = scenario is "single" or "batch" or "partly-removed";
+        CardModel[] expectedCards = scenario == "batch" ? new[] { first, second! } : new[] { first };
+        IEnumerable<(CardModel Card, string Phase)> expectedChanges = notified
+            ? expectedCards.SelectMany(card => new[] { (card, "normal"), (card, "late") })
+            : Array.Empty<(CardModel, string)>();
+        Assert.Equal(expectedChanges, observer.Changes.Select(change => (change.Card, change.Phase)));
+        Assert.All(observer.Changes, change =>
+        {
+            Assert.Equal(PileType.Hand, change.OldPile);
+            Assert.Equal(PileType.Discard, change.CurrentPile);
+        });
+        if (scenario == "batch")
+        {
+            Assert.All(results, result => Assert.True(result.Success));
+            Assert.All(observer.DiscardSnapshots, snapshot => Assert.Equal(expectedCards, snapshot));
+        }
+        if (scenario == "partly-removed")
+        {
+            Assert.False(results[1].Success);
+            Assert.Null(second!.Pile);
+        }
+        if (scenario == "reorder") Assert.Equal(new[] { second!, first }, piles.DiscardPile.Cards);
+        if (scenario == "full-hand") Assert.Equal(CardPile.MaxCardsInHand, piles.Hand.Cards.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Exhaust_ResultAndCallbacksFollowNative(bool ending)
+    {
+        (Player player, CombatState combat, PileObserverCard observer) = await MakeSemanticContext("exhaust-" + ending);
+        CardModel card = AddSemanticCard<StrikeRegent>(player, PileType.Hand);
+        int historyBefore = combat.SemanticHistory.CardsExhaustedThisCombat;
+        if (ending) player.Creature.SetCurrentHpInternal(0);
+
+        CardPileAddResult? result = await CardPileCmd.Exhaust(combat, card, causedByEthereal: true);
+
+        if (ending)
+        {
+            Assert.Null(result);
+            Assert.Same(player.PlayerCombatState!.Hand, card.Pile);
+            Assert.Empty(observer.Changes);
+            Assert.Empty(observer.ExhaustHistoryCounts);
+            Assert.Equal(historyBefore, combat.SemanticHistory.CardsExhaustedThisCombat);
+        }
+        else
+        {
+            Assert.True(result.HasValue && result.Value.Success);
+            Assert.Same(player.PlayerCombatState!.ExhaustPile, card.Pile);
+            Assert.Equal(new[] { "normal", "late", "exhaust" }, observer.EventOrder);
+            Assert.All(observer.ChangeHistoryCounts, count => Assert.Equal(historyBefore, count));
+            Assert.Equal(new[] { historyBefore + 1 }, observer.ExhaustHistoryCounts);
+            CardModel ethereal = AddSemanticCard<AscendersBane>(player, PileType.Hand);
+            observer.VetoEthereal = true;
+            await CombatEngine.DoTurnEndAsync(combat, player);
+            Assert.Same(player.PlayerCombatState.Hand, ethereal.Pile);
+            Assert.Equal(historyBefore + 1, combat.SemanticHistory.CardsExhaustedThisCombat);
+        }
+    }
+
+    private static async Task<(Player, CombatState, PileObserverCard)> MakeSemanticContext(string seed)
+    {
+        ModelDb.ResetForTests();
+        ModelDb.Init(Sts2Sim.Core.Content.ContentRegistry.AllTypes);
+        var run = new RunState("399-piles-" + seed, new Sts2Sim.Core.Content.Acts.Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        var room = new Sts2Sim.Core.Rooms.CombatRoom(() =>
+            (MonsterModel)ModelDb.Monster<Sts2Sim.Core.Models.Monsters.WanderingGrunt>().MutableClone());
+        run.PushRoom(room);
+        await room.Enter(run);
+        foreach (CardModel card in player.PlayerCombatState!.Hand.Cards.ToArray())
+            CardPileCmd.Add(card, PileType.Draw);
+        var observer = (PileObserverCard)new PileObserverCard().MutableClone();
+        observer.AssignOwner(player);
+        player.PlayerCombatState.DrawPile.AddInternal(observer);
+        return (player, room.Engine.State, observer);
+    }
+
+    private static CardModel AddSemanticCard<T>(Player player, PileType pile) where T : CardModel
+    {
+        var card = (CardModel)ModelDb.Card<T>().MutableClone();
+        card.AssignOwner(player);
+        CardPileCmd.Get(pile, player)!.AddInternal(card);
+        return card;
+    }
+}
+
+internal sealed class PileObserverCard : CardModel
+{
+    public override CardType Type => CardType.Status;
+    public override CardRarity Rarity => CardRarity.Status;
+    public override TargetType TargetType => TargetType.None;
+    protected override int CanonicalEnergyCost => -1;
+    public bool VetoEthereal { get; set; }
+    public List<(CardModel Card, string Phase, PileType OldPile, PileType? CurrentPile)> Changes { get; } = new();
+    public List<CardModel[]> DiscardSnapshots { get; } = new();
+    public List<string> EventOrder { get; } = new();
+    public List<int> ChangeHistoryCounts { get; } = new();
+    public List<int> ExhaustHistoryCounts { get; } = new();
+    public override bool ShouldEtherealTrigger(CardModel card) => !VetoEthereal;
+    public override Task AfterCardChangedPiles(CardModel card, PileType oldPileType, AbstractModel? clonedBy) =>
+        Record(card, oldPileType, "normal");
+    public override Task AfterCardChangedPilesLate(CardModel card, PileType oldPileType, AbstractModel? clonedBy) =>
+        Record(card, oldPileType, "late");
+    private Task Record(CardModel card, PileType oldPile, string phase)
+    {
+        Changes.Add((card, phase, oldPile, card.Pile?.Type));
+        DiscardSnapshots.Add(Owner.PlayerCombatState!.DiscardPile.Cards.ToArray());
+        EventOrder.Add(phase);
+        ChangeHistoryCounts.Add(((CombatState)CombatState!).SemanticHistory.CardsExhaustedThisCombat);
+        return Task.CompletedTask;
+    }
+    public override Task AfterCardExhausted(CardModel card, bool causedByEthereal)
+    {
+        EventOrder.Add("exhaust");
+        ExhaustHistoryCounts.Add(((CombatState)CombatState!).SemanticHistory.CardsExhaustedThisCombat);
+        return Task.CompletedTask;
+    }
 }
 
 file sealed class DrawGateModel : AbstractModel

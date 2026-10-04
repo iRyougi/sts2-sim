@@ -1049,17 +1049,37 @@ public static class Hook
         return modifiedCost;
     }
 
+    public static Task AfterCardChangedPiles(
+        IRunState runState,
+        CardModel card,
+        PileType oldPileType,
+        AbstractModel? clonedBy) =>
+        AfterCardChangedPiles(runState, null, card, oldPileType, clonedBy);
+
     public static async Task AfterCardChangedPiles(
         IRunState runState,
+        ICombatState? combatState,
         CardModel card,
         PileType oldPileType,
         AbstractModel? clonedBy)
     {
-        foreach (AbstractModel model in runState.IterateHookListeners(null).ToArray())
+        foreach (AbstractModel model in runState.IterateHookListeners(combatState).ToArray())
         {
             await model.AfterCardChangedPiles(card, oldPileType, clonedBy);
             model.InvokeExecutionFinished();
         }
+        foreach (AbstractModel model in runState.IterateHookListeners(combatState).ToArray())
+        {
+            await model.AfterCardChangedPilesLate(card, oldPileType, clonedBy);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static bool ShouldEtherealTrigger(ICombatState combatState, CardModel card)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+            if (!model.ShouldEtherealTrigger(card)) return false;
+        return true;
     }
 
     public static async Task BeforeCardPlayed(ICombatState combatState, CardPlay cardPlay)

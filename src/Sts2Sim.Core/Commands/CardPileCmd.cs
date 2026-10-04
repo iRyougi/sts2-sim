@@ -8,6 +8,9 @@ using Sts2Sim.Core.Random;
 
 namespace Sts2Sim.Core.Commands;
 
+/// <summary>The result of a semantic pile move; an ended combat can return an unexecuted successful preflight.</summary>
+public readonly record struct CardPileAddResult(CardModel Card, CardPile? OldPile, PileType TargetPile, bool Success);
+
 /// <summary>牌堆间的移动/洗牌/抽牌命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CardPileCmd</c>）。</summary>
 public static class CardPileCmd
 {
@@ -34,6 +37,70 @@ public static class CardPileCmd
 
         if (newPile.Type == PileType.Deck) card.FloorAddedToDeck = card.Owner.RunState.TotalFloor;
         newPile.AddInternal(card, GetInsertionIndex(card, newPile, position));
+    }
+
+    /// <summary>Moves an existing combat card and awaits its pile-change notification.
+    /// New cards still enter through EnterCombat; persistent cards use AddToDeck.</summary>
+    public static async Task<CardPileAddResult> AddAsync(
+        ICombatState combatState, CardModel card, PileType pileType,
+        CardPilePosition position = CardPilePosition.Bottom) =>
+        (await AddAsync(combatState, new[] { card }, pileType, position))[0];
+
+    /// <summary>Native Add(IEnumerable): validate first, move the whole batch, then notify in result order.
+    /// This entry is limited to existing combat cards: a card with no combat pile has left this surface.</summary>
+    public static async Task<IReadOnlyList<CardPileAddResult>> AddAsync(
+        ICombatState combatState, IEnumerable<CardModel> cards, PileType pileType,
+        CardPilePosition position = CardPilePosition.Bottom)
+    {
+        ArgumentNullException.ThrowIfNull(combatState);
+        ArgumentNullException.ThrowIfNull(cards);
+        CardModel[] input = cards.ToArray();
+        if (input.Length == 0) return Array.Empty<CardPileAddResult>();
+        if (pileType is not (PileType.Draw or PileType.Hand or PileType.Discard or PileType.Exhaust or PileType.Play))
+            throw new ArgumentOutOfRangeException(nameof(pileType), "Use AddToDeck for persistent cards.");
+        if (combatState.IsEnding())
+            return input.Select(card => new CardPileAddResult(card, null, PileType.None, false)).ToArray();
+
+        var results = new List<CardPileAddResult>(input.Length);
+        Player? owner = null;
+        foreach (CardModel card in input)
+        {
+            ArgumentNullException.ThrowIfNull(card);
+            Player cardOwner = card.Owner ?? throw new InvalidOperationException("Card has no owner.");
+            CardPile? oldPile = card.Pile;
+            bool success = oldPile is not null && oldPile.Type is not (PileType.None or PileType.Deck) &&
+                !cardOwner.Creature.IsDead && cardOwner.Creature.CombatState is not null;
+            results.Add(new CardPileAddResult(card, oldPile, pileType, success));
+            if (!success) continue;
+            if (!ReferenceEquals(cardOwner.Creature.CombatState, combatState) ||
+                !combatState.ContainsCreature(cardOwner.Creature))
+                throw new InvalidOperationException("Moved cards must belong to the supplied combat.");
+            owner ??= cardOwner;
+            if (!ReferenceEquals(owner, cardOwner))
+                throw new InvalidOperationException("Cards in a pile batch must have the same owner.");
+        }
+
+        // The native ended guard is after preflight; it is distinct from the earlier IsEnding failure.
+        if (!combatState.IsLiveCombat()) return results;
+        foreach (CardPileAddResult result in results)
+        {
+            if (!result.Success) continue;
+            CardModel card = result.Card;
+            CardPile destination = Get(pileType, card.Owner)
+                ?? throw new InvalidOperationException($"Player has no {pileType} pile.");
+            if (destination.Type == PileType.Hand && destination.Cards.Count >= CardPile.MaxCardsInHand)
+                destination = Get(PileType.Discard, card.Owner)!;
+            card.Pile?.RemoveInternal(card);
+            destination.AddInternal(card, GetInsertionIndex(card, destination, position));
+        }
+
+        foreach (CardPileAddResult result in results)
+        {
+            if (result.Success && (result.OldPile is null || result.OldPile.Type != result.Card.Pile?.Type))
+                await Hook.AfterCardChangedPiles(result.Card.Owner.RunState, result.Card.CombatState,
+                    result.Card, result.OldPile?.Type ?? PileType.None, null);
+        }
+        return results;
     }
 
     private static int GetInsertionIndex(CardModel card, CardPile pile, CardPilePosition position) => position switch
@@ -135,7 +202,7 @@ public static class CardPileCmd
 
     /// <summary>Moves an existing combat card to the exhaust pile and emits the semantic exhaust hook.
     /// Generating a card directly into the exhaust pile is not an exhaust event.</summary>
-    public static async Task Exhaust(
+    public static async Task<CardPileAddResult?> Exhaust(
         ICombatState combatState,
         CardModel card,
         bool causedByEthereal = false)
@@ -144,7 +211,7 @@ public static class CardPileCmd
         ArgumentNullException.ThrowIfNull(card);
         if (combatState.IsOverOrEnding())
         {
-            return;
+            return null;
         }
         if (!combatState.IsLiveCombat() ||
             card.Owner.Creature.CombatState != combatState ||
@@ -154,7 +221,7 @@ public static class CardPileCmd
         }
 
         bool departedHand = card.Pile?.Type == PileType.Hand;
-        Add(card, PileType.Exhaust);
+        CardPileAddResult result = await AddAsync(combatState, card, PileType.Exhaust);
         if (combatState is CombatState concreteState)
             concreteState.SemanticHistory.RecordExhaust(concreteState, card.Owner);
         await Hook.AfterCardExhausted(combatState, card, causedByEthereal);
@@ -162,10 +229,11 @@ public static class CardPileCmd
         {
             await NotifyHandDeparture(combatState, card.Owner, departedHand);
         }
+        return result;
     }
 
     /// <summary>Completes the semantic hand-departure boundary after the action's own hooks/effects have run.
-    /// End-turn discard uses synchronous <see cref="Add"/> and Ethereal exhaust explicitly suppresses this path.</summary>
+    /// End-turn discard does not call this boundary; Ethereal exhaust explicitly suppresses it.</summary>
     internal static Task NotifyHandDeparture(ICombatState combatState, Player player, bool departedHand) =>
         departedHand ? CheckForEmptyHand(combatState, player) : Task.CompletedTask;
 

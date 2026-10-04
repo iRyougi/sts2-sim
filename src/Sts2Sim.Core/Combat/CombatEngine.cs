@@ -317,7 +317,6 @@ public sealed class CombatEngine
                 if (!card.HasKeyword(CardKeyword.Retain) && !retainWholeHand)
                 {
                     flushed.Add(card);
-                    CardPileCmd.Add(card, PileType.Discard);
                 }
                 else
                 {
@@ -325,6 +324,8 @@ public sealed class CombatEngine
                 }
             }
 
+            if (flushed.Count > 0)
+                await CardPileCmd.AddAsync(State, flushed, PileType.Discard);
             await Hook.AfterFlush(State, player, flushed, retained);
             player.PlayerCombatState.EndOfTurnCleanup();
         }
@@ -354,8 +355,8 @@ public sealed class CombatEngine
     }
 
     /// <summary>原版 <c>CombatManager.DoTurnEnd</c> / <c>DoTurnEndCards</c>：按手牌顺序把牌分两类——有回合末效果的，
-    /// 以及其余的虚无牌；先把虚无牌逐张消耗，再把回合末效果牌逐张移入打出区、结算效果，然后放到弃牌堆底
-    /// （本身是虚无的则消耗）。之后才在阶段二弃掉剩下的手牌，所以弃牌堆里回合末效果牌排在当回合其他手牌之前。</summary>
+    /// 以及其余的虚无牌；先把虚无牌逐张消耗，再独立启动效果牌入 Play。每张效果等待自身入 Play 和前一张完整结果，
+    /// 然后进 Discard（本身是虚无的则消耗）。整批完成后才在阶段二弃掉剩余手牌。映射 NonInteractive/Instant 无动画等待模式。</summary>
     internal static async Task DoTurnEndAsync(ICombatState combatState, Player player)
     {
         PlayerCombatState state = player.PlayerCombatState!;
@@ -370,9 +371,8 @@ public sealed class CombatEngine
             {
                 turnEndCards.Add(card);
             }
-            else if (card.HasKeyword(CardKeyword.Ethereal))
+            else if (card.HasKeyword(CardKeyword.Ethereal) && Hook.ShouldEtherealTrigger(combatState, card))
             {
-                // 原版还要求 Hook.ShouldEtherealTrigger，正式版里没有任何模型重写它，恒为真。
                 etherealCards.Add(card);
             }
         }
@@ -382,19 +382,39 @@ public sealed class CombatEngine
             await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true);
         }
 
+        Task? previousResult = null;
+        var all = new List<Task>();
+        float delay = 0f;
+        int index = 0;
         foreach (CardModel card in turnEndCards)
         {
-            CardPileCmd.Add(card, PileType.Play);
+            Task move = AddTurnEndCardToPlayPileWithDelay(card, delay);
+            Task wait = previousResult is null ? move : Task.WhenAll(move, previousResult);
+            Task<CardPileAddResult?> result = ResolveTurnEndCardEffects(card, wait);
+            // Native TweenTurnEndCardToResultPile only awaits this result and a visual tween.
+            // No gameplay work follows the success check; headless retains the result dependency.
+            all.Add(result);
+            previousResult = result;
+            delay += 0.8f * (1f - (float)index / (index + 3f));
+            index++;
+        }
+        await Task.WhenAll(all);
+
+        Task<CardPileAddResult> AddTurnEndCardToPlayPileWithDelay(CardModel card, float visualDelay)
+        {
+            // Cmd.Wait is immediate in NonInteractive/Instant mode. Keep delay calculation,
+            // without introducing wall-clock scheduling into the simulator.
+            _ = visualDelay;
+            return CardPileCmd.AddAsync(combatState, card, PileType.Play);
+        }
+
+        async Task<CardPileAddResult?> ResolveTurnEndCardEffects(CardModel card, Task wait)
+        {
+            await wait;
             await card.ResolveTurnEndInHandEffect();
-            card.InvokeExecutionFinished();
-            if (card.HasKeyword(CardKeyword.Ethereal))
-            {
-                await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true);
-            }
-            else
-            {
-                CardPileCmd.Add(card, PileType.Discard, CardPilePosition.Bottom);
-            }
+            return card.HasKeyword(CardKeyword.Ethereal)
+                ? await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true)
+                : await CardPileCmd.AddAsync(combatState, card, PileType.Discard, CardPilePosition.Bottom);
         }
     }
 

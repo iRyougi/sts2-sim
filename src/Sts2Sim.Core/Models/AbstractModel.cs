@@ -428,7 +428,7 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return false;
     }
 
-    /// <summary>Notifies run-level listeners after a card permanently enters its owner's deck.</summary>
+    /// <summary>Notifies run/combat listeners after a card changes pile type.</summary>
     public virtual Task AfterCardChangedPiles(
         CardModel card,
         PileType oldPileType,
@@ -436,6 +436,11 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     {
         return Task.CompletedTask;
     }
+
+    public virtual Task AfterCardChangedPilesLate(
+        CardModel card, PileType oldPileType, AbstractModel? clonedBy) => Task.CompletedTask;
+
+    public virtual bool ShouldEtherealTrigger(CardModel card) => true;
 
     public virtual Task BeforeCardPlayed(CardPlay cardPlay)
     {
