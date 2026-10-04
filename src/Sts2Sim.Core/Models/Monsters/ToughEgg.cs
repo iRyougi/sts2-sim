@@ -11,6 +11,7 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 public sealed class ToughEgg : MonsterModel
 {
     private bool _isHatched;
+    private MonsterState? _afterHatchedState;
 
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 15, 14);
     public override int MaxInitialHp => Ascension(AscensionLevel.ToughEnemies, 19, 18);
@@ -28,7 +29,15 @@ public sealed class ToughEgg : MonsterModel
         }
     }
 
-    public MoveState AfterHatchedState { get; private set; } = null!;
+    public MonsterState? AfterHatchedState
+    {
+        get => _afterHatchedState;
+        set
+        {
+            AssertMutable();
+            _afterHatchedState = value;
+        }
+    }
 
     public override async Task AfterAddedToRoom()
     {
@@ -41,7 +50,7 @@ public sealed class ToughEgg : MonsterModel
         else
         {
             await Hatch();
-            SetMoveImmediate(AfterHatchedState, forceTransition: true);
+            MoveStateMachine?.ForceCurrentState(AfterHatchedState!);
         }
     }
 
@@ -58,7 +67,12 @@ public sealed class ToughEgg : MonsterModel
     private async Task HatchMove(IReadOnlyList<Creature> targets)
     {
         IsHatched = true;
-        foreach (PowerModel power in Creature.Powers.Where(power => power is not MinionPower).ToArray())
+        if (Creature.GetPower<HatchPower>() is { } hatchPower)
+        {
+            await PowerCmd.Remove(hatchPower);
+        }
+
+        foreach (PowerModel power in Creature.Powers.Where(power => power is not MinionPower).ToList())
         {
             await PowerCmd.Remove(power);
         }
@@ -69,12 +83,47 @@ public sealed class ToughEgg : MonsterModel
     private async Task Hatch()
     {
         int hp = RunRng.Niche.NextInt(HatchlingMinHp, HatchlingMaxHp + 1);
-        Creature.SetMaxHpInternal(hp);
-        await CreatureCmd.Heal(Creature, hp);
+        await CreatureCmd.SetMaxAndCurrentHp(Creature, hp);
     }
 
     private Task Nibble(IReadOnlyList<Creature> targets) =>
         DamageCmd.Attack(NibbleDamage).FromMonster(this).Execute();
+
+    internal override void RestoreCombatCloneReferencesFrom(
+        MonsterModel source,
+        IReadOnlyDictionary<Creature, Creature> creatureMap)
+    {
+        var egg = (ToughEgg)source;
+        if (egg._afterHatchedState is not { } savedState)
+        {
+            _afterHatchedState = null;
+            return;
+        }
+
+        if (egg.MoveStateMachine is null ||
+            !egg.MoveStateMachine.States.TryGetValue(savedState.Id, out MonsterState? sourceState) ||
+            !ReferenceEquals(sourceState, savedState) ||
+            MoveStateMachine is null ||
+            !MoveStateMachine.States.TryGetValue(savedState.Id, out MonsterState? clonedState))
+        {
+            throw new InvalidOperationException(
+                $"ToughEgg saved state {savedState.Id} is not present in its combat state graph.");
+        }
+
+        AfterHatchedState = clonedState;
+    }
+
+    internal override void AppendCombatStateDescription(
+        ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
+        global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
+    {
+        builder.Append(IsHatched);
+        builder.Append(_afterHatchedState is not null);
+        if (_afterHatchedState is { } savedState)
+        {
+            builder.Append(savedState.Id);
+        }
+    }
 
     private int Ascension(AscensionLevel level, int high, int low) =>
         Creature?.CombatState?.RunState.Ascension.GetValueIfAscension(level, high, low) ?? low;

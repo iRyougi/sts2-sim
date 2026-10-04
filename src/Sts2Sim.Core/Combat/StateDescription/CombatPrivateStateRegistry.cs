@@ -87,6 +87,7 @@ internal static class CombatPrivateStateRegistry
         "Aeonglass.<AdditionalStrength>k__BackingField",
         "Aeonglass.<WitherUpgradeCount>k__BackingField", "Queen._hasAmalgamDied", "Queen._amalgam",
         "CeremonialBeast._beastCryState",
+        "ToughEgg._isHatched", "ToughEgg._afterHatchedState",
         "TestSubject._respawns", "TestSubject._extraMultiClawCount",
         "Wither._fakeUpgradeLevel",
         "MawBank._hasItemBeenBought",
@@ -136,10 +137,6 @@ internal static class CombatPrivateStateRegistry
                 "Initial branch input already materialized into the fingerprinted current move.",
             ["ThievingHopper.<IsHovering>k__BackingField"] =
                 "Presentation flag; FlutterPower and current move state contain all future behavior.",
-            ["ToughEgg._isHatched"] =
-                "Room-entry configuration is materialized before search; later writes have no future reads.",
-            ["ToughEgg.<AfterHatchedState>k__BackingField"] =
-                "Stable reference to NIBBLE_MOVE in the fingerprinted move-state machine.",
             ["Tunneler.<IsStunned>k__BackingField"] =
                 "Presentation flag; the transient STUNNED move encodes the future transition.",
             ["Wriggler._startStunned"] =
