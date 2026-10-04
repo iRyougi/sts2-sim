@@ -13,8 +13,28 @@ using Sts2Sim.Core.ValueProps;
 
 public sealed class Aeonglass : MonsterModel
 {
-    public int AdditionalStrength { get; private set; }
-    public int WitherUpgradeCount { get; private set; }
+    private int _additionalStrength;
+    private int _witherUpgradeCount;
+
+    private int AdditionalStrength
+    {
+        get => _additionalStrength;
+        set
+        {
+            AssertMutable();
+            _additionalStrength = value;
+        }
+    }
+
+    public int WitherUpgradeCount
+    {
+        get => _witherUpgradeCount;
+        set
+        {
+            AssertMutable();
+            _witherUpgradeCount = value;
+        }
+    }
 
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 535, 512);
 
@@ -52,7 +72,7 @@ public sealed class Aeonglass : MonsterModel
     {
         if (card is Wither wither)
         {
-            ApplyFakeUpgrades(wither, WitherUpgradeCount);
+            MatchWitherToUpgradeCount(wither);
         }
 
         return Task.CompletedTask;
@@ -101,9 +121,9 @@ public sealed class Aeonglass : MonsterModel
         AdditionalStrength++;
     }
 
-    private static void ApplyFakeUpgrades(Wither wither, int count)
+    public void MatchWitherToUpgradeCount(Wither wither)
     {
-        for (int index = 0; index < count; index++)
+        for (int index = 0; index < WitherUpgradeCount; index++)
         {
             wither.FakeUpgrade();
         }
