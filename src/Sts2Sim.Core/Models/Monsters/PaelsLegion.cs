@@ -9,6 +9,8 @@ public sealed class PaelsLegion : MonsterModel
 
     public override int MaxInitialHp => 9999;
 
+    public override bool IsHealthBarVisible => false;
+
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
         var move = new MoveState("NOTHING_MOVE", _ => Task.CompletedTask);

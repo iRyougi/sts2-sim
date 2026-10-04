@@ -39,7 +39,7 @@ public sealed class TheBombPower : PowerModel
 
         await CreatureCmd.Damage(
             Owner.CombatState!,
-            Owner.CombatState!.GetOpponentsOf(Owner),
+            Owner.CombatState!.HittableEnemies,
             _damage,
             ValueProp.Unpowered,
             Owner,

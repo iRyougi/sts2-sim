@@ -20,6 +20,8 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
 
     public abstract int MaxInitialHp { get; }
 
+    public virtual bool IsHealthBarVisible => true;
+
     public Rng Rng { get; set; } = null!;
 
     public RunRngSet RunRng { get; set; } = null!;
