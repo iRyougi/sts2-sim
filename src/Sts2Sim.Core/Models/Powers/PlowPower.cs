@@ -39,7 +39,11 @@ public sealed class PlowPower : PowerModel
 
         if (Owner.Monster is CeremonialBeast beast)
         {
-            beast.SetStunned();
+            await beast.SetStunned();
+            await CreatureCmd.Stun<CeremonialBeast>(
+                Owner,
+                static (owner, targets) => owner.StunnedMove(targets),
+                beast.BeastCryState.StateId);
         }
         else
         {

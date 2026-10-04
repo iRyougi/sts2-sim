@@ -86,6 +86,7 @@ internal static class CombatPrivateStateRegistry
         "WitheringPresencePower._cardsPlayed", "WitheringPresencePower.<Target>k__BackingField",
         "Aeonglass.<AdditionalStrength>k__BackingField",
         "Aeonglass.<WitherUpgradeCount>k__BackingField", "Queen._hasAmalgamDied", "Queen._amalgam",
+        "CeremonialBeast._beastCryState",
         "TestSubject._respawns", "TestSubject._extraMultiClawCount",
         "Wither._fakeUpgradeLevel",
         "MawBank._hasItemBeenBought",
@@ -117,10 +118,10 @@ internal static class CombatPrivateStateRegistry
                 "Pickup replacement has already happened; this saved ID has no future combat read.",
             ["SeaGlass._characterId"] =
                 "The character choice is used only during the already-completed pickup effect and for presentation.",
-            ["CeremonialBeast.<IsStunnedByPlowRemoval>k__BackingField"] =
-                "Presentation flag; the transient STUN_MOVE and its performed state encode the future transition.",
-            ["CeremonialBeast.<IsInSecondPhase>k__BackingField"] =
-                "Presentation flag; no simulator behavior reads it after assignment.",
+            ["CeremonialBeast._isStunnedByPlowRemoval"] =
+                "Native hurt-animation flag; its presentation reader is omitted in the headless simulator.",
+            ["CeremonialBeast._isInSecondPhase"] =
+                "Native background-animation flag; its presentation reader is omitted in the headless simulator.",
             ["Chomper.<ScreamFirst>k__BackingField"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["Inklet._middleInklet"] =
