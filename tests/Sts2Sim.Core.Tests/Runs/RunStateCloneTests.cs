@@ -797,6 +797,11 @@ public sealed partial class RunStateCloneTests
         MapPoint sourceBoss = run.Map.BossMapPoint;
         sourceStart.AddQuest(quest);
         sourceBoss.AddQuest(quest);
+        // A quest owner can also reach a stable combat graph; each model must have one clone identity.
+        var combat = new CombatState(run);
+        combat.AddPlayerCreature(player.Creature);
+        var enemy = combat.AddMonster(
+            (MonsterModel)ModelDb.Get(typeof(TwigSlimeM)).MutableClone(), CombatSide.Enemy);
         RunState child = run.CloneExact();
         RunState sibling = run.CloneExact();
         CardModel childQuest = child.Players[0].Deck.Cards.Single(card => card.GetType() == quest.GetType());
@@ -807,6 +812,29 @@ public sealed partial class RunStateCloneTests
         Assert.NotSame(quest, childQuest);
         Assert.NotSame(childQuest, siblingQuest);
         Assert.Same(child.Players[0], childQuest.Owner);
+        var childCombat = Assert.IsType<CombatState>(child.Players[0].Creature.CombatState);
+        var siblingCombat = Assert.IsType<CombatState>(sibling.Players[0].Creature.CombatState);
+        var childEnemy = Assert.Single(childCombat.Enemies);
+        var siblingEnemy = Assert.Single(siblingCombat.Enemies);
+        Assert.NotSame(combat, childCombat);
+        Assert.NotSame(childCombat, siblingCombat);
+        Assert.NotSame(enemy.Monster, childEnemy.Monster);
+        Assert.NotSame(childEnemy.Monster, siblingEnemy.Monster);
+        Assert.Same(childCombat, childEnemy.CombatState);
+        int originalHp = enemy.CurrentHp;
+        childEnemy.LoseHpInternal(1m, Sts2Sim.Core.ValueProps.ValueProp.Unblockable);
+        Assert.Equal(originalHp - 1, childEnemy.CurrentHp);
+        Assert.Equal(originalHp, enemy.CurrentHp);
+        Assert.Equal(originalHp, siblingEnemy.CurrentHp);
+        RunState imagination = run.CloneReseeded(0x444UL);
+        var imaginedCombat = Assert.IsType<CombatState>(imagination.Players[0].Creature.CombatState);
+        var imaginedEnemy = Assert.Single(imaginedCombat.Enemies);
+        Assert.NotSame(enemy, imaginedEnemy);
+        Assert.NotSame(childEnemy, imaginedEnemy);
+        Assert.Same(imaginedCombat, imaginedEnemy.CombatState);
+        var imaginedQuest = imagination.Players[0].Deck.Cards.Single(card => card.GetType() == quest.GetType());
+        Assert.Same(imaginedQuest, Assert.Single(imagination.Map.StartingMapPoint.Quests));
+        Assert.Same(imaginedQuest, Assert.Single(imagination.Map.BossMapPoint.Quests));
         child.Map.StartingMapPoint.RemoveQuest(childQuest);
         Assert.Empty(child.Map.StartingMapPoint.Quests);
         Assert.Same(childQuest, Assert.Single(child.Map.BossMapPoint.Quests));
@@ -816,6 +844,12 @@ public sealed partial class RunStateCloneTests
         Assert.Empty(sourceBoss.Quests);
         Assert.Same(childQuest, Assert.Single(child.Map.BossMapPoint.Quests));
         Assert.Same(siblingQuest, Assert.Single(sibling.Map.BossMapPoint.Quests));
+        sourceStart.RemoveQuest(quest);
+        CardModel canonicalQuest = ModelDb.Card<LanternKey>();
+        sourceStart.AddQuest(canonicalQuest);
+        Assert.Throws<InvalidOperationException>(() => run.CloneExact());
+        Assert.Throws<InvalidOperationException>(() => run.CloneReseeded(0x444UL));
+        Assert.False(canonicalQuest.HasOwner);
     }
     
     private static void AssertPendingTransplantRejection()

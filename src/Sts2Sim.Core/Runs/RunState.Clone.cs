@@ -84,12 +84,13 @@ public sealed partial class RunState
         IEnumerable<AbstractModel> mapQuests = source.Map.GetAllMapPoints()
             .Append(source.Map.StartingMapPoint).Append(source.Map.BossMapPoint)
             .SelectMany(point => point.Quests);
-        foreach (AbstractModel original in RunCloneOwnedRootDiscovery.Collect(mapQuests))
+        // MapPoint needs only quest roots here. Their references are copied by the shared run
+        // graph, after combat roots have published their single clone identities.
+        foreach (AbstractModel original in mapQuests.Distinct<AbstractModel>(ReferenceEqualityComparer.Instance))
         {
-            if (modelMap.ContainsKey(original)) continue;
-            AbstractModel copied = original.IsCanonical ? original
-                : original is CardModel card && card.HasOwner
-                    ? card.CloneForCombat(playerMap[card.Owner]) : original.MutableClone();
+            if (original.IsCanonical || modelMap.ContainsKey(original)) continue;
+            AbstractModel copied = original is CardModel card && card.HasOwner
+                ? card.CloneForCombat(playerMap[card.Owner]) : original.MutableClone();
             modelMap.Add(original, copied);
             if (original is CardModel sourceCard) cardMap.TryAdd(sourceCard, (CardModel)copied);
         }
