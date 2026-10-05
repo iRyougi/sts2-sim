@@ -28,7 +28,7 @@ public sealed class AutoPlayCardTests : IDisposable
             typeof(IAmInvincible), typeof(MakeItSo), typeof(Catastrophe), typeof(BeatDown),
             typeof(DecisionsDecisions), typeof(Bombardment), typeof(Clash), typeof(Neutralize), typeof(Dash),
             typeof(Ricochet),
-            typeof(WeakPower),
+            typeof(WeakPower), typeof(TheBomb), typeof(TheBombPower),
         });
     }
 
@@ -125,6 +125,47 @@ public sealed class AutoPlayCardTests : IDisposable
             Assert.Equal(hpBefore - 12, enemy.CurrentHp);
             Assert.Equal(targetsBefore + 4, player.RunState.Rng.CombatTargets.Counter);
         }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Catastrophe_LastEnemyKilled_LeavesLaterPickInDrawPile(bool upgraded, bool unplayable)
+    {
+        (Player player, CombatRoom room) = await CreateCombatAsync("catastrophe-last-enemy");
+        foreach (CardModel c in player.PlayerCombatState!.DrawPile.Cards.ToList())
+            CardPileCmd.Add(c, PileType.Discard);
+
+        // Shuffle seed 8 selects Ricochet first from this two-card list.
+        player.RunState.Rng.MockRng(RunRngType.Shuffle, 8uL);
+        AddTo<Ricochet>(player, PileType.Draw);
+        TheBomb bomb = AddTo<TheBomb>(player, PileType.Draw);
+        if (unplayable) bomb.AddKeywordInternal(CardKeyword.Unplayable);
+        StrikeRegent fallback = AddTo<StrikeRegent>(player, PileType.Draw);
+        fallback.AddKeywordInternal(CardKeyword.Unplayable);
+        Catastrophe card = AddToHand<Catastrophe>(player);
+        if (upgraded) card.Upgrade();
+        Creature enemy = room.Engine.State.HittableEnemies.Single();
+        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        int playsBefore = player.PlayerCombatState.CardsPlayedThisTurn;
+        int energyBefore = player.PlayerCombatState.Energy;
+        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+
+        await card.PlayAsync(target: null);
+
+        Assert.True(room.Engine.IsEnding);
+        Assert.True(enemy.IsDead);
+        Assert.Equal(2, player.PlayerCombatState.DrawPile.Cards.Count);
+        Assert.Contains(bomb, player.PlayerCombatState.DrawPile.Cards);
+        Assert.Contains(fallback, player.PlayerCombatState.DrawPile.Cards);
+        Assert.Null(player.Creature.GetPower<TheBombPower>());
+        Assert.Equal(playsBefore + 2, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(energyBefore - 2, player.PlayerCombatState.Energy);
+        // Native Catastrophe still selects on later iterations before AutoPlay refuses.
+        Assert.Equal(shuffleBefore + (upgraded && unplayable ? 2 : 1),
+            player.RunState.Rng.Shuffle.Counter);
     }
 
     [Theory]

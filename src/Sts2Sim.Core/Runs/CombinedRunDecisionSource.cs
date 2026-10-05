@@ -32,7 +32,7 @@ public sealed class CombinedRunDecisionSource : IRunDecisionSource, ICombatCompl
         (_combatSource as ICombatCompletionValidator)?.ValidateCompletedCombat(state);
 
     public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request) =>
-        request.Player.Creature.CombatState is CombatState { IsProjection: false }
+        request.IsLiveCombatSelection
             ? _combatSource.ChooseCardsAsync(request)
             : _strategySource.ChooseCardsAsync(request);
 

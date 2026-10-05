@@ -12,6 +12,7 @@ using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
+using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Reporting;
 using Sts2Sim.Core.Rewards;
@@ -124,6 +125,96 @@ public sealed class NonCombatFloorDetailTests : IDisposable
         Assert.Equal(["Card", "Relic", "Potion", "CardRemoval"], detail.Purchases.Select(p => p.Kind));
         Assert.DoesNotContain(player.Deck.Cards, card => ReferenceEquals(card, cardToRemove));
         Assert.Equal(goldBefore - expected.Sum(purchase => purchase.Price), player.Gold);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunDriver_Shop_PotionFailuresResumeWithoutRecordingPurchasesAndAreBounded(bool useSozu)
+    {
+        RunState runState = NewTravelRun("detail-shop-potion-failures", MapPointType.Shop);
+        Player player = runState.Players[0];
+        player.Gold = 100_000;
+        Sozu? sozu = null;
+        if (useSozu)
+        {
+            sozu = (Sozu)ModelDb.Relic<Sozu>().MutableClone();
+            sozu.AssignOwner(player);
+            player.AddRelicInternal(sozu);
+        }
+        else
+        {
+            for (int index = 0; index < player.MaxPotionCount; index++)
+                player.AddPotionInternal(ModelDb.Potion<StrengthPotion>());
+        }
+        int goldBefore = player.Gold;
+        var slotsBefore = player.PotionSlots.ToArray();
+        MerchantPotionEntry? shelf = null;
+        PotionModel? potion = null;
+        int price = 0;
+        int decisionsTaken = 0;
+        var decisions = new ConfigurableDecisionSource
+        {
+            ShopChoice = (inventory, currentPlayer) =>
+            {
+                if (decisionsTaken++ == 0)
+                {
+                    shelf = inventory.Potions[0];
+                    potion = shelf.Potion;
+                    price = shelf.Price;
+                }
+                else if (decisionsTaken <= 3)
+                {
+                    Assert.Equal(goldBefore, currentPlayer.Gold);
+                    Assert.Equal(slotsBefore, currentPlayer.PotionSlots);
+                    Assert.Same(shelf, inventory.Potions[0]);
+                    Assert.Same(potion, shelf!.Potion);
+                    Assert.False(shelf.Purchased);
+                    Assert.Null(potion!.Owner);
+                    if (decisionsTaken == 3)
+                    {
+                        if (sozu is not null) currentPlayer.RemoveRelicInternal(sozu);
+                        else currentPlayer.RemovePotionInternal(currentPlayer.PotionSlots[0]!);
+                    }
+                }
+                return decisionsTaken <= 3 ? new ShopDecision.BuyPotion(shelf!) : new ShopDecision.Leave();
+            },
+        };
+
+        FloorEntry floor = await RunDriverFloorAsync(runState, decisions);
+
+        var detail = Assert.IsType<ShopFloorDetail>(floor.Detail);
+        PurchaseRecord record = Assert.Single(detail.Purchases);
+        Assert.Equal(new PurchaseRecord("Potion", potion!.Id.ToString(), price), record);
+        Assert.Equal(goldBefore - price, player.Gold);
+        Assert.True(shelf!.Purchased);
+        Assert.Contains(player.PotionSlots, item => ReferenceEquals(potion, item));
+        Assert.Same(player, potion.Owner);
+        Assert.Equal(4, decisionsTaken);
+
+        // The same failure mode from a source that never leaves must terminate explicitly.
+        RunState stuckRun = NewTravelRun("detail-shop-potion-failure-limit", MapPointType.Shop);
+        Player stuckPlayer = stuckRun.Players[0];
+        stuckPlayer.Gold = 100_000;
+        for (int index = 0; index < stuckPlayer.MaxPotionCount; index++)
+            stuckPlayer.AddPotionInternal(ModelDb.Potion<StrengthPotion>());
+        int failures = 0;
+        string? failedPotionId = null;
+        var stuckSource = new ConfigurableDecisionSource
+        {
+            ShopChoice = (inventory, _) =>
+            {
+                failures++;
+                failedPotionId = inventory.Potions[0].Potion.Id.ToString();
+                return new ShopDecision.BuyPotion(inventory.Potions[0]);
+            },
+        };
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunDriverFloorAsync(stuckRun, stuckSource));
+        Assert.Equal(33, failures);
+        Assert.Contains("33", exception.Message);
+        Assert.Contains(failedPotionId!, exception.Message);
+        Assert.Contains("failed", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

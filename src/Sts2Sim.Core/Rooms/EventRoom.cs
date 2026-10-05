@@ -147,6 +147,15 @@ public sealed class EventRoom : AbstractRoom
 
     public override Task Exit(RunState? runState)
     {
+        // Native EventSynchronizer.BeforeExitingRoom resets the combat layout even when
+        // the event chose its non-combat option. A consumed forced room cleans itself up.
+        if (_preparedCombatRoom is { } prepared)
+        {
+            foreach (var state in prepared.EnumerateRunCloneStates())
+                foreach (var creature in state.Creatures.ToArray())
+                    state.RemoveCreature(creature);
+            _preparedCombatRoom = null;
+        }
         Event?.EnsureCleanup();
         return Task.CompletedTask;
     }

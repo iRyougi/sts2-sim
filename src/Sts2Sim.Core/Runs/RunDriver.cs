@@ -795,6 +795,9 @@ public sealed class RunDriver
             await ResolveRewardsAsync(rewards);
         }
     }
+    // Bound failed replay/third-party decisions separately from successful shelf purchases.
+    private const int MaxFailedShopPurchases = 32;
+
     private async Task<ShopFloorDetail?> DriveShopAsync(MerchantRoom shop)
     {
         Player player = _runState.Players[0];
@@ -802,7 +805,9 @@ public sealed class RunDriver
         int maximumPurchases = inventory.Cards.Count + inventory.Relics.Count + inventory.Potions.Count + 1;
         List<PurchaseRecord>? purchaseRecords = _recorder is null ? null : [];
 
-        for (int purchases = 0; ; purchases++)
+        int purchases = 0;
+        int failedPurchases = 0;
+        while (true)
         {
             while (shop.TryDequeuePendingRewardOffer(out RewardsSet? rewards)) await ResolveRewardsAsync(rewards);
             ShopDecision decision = await _decisionSource.ChooseShopActionAsync(inventory, player);
@@ -827,16 +832,28 @@ public sealed class RunDriver
                     ValidateShopPurchase(buyCard.Entry, inventory.Cards, player);
                     int cardPrice = await shop.BuyWithPriceAsync(buyCard.Entry, player);
                     purchaseRecords?.Add(new PurchaseRecord("Card", buyCard.Entry.Card.Id.ToString(), cardPrice));
+                    purchases++;
                     break;
                 case ShopDecision.BuyRelic buyRelic:
                     ValidateShopPurchase(buyRelic.Entry, inventory.Relics, player);
                     int relicPrice = await shop.BuyWithPriceAsync(buyRelic.Entry, player);
                     purchaseRecords?.Add(new PurchaseRecord("Relic", buyRelic.Entry.Relic.Id.ToString(), relicPrice));
+                    purchases++;
                     break;
                 case ShopDecision.BuyPotion buyPotion:
                     ValidateShopPurchase(buyPotion.Entry, inventory.Potions, player);
-                    int potionPrice = await shop.BuyWithPriceAsync(buyPotion.Entry, player);
-                    purchaseRecords?.Add(new PurchaseRecord("Potion", buyPotion.Entry.Potion.Id.ToString(), potionPrice));
+                    var (success, potionPrice) = await shop.TryBuyPotionWithPriceAsync(buyPotion.Entry, player);
+                    if (success)
+                    {
+                        purchaseRecords?.Add(new PurchaseRecord("Potion", buyPotion.Entry.Potion.Id.ToString(), potionPrice));
+                        purchases++;
+                    }
+                    else if (++failedPurchases > MaxFailedShopPurchases)
+                    {
+                        throw new InvalidOperationException(
+                            $"Shop purchase of potion {buyPotion.Entry.Potion.Id} failed {failedPurchases} times; " +
+                            $"decision source exceeded the limit of {MaxFailedShopPurchases} failed purchases.");
+                    }
                     break;
                 case ShopDecision.BuyCardRemoval buyCardRemoval:
                     ValidateShopPurchase(inventory.CardRemoval, new[] { inventory.CardRemoval }, player);
@@ -849,6 +866,7 @@ public sealed class RunDriver
                         "CardRemoval",
                         buyCardRemoval.CardToRemove.Id.ToString(),
                         removalPrice));
+                    purchases++;
                     break;
                 default:
                     throw new InvalidOperationException($"Unhandled shop decision: {decision}");

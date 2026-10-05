@@ -13,6 +13,11 @@ public sealed record CardSelectionRequest(
     bool Cancelable = false,
     IReadOnlyList<IReadOnlyList<CardModel>>? Bundles = null)
 {
+    /// <summary>Prepared event layouts and completed combats are not live combat decisions.
+    /// Startup hooks run before IsInProgress, so the engine's setup window counts too.</summary>
+    public bool IsLiveCombatSelection => Player.Creature.CombatState is CombatState
+        { IsProjection: false, Engine: { IsInProgress: true } or { IsStarting: true } };
+
     /// <summary>For atomic bundle choices Candidates contains one identity per bundle; Bundles exposes
     /// all visible cards in matching order. Returning a candidate selects that entire bundle.</summary>
     public bool IsBundleSelection => Bundles is not null;

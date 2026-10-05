@@ -181,10 +181,10 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    public Task Buy(MerchantPotionEntry entry, Player player) => BuyWithPriceAsync(entry, player);
+    public Task Buy(MerchantPotionEntry entry, Player player) => TryBuyPotionWithPriceAsync(entry, player);
 
-    /// <summary>Buys a potion and returns the charged price for reporting consumers.</summary>
-    public async Task<int> BuyWithPriceAsync(MerchantPotionEntry entry, Player player)
+    /// <summary>Attempts to buy a potion; failed procurement leaves the shelf and gold unchanged.</summary>
+    public async Task<(bool Success, int Price)> TryBuyPotionWithPriceAsync(MerchantPotionEntry entry, Player player)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
@@ -193,11 +193,6 @@ public sealed class MerchantRoom : AbstractRoom
         {
             MerchantInventory inventory = InventoryFor(player);
             ValidatePurchase(entry, player, inventory.Potions);
-            if (!player.PotionSlots.Contains(null))
-            {
-                throw new InvalidOperationException("No empty potion slot available.");
-            }
-
             if (entry.Potion.Owner is not null)
             {
                 throw new InvalidOperationException("The merchant potion already has an owner.");
@@ -206,14 +201,14 @@ public sealed class MerchantRoom : AbstractRoom
             int price = entry.Price;
             if (!await PotionCmd.TryToProcure(entry.Potion, player))
             {
-                throw new InvalidOperationException("Potion acquisition was vetoed.");
+                return (false, 0);
             }
             await PlayerCmd.LoseGold(price, player);
             entry.MarkPurchased();
             RefillIfNeeded(entry, player, inventory);
             await Hook.AfterItemPurchased(player.RunState, player, entry, price);
             inventory.RefreshCardCreationResults();
-            return price;
+            return (true, price);
         }
         finally
         {
