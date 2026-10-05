@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(HookListenerCacheDiagnostics)' == 'true'">
+    <DefineConstants>$(DefineConstants);HOOK_LISTENER_CACHE_DIAGNOSTICS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.IO.Hashing" Version="9.0.0" />
   </ItemGroup>

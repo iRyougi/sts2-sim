@@ -1195,6 +1195,7 @@ internal static class RunCloneGraphSnapshot
             or "_cardSelectionSource" or "<CardSelectionSource>k__BackingField"
             or "_activeChoiceTask" or "_activeChoiceOption" or "_activeChoicePageVersion"
             or "_takeTask" or "_resolutionTask" or "_outcomeTask" or "_exitTask" or "_completionTask"
+        || field.DeclaringType == typeof(CombatState) && field.Name == "_hookListenerSnapshotCache"
         || field.DeclaringType == typeof(AbstractModel) && field.Name == "ExecutionFinished"
         || field.DeclaringType == typeof(RelicModel) && field.Name == "Flashed";
 

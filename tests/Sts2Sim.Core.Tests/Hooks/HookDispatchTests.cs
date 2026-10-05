@@ -3,6 +3,7 @@ namespace Sts2Sim.Core.Tests.Hooks;
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Rooms;
@@ -15,17 +16,24 @@ using Xunit.Abstractions;
 public class HookDispatchTests(ITestOutputHelper output)
 {
     private delegate bool CostHook(CardModel card, decimal originalCost, out decimal modifiedCost);
+    private delegate Task PileHook(CardModel card, PileType oldPileType, AbstractModel? clonedBy);
 
     [Theory]
     [InlineData("Energy", nameof(AbstractModel.TryModifyEnergyCostInCombat))]
     [InlineData("EnergyLate", nameof(AbstractModel.TryModifyEnergyCostInCombatLate))]
     [InlineData("Star", nameof(AbstractModel.TryModifyStarCostInCombat))]
+    [InlineData("AfterPiles", nameof(AbstractModel.AfterCardChangedPiles))]
+    [InlineData("AfterPilesLate", nameof(AbstractModel.AfterCardChangedPilesLate))]
     public void CostOverrideIndex_MatchesRuntimeVirtualDispatch(string slotName, string methodName)
     {
-        HookOverrideIndex.CostSlot slot = Enum.Parse<HookOverrideIndex.CostSlot>(slotName);
+        bool pileSlot = slotName is "AfterPiles" or "AfterPilesLate";
+        Type delegateType = pileSlot ? typeof(PileHook) : typeof(CostHook);
+        Type[] parameters = pileSlot
+            ? [typeof(CardModel), typeof(PileType), typeof(AbstractModel)]
+            : [typeof(CardModel), typeof(decimal), typeof(decimal).MakeByRefType()];
         MethodInfo baseSlot = typeof(AbstractModel).GetMethod(methodName,
             BindingFlags.Instance | BindingFlags.Public, binder: null,
-            [typeof(CardModel), typeof(decimal), typeof(decimal).MakeByRefType()], modifiers: null)!;
+            parameters, modifiers: null)!;
         Type[] models = typeof(AbstractModel).Assembly.GetTypes()
             .Where(type => !type.IsAbstract && type.IsSubclassOf(typeof(AbstractModel)))
             .OrderBy(type => type.FullName, StringComparer.Ordinal).ToArray();
@@ -35,9 +43,13 @@ public class HookDispatchTests(ITestOutputHelper output)
             // Bind the base slot on an instance without running its constructor or any Hook.
             // The runtime resolves the delegate target independently of GetBaseDefinition.
             var model = (AbstractModel)RuntimeHelpers.GetUninitializedObject(type);
-            var actual = (CostHook)Delegate.CreateDelegate(typeof(CostHook), model, baseSlot);
+            Delegate actual = Delegate.CreateDelegate(delegateType, model, baseSlot);
             bool expected = actual.Method.DeclaringType != typeof(AbstractModel);
-            Assert.True(HookOverrideIndex.MayOverride(model, slot) == expected,
+            bool indexed = pileSlot
+                ? HookOverrideIndex.MayOverride(model, slotName == "AfterPiles"
+                    ? HookOverrideIndex.PileSlot.Normal : HookOverrideIndex.PileSlot.Late)
+                : HookOverrideIndex.MayOverride(model, Enum.Parse<HookOverrideIndex.CostSlot>(slotName));
+            Assert.True(indexed == expected,
                 $"{slotName}: {type.FullName}; runtime target={actual.Method.DeclaringType?.FullName}; expected override={expected}");
             if (expected) overrides.Add(type.FullName!);
         }

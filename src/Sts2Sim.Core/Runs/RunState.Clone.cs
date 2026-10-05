@@ -594,6 +594,7 @@ public sealed partial class RunState
             field.Name is "_stateLock" or "_lifecycleLock" or "_rewardLock" or "_takeLock" or "_resolutionLock"
                 or "_purchaseGate" or "_revealGate" or "_interactionGate" or "_insideLifecycle" or "_observer"
                 or "_cardSelectionSource" or "<CardSelectionSource>k__BackingField"
+            || field.DeclaringType == typeof(CombatState) && field.Name == "_hookListenerSnapshotCache"
             || field.DeclaringType == typeof(EventModel)
                 && field.Name is "_activeChoiceTask" or "_activeChoiceOption" or "_activeChoicePageVersion";
 

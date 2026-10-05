@@ -475,6 +475,27 @@ public static class Hook
             yield return model;
     }
 
+    private static AbstractModel[] GetCostHookListeners(ICombatState combatState, HookOverrideIndex.CostSlot slot)
+    {
+        // The original gate is queried freshly at each phase, outside persistent cache data.
+        if (combatState is CombatState concrete)
+        {
+            if (combatState.IsOverOrEnding() && !combatState.IsStarting()) return [];
+            CombatState.HookListenerPhase phase = slot switch
+            {
+                HookOverrideIndex.CostSlot.Energy => CombatState.HookListenerPhase.Energy,
+                HookOverrideIndex.CostSlot.EnergyLate => CombatState.HookListenerPhase.EnergyLate,
+                _ => CombatState.HookListenerPhase.Star,
+            };
+            if (concrete.GetHookListenerSnapshot(combatState.RunState, phase) is { } snapshot)
+                return snapshot.CostListeners(slot);
+            return combatState.RunState.IterateHookListeners(combatState)
+                .Where(model => HookOverrideIndex.MayOverride(model, slot)).ToArray();
+        }
+        return IterateCombatHookListeners(combatState)
+            .Where(model => HookOverrideIndex.MayOverride(model, slot)).ToArray();
+    }
+
     // Native combatState.IterateHookListeners includes relics and potions after each player's powers.
     // The simulator's public iterator omits inventory for RunState's composition.
     private static IEnumerable<AbstractModel> IterateDirectCombatHookListeners(ICombatState combatState) =>
@@ -1014,14 +1035,12 @@ public static class Hook
     {
         decimal modifiedCost = originalCost;
         wasModified = false;
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
-                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Energy)).ToArray())
+        foreach (AbstractModel model in GetCostHookListeners(combatState, HookOverrideIndex.CostSlot.Energy))
         {
             wasModified |= model.TryModifyEnergyCostInCombat(card, modifiedCost, out modifiedCost);
         }
 
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
-                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.EnergyLate)).ToArray())
+        foreach (AbstractModel model in GetCostHookListeners(combatState, HookOverrideIndex.CostSlot.EnergyLate))
         {
             wasModified |= model.TryModifyEnergyCostInCombatLate(card, modifiedCost, out modifiedCost);
         }
@@ -1043,8 +1062,7 @@ public static class Hook
     {
         decimal modifiedCost = originalCost;
         wasModified = false;
-        foreach (AbstractModel model in IterateCombatHookListeners(combatState)
-                     .Where(model => HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Star)).ToArray())
+        foreach (AbstractModel model in GetCostHookListeners(combatState, HookOverrideIndex.CostSlot.Star))
         {
             wasModified |= model.TryModifyStarCostInCombat(card, modifiedCost, out modifiedCost);
         }
@@ -1066,14 +1084,27 @@ public static class Hook
         PileType oldPileType,
         AbstractModel? clonedBy)
     {
-        foreach (AbstractModel model in runState.IterateHookListeners(combatState).ToArray())
+        // Both original phases are eager and ungated. Keep every finished notification,
+        // including listeners with neutral base bodies, at its original ordered position.
+        CombatState.HookListenerSnapshot? normal = (combatState as CombatState)?
+            .GetHookListenerSnapshot(runState, CombatState.HookListenerPhase.AfterPiles);
+        AbstractModel[] listeners = normal?.Full ?? runState.IterateHookListeners(combatState).ToArray();
+        for (int i = 0; i < listeners.Length; i++)
         {
-            await model.AfterCardChangedPiles(card, oldPileType, clonedBy);
+            AbstractModel model = listeners[i];
+            if (normal is null || normal.OverridesPile(i, HookOverrideIndex.PileSlot.Normal))
+                await model.AfterCardChangedPiles(card, oldPileType, clonedBy);
             model.InvokeExecutionFinished();
         }
-        foreach (AbstractModel model in runState.IterateHookListeners(combatState).ToArray())
+        // Normal Hook/await/finished can change any source, so late always obtains a fresh phase.
+        CombatState.HookListenerSnapshot? late = (combatState as CombatState)?
+            .GetHookListenerSnapshot(runState, CombatState.HookListenerPhase.AfterPilesLate);
+        listeners = late?.Full ?? runState.IterateHookListeners(combatState).ToArray();
+        for (int i = 0; i < listeners.Length; i++)
         {
-            await model.AfterCardChangedPilesLate(card, oldPileType, clonedBy);
+            AbstractModel model = listeners[i];
+            if (late is null || late.OverridesPile(i, HookOverrideIndex.PileSlot.Late))
+                await model.AfterCardChangedPilesLate(card, oldPileType, clonedBy);
             model.InvokeExecutionFinished();
         }
     }
