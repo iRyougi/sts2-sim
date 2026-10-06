@@ -8,6 +8,7 @@ using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Monsters;
+using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 
@@ -24,6 +25,7 @@ public sealed class AutoPlayCmdTests : IDisposable
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(Sts2Sim.Core.Models.Relics.DivineRight),
             typeof(WanderingGrunt), typeof(Volley), typeof(AutoPlayResourceProbeCard),
+            typeof(TheBomb), typeof(TheBombPower),
         });
     }
 
@@ -43,6 +45,41 @@ public sealed class AutoPlayCmdTests : IDisposable
 
         Assert.Equal(new[] { "top", "second" }, playOrder);
         Assert.Equal(PileType.Draw, third.Pile!.Type);
+
+        // Native preloads the batch into Play, then refuses later skills after victory.
+        (Player endingPlayer, CombatRoom endingRoom) = await CreateCombatAsync("auto-play-ending-bomb");
+        ClearCombatPiles(endingPlayer);
+        TheBomb bomb = AddTo<TheBomb>(endingPlayer, PileType.Draw, CardPilePosition.Bottom);
+        bomb.ExhaustOnNextPlay = true;
+        TheBomb unplayable = AddTo<TheBomb>(endingPlayer, PileType.Draw, CardPilePosition.Bottom);
+        unplayable.AddKeywordInternal(CardKeyword.Unplayable);
+        unplayable.ExhaustOnNextPlay = true;
+        AddTo<StrikeRegent>(endingPlayer, PileType.Draw, CardPilePosition.Top);
+        Creature enemy = endingRoom.Engine.State.HittableEnemies.Single();
+        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        await AutoPlayCmd.FromTopOfDrawPile(endingRoom.Engine.State, endingPlayer, count: 3);
+        Assert.True(enemy.IsDead);
+        Assert.Equal(1, endingPlayer.PlayerCombatState!.CardsPlayedThisTurn);
+        Assert.Equal(PileType.Play, bomb.Pile!.Type);
+        Assert.Equal(PileType.Play, unplayable.Pile!.Type);
+        Assert.False(bomb.ExhaustOnNextPlay);
+        Assert.False(unplayable.ExhaustOnNextPlay);
+        Assert.Null(endingPlayer.Creature.GetPower<TheBombPower>());
+
+        // Generic batches retain the original pile for cards refused after the first kill.
+        (Player batchPlayer, CombatRoom batchRoom) = await CreateCombatAsync("auto-play-generic-ending");
+        ClearCombatPiles(batchPlayer);
+        StrikeRegent strike = AddTo<StrikeRegent>(batchPlayer, PileType.Draw);
+        TheBomb skippedBomb = AddTo<TheBomb>(batchPlayer, PileType.Draw);
+        skippedBomb.ExhaustOnNextPlay = true;
+        Creature batchEnemy = batchRoom.Engine.State.HittableEnemies.Single();
+        batchEnemy.LoseHpInternal(batchEnemy.CurrentHp - 1, default);
+        await AutoPlayCmd.FromCards(batchRoom.Engine.State, batchPlayer, [strike, skippedBomb]);
+        Assert.True(batchEnemy.IsDead);
+        Assert.Equal(1, batchPlayer.PlayerCombatState!.CardsPlayedThisTurn);
+        Assert.Equal(PileType.Draw, skippedBomb.Pile!.Type);
+        Assert.True(skippedBomb.ExhaustOnNextPlay);
+        Assert.Null(batchPlayer.Creature.GetPower<TheBombPower>());
     }
 
     [Fact]
