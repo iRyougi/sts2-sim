@@ -199,7 +199,13 @@ public sealed class RunEngine
                 ? ConfigureCombatObserver(combatToObserve)
                 : null;
             _runState.PushRoom(room);
-            try { await room.Enter(_runState); }
+            try
+            {
+                using IDisposable? entryRewards = room is MerchantRoom merchant
+                    ? merchant.BeginEntryRewardResolution(rewards => ResolveRewardsAsync(rewards))
+                    : null;
+                await room.Enter(_runState);
+            }
             catch
             {
                 if (room is EventRoom failedEventRoom)

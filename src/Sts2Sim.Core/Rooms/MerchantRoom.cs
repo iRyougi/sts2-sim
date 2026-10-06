@@ -20,10 +20,59 @@ public sealed class MerchantRoom : AbstractRoom
     private bool _isActive;
     private readonly object _rewardLock = new();
     private readonly Queue<RewardsSet> _rewardOffers = new();
+    private Func<RewardsSet, Task>? _entryRewardResolver;
+    private int _entryRewardResolutionDepth;
 
     public bool HasPendingRewards
     {
         get { lock (_rewardLock) return _rewardOffers.Any(HasUnresolvedRewards); }
+    }
+
+    internal bool IsResolvingEntryRewards => _entryRewardResolver is not null;
+
+    // Native RewardsSet.Offer waits inside the entry hook's purchase. Bind only
+    // while entering; ordinary player purchases keep the pending-offer adaptation.
+    internal IDisposable BeginEntryRewardResolution(Func<RewardsSet, Task> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        Func<RewardsSet, Task>? previous = _entryRewardResolver;
+        _entryRewardResolver = resolver;
+        return new EntryRewardResolutionScope(this, previous);
+    }
+
+    internal async Task ResolveEntryRewardOfferAsync(RewardsSet rewards)
+    {
+        Func<RewardsSet, Task>? resolver = _entryRewardResolver;
+        if (resolver is null) return;
+        _entryRewardResolutionDepth++;
+        try
+        {
+            await resolver(rewards);
+            if (HasUnresolvedRewards(rewards))
+                throw new InvalidOperationException("Entry reward selection left unresolved merchant rewards.");
+        }
+        finally
+        {
+            _entryRewardResolutionDepth--;
+        }
+    }
+
+    private void ThrowIfResolvingEntryRewards()
+    {
+        if (_entryRewardResolutionDepth != 0)
+            throw new InvalidOperationException("Resolve merchant entry rewards before purchasing or leaving.");
+    }
+
+    private sealed class EntryRewardResolutionScope(
+        MerchantRoom owner, Func<RewardsSet, Task>? previous) : IDisposable
+    {
+        private bool _disposed;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            owner._entryRewardResolver = previous;
+        }
     }
 
     internal bool CanOfferRewards(Player player) => _isActive &&
@@ -80,9 +129,9 @@ public sealed class MerchantRoom : AbstractRoom
         Func<RewardsSet, RewardsSet> mapOffer,
         Action<AbstractRoom, AbstractRoom> registerRoom)
     {
-        if (_purchaseGate.CurrentCount != 1)
+        if (_purchaseGate.CurrentCount != 1 || _entryRewardResolver is not null)
             throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
-                "Merchant purchase is still executing.");
+                "Merchant purchase or entry reward resolution is still executing.");
         var clone = new MerchantRoom
         {
             _inventoryRunState = _inventoryRunState is null ? null : runState,
@@ -103,6 +152,7 @@ public sealed class MerchantRoom : AbstractRoom
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -130,6 +180,7 @@ public sealed class MerchantRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -160,6 +211,7 @@ public sealed class MerchantRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -188,6 +240,7 @@ public sealed class MerchantRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -224,6 +277,7 @@ public sealed class MerchantRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(cardToRemove);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -291,6 +345,7 @@ public sealed class MerchantRoom : AbstractRoom
 
     public override async Task Exit(RunState? runState)
     {
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {

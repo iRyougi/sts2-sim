@@ -142,7 +142,8 @@ internal static class ImaginationHiddenStateRegistry
         Room("EventRoom", N, runtime, "_eventFactory");
         Room("EventRoom", H, "Hidden prepared combat is rebuilt before an event choice.", "_preparedCombatRoom");
         Room("EventRoom", V, history, "<Event>k__BackingField");
-        Room("MerchantRoom", N, runtime, "_purchaseGate _rewardLock");
+        Room("MerchantRoom", N, runtime,
+            "_purchaseGate _rewardLock _entryRewardResolver _entryRewardResolutionDepth");
         Room("MerchantRoom", V, reward,
             "_inventories _inventoryRunState _displayPlayer _isActive _rewardOffers <IsInventoryOpen>k__BackingField");
         Room("RestSiteRoom", N, runtime, "_rewardLock");

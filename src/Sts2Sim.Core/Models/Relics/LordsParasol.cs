@@ -37,7 +37,7 @@ public sealed class LordsParasol : RelicModel
         }
         foreach (MerchantPotionEntry entry in inventory.Potions.ToArray())
         {
-            if (!entry.Purchased && Owner.PotionSlots.Contains(null))
+            if (!entry.Purchased)
             {
                 await merchant.Buy(entry, Owner);
             }

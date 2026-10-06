@@ -323,9 +323,33 @@ public sealed class CombatRoom : AbstractRoom
         Prepare(runState);
         CombatState combatState = _preparedCombatState!;
         _beforeSetupDiagnostic?.Invoke(this, combatState);
+        if (runState is not null
+            && _cardSelectionSource is ICombatOpeningPlanner { RequiresOpeningSnapshot: true } planner)
+            await planner.PrepareOpeningAsync(new CombatOpeningContext(runState, this,
+                afterRoomEntered: afterSetup is not null));
         combatState.CardSelectionSource = _cardSelectionSource;
         Engine = new CombatEngine(combatState, _observer);
         await Engine.StartCombatAsync(afterSetup);
+    }
+
+    // Only CombatOpeningContext invokes this on an independent, already prepared room.
+    // Rebuild the hook against the cloned graph; never copy the live afterSetup closure.
+    internal CombatState PreparedOpeningState => _preparedCombatState
+        ?? throw new InvalidOperationException("Combat has not been prepared.");
+
+    internal async Task ReplayPreparedOpeningAsync(RunState runState,
+        ICardSelectionDecisionSource selection, bool afterRoomEntered,
+        ICombatOpeningObserver? observer = null)
+    {
+        if (_preparedCombatState is null || Engine is not null
+            || !ReferenceEquals(_preparedCombatState.RunState, runState))
+            throw new InvalidOperationException("Opening replay requires an unstarted prepared combat.");
+        _preparedCombatState.CardSelectionSource = selection;
+        Engine = new CombatEngine(_preparedCombatState, observer is null ? null
+            : new CombatOpeningObserverAdapter(_preparedCombatState, observer));
+        observer?.OpeningStarted(_preparedCombatState);
+        await Engine.StartCombatAsync(afterRoomEntered
+            ? () => Hook.AfterRoomEntered(runState, this) : null);
     }
 
     private static string NormalizeEncounterName(string encounterName)

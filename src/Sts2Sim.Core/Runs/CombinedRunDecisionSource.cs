@@ -9,8 +9,11 @@ using Sts2Sim.Core.Rewards;
 namespace Sts2Sim.Core.Runs;
 
 /// <summary>战斗与战斗内选牌交给搜索，其余全部交给战略决策源。</summary>
-public sealed class CombinedRunDecisionSource : IRunDecisionSource, ICombatCompletionValidator
+public sealed class CombinedRunDecisionSource : IRunDecisionSource, ICombatCompletionValidator, ICombatOpeningPlanner
 {
+    public bool RequiresOpeningSnapshot => _combatSource is ICombatOpeningPlanner { RequiresOpeningSnapshot: true };
+    public Task PrepareOpeningAsync(CombatOpeningContext context) =>
+        _combatSource is ICombatOpeningPlanner planner ? planner.PrepareOpeningAsync(context) : Task.CompletedTask;
     private readonly IRunDecisionSource _combatSource;
     private readonly IRunDecisionSource _strategySource;
 
