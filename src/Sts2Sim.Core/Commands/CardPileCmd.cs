@@ -508,7 +508,8 @@ public static class CardPileCmd
             }
             await ShuffleIfNecessary(combatState, player);
             CardModel? card = state.DrawPile.Cards.FirstOrDefault();
-            if (card == null)
+            // AfterShuffle (for example Stratagem) may fill the hand before this draw resumes.
+            if (card == null || state.Hand.Cards.Count >= CardPile.MaxCardsInHand)
             {
                 break;
             }
