@@ -8,6 +8,7 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Characters;
+using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.MonsterMoves;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.MonsterMoves.Intents;
@@ -64,14 +65,19 @@ public sealed class MultiActRunEngineTests : IDisposable
         Assert.Equal([1], ancientFactoryActIndices);
     }
 
-    [Fact]
-    public async Task RunEngine_TwoActs_FinalBossCompletesRun()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunEngine_TwoActs_FinalBossCompletesRun(bool obtainCompass)
     {
-        (RunState runState, _) = CreateRunState(includeSecondAct: true);
+        (RunState runState, Player player) = CreateRunState(includeSecondAct: true);
         var engine = new RunEngine(
             runState,
             points =>
             {
+                Assert.All(points, point => Assert.Same(runState.Map.GetPoint(point.coord), point));
+                if (obtainCompass && runState.CurrentActIndex == 1)
+                    Assert.Equal(runState.Map.StartingMapPoint.coord, Assert.Single(runState.VisitedMapCoords));
                 MapPoint chosen = PickFirstByCoord(points);
                 if (runState.CurrentActIndex == 1)
                 {
@@ -80,7 +86,9 @@ public sealed class MultiActRunEngineTests : IDisposable
 
                 return chosen;
             },
-            createAncientEventRoom: _ => CreateNoopAncientRoom());
+            createAncientEventRoom: _ => CreateNoopAncientRoom(obtainCompass
+                ? () => RelicCmd.Obtain(ModelDb.Relic<GoldenCompass>(), player)
+                : null));
 
         RunEngine.Result result = await engine.RunAsync(maxFloors: 2);
 
@@ -90,8 +98,10 @@ public sealed class MultiActRunEngineTests : IDisposable
         Assert.Equal(2, result.FloorsVisited);
     }
 
-    [Fact]
-    public async Task RunDriver_TwoActs_ActOneBossContinuesIntoHiveMapDecision()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunDriver_TwoActs_ActOneBossContinuesIntoHiveMapDecision(bool obtainCompass)
     {
         var runState = new RunState(
             "multi-act-run-driver",
@@ -102,14 +112,16 @@ public sealed class MultiActRunEngineTests : IDisposable
         runState.AddPlayer(player);
         var mapDecisionActIndices = new List<int>();
         var ancientFactoryActIndices = new List<int>();
-        var decisions = new MultiActDriverDecisionSource(runState, mapDecisionActIndices);
+        var decisions = new MultiActDriverDecisionSource(runState, mapDecisionActIndices, obtainCompass);
         var driver = new RunDriver(
             runState,
             decisions,
             createAncientEventRoom: state =>
             {
                 ancientFactoryActIndices.Add(state.CurrentActIndex);
-                return CreateNoopAncientRoom();
+                return CreateNoopAncientRoom(obtainCompass
+                    ? () => RelicCmd.Obtain(ModelDb.Relic<GoldenCompass>(), player)
+                    : null);
             });
 
         RunDriver.Result result = await driver.RunAsync(maxFloors: 2);
@@ -324,10 +336,13 @@ public sealed class MultiActRunEngineTests : IDisposable
 
     private sealed class MultiActDriverDecisionSource(
         RunState runState,
-        List<int> mapDecisionActIndices) : IRunDecisionSource
+        List<int> mapDecisionActIndices, bool obtainCompass = false) : IRunDecisionSource
     {
         public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options)
         {
+            Assert.All(options, point => Assert.Same(runState.Map.GetPoint(point.coord), point));
+            if (obtainCompass && runState.CurrentActIndex == 1)
+                Assert.Equal(runState.Map.StartingMapPoint.coord, Assert.Single(runState.VisitedMapCoords));
             mapDecisionActIndices.Add(runState.CurrentActIndex);
             MapPoint chosen = PickFirstByCoord(options);
             if (runState.CurrentActIndex == 1)
@@ -348,17 +363,17 @@ public sealed class MultiActRunEngineTests : IDisposable
             Task.FromResult(RewardDecisionPolicy.Choose(rewards));
     }
 
-    private static EventRoom CreateNoopAncientRoom() =>
-        new(() => (EventModel)new NoopAncientEvent().MutableClone());
+    private static EventRoom CreateNoopAncientRoom(Func<Task>? onChoice = null) =>
+        new(() => (EventModel)new NoopAncientEvent(onChoice).MutableClone());
 
-    private sealed class NoopAncientEvent : EventModel
+    private sealed class NoopAncientEvent(Func<Task>? onChoice = null) : EventModel
     {
         protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
         [
-            new EventOption("DONE", () =>
+            new EventOption("DONE", async () =>
             {
+                if (onChoice is not null) await onChoice();
                 Finish();
-                return Task.CompletedTask;
             }),
         ];
     }
