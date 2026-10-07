@@ -21,7 +21,9 @@ namespace Sts2Sim.Core.Tests.Runs;
 
 file sealed class SuspendingForcedCombatEvent : EventModel
 {
+    public override bool GenerateForcedCombatRewards => true;
     public ForcedCombatOutcome? SeenOutcome { get; private set; }
+    public int ResumeCount { get; private set; }
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
@@ -36,6 +38,7 @@ file sealed class SuspendingForcedCombatEvent : EventModel
     protected override void AfterForcedCombat(ForcedCombatOutcome outcome)
     {
         SeenOutcome = outcome;
+        ResumeCount++;
         Finish();
     }
 }
@@ -140,6 +143,98 @@ public sealed class EventForcedCombatLifecycleTests : IDisposable
         var @event = Assert.IsType<TimedOutForcedCombatEvent>(room.Event);
         Assert.Equal(new ForcedCombatOutcome(Victory: true, TimedOut: true), @event.SeenOutcome);
         Assert.True(@event.IsFinished);
+    }
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ForcedCombatRewardClone_ResumesOnlySuspendedParent(bool suspended, bool reseeded)
+    {
+        string seed = $"forced-reward-clone-{suspended}-{reseeded}";
+        (RunState run, Player player, EventRoom room) = suspended
+            ? await EnterEvent<SuspendingForcedCombatEvent>(seed)
+            : await EnterEvent<DenseVegetation>(seed);
+        // ContinueAsync must recognize this as an already entered map point.
+        run.AddVisitedMapCoord(run.Map.StartingMapPoint.coord);
+        player.Creature.SetMaxHpInternal(10_000m);
+        player.Creature.HealInternal(10_000m);
+        if (!suspended)
+            await room.Event.ChooseOption(room.Event.CurrentOptions.Single(option => option.Key == "REST"));
+        bool forked = false;
+        var source = new RewardCloneDecisionSource(async rewards =>
+        {
+            if (forked) return;
+            forked = true;
+            Assert.Equal(suspended, room.Event.IsAwaitingForcedCombat);
+            Assert.Equal(!suspended, room.Event.IsFinished);
+            Assert.NotNull(run.ForcedCombatResumeOutcome);
+            // The production graph auditor deliberately rejects foreign test-model types.
+            // Keep its complete audit for DenseVegetation; snapshot the controlled fixture's
+            // source resources, full RNG streams, room/offer state and callback progress separately.
+            Func<string> snapshot = () => !suspended ? RunCloneGraphSnapshot.Capture(run)
+                : System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    player.Gold, player.Creature.CurrentHp,
+                    Deck = player.Deck.Cards.Select(card => (card.Id, card.CurrentUpgradeLevel)).ToArray(),
+                    RunRng = run.Rng.ToSerializable(), PlayerRng = player.PlayerRng.ToSerializable(),
+                    run.CurrentRoomCount, Offers = run.ActiveRewardOffers.Count, run.ForcedCombatResumeOutcome,
+                    room.Event.IsFinished, room.Event.IsAwaitingForcedCombat,
+                    Progress = ((SuspendingForcedCombatEvent)room.Event).ResumeCount,
+                }, new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
+            string before = snapshot();
+            RunState clone = reseeded ? run.CloneReseeded(0x464UL) : run.CloneExact();
+            var parent = Assert.IsType<EventRoom>(clone.BaseRoom);
+            var combat = Assert.IsType<CombatRoom>(clone.CurrentRoom);
+            RewardsSet offer = Assert.Single(combat.GeneratedRewards);
+            int goldBefore = clone.Players[0].Gold;
+            int goldExpected = offer.Gold.IsResolved ? 0 : offer.Gold.Amount;
+            int deckBefore = clone.Players[0].Deck.Cards.Count;
+            int cardExpected = offer.Card.IsResolved || offer.Card.Options.Count == 0 ? 0 : 1;
+            if (suspended && !reseeded)
+            {
+                // Simulate a lost suspension flag: it must not silently skip recovery.
+                RunState invalid = reseeded ? run.CloneReseeded(0x464UL) : run.CloneExact();
+                typeof(EventModel).GetField("_isAwaitingForcedCombat",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .SetValue(Assert.IsType<EventRoom>(invalid.BaseRoom).Event, false);
+                Assert.Equal("Forced combat parent event is neither awaiting combat nor finished.",
+                    (await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                        new RunDriver(invalid, new LifecycleDecisionSource()).ContinueAsync(1))).Message);
+            }
+            await new RunDriver(clone, new LifecycleDecisionSource()).ContinueAsync(1);
+            Assert.True(parent.Event.IsFinished, seed);
+            Assert.False(parent.Event.IsAwaitingForcedCombat, seed);
+            Assert.Null(clone.ForcedCombatResumeOutcome);
+            Assert.Empty(clone.ActiveRewardOffers);
+            Assert.Equal(0, clone.CurrentRoomCount);
+            Assert.Equal(goldBefore + goldExpected, clone.Players[0].Gold);
+            Assert.Equal(deckBefore + cardExpected, clone.Players[0].Deck.Cards.Count);
+            if (suspended) Assert.Equal(1, Assert.IsType<SuspendingForcedCombatEvent>(parent.Event).ResumeCount);
+            Assert.Equal(before, snapshot());
+        });
+        await new RunDriver(run, source).DriveEventAsync(room);
+        Assert.True(forked, $"seed={seed}: no real forced-combat reward boundary reached");
+        Assert.True(room.Event.IsFinished);
+        Assert.False(room.Event.IsAwaitingForcedCombat);
+        Assert.False(room.Event.HasPendingForcedCombat);
+        Assert.Null(run.ForcedCombatResumeOutcome);
+        Assert.Empty(run.ActiveRewardOffers);
+        Assert.Same(room, run.CurrentRoom);
+        if (suspended) Assert.Equal(1, Assert.IsType<SuspendingForcedCombatEvent>(room.Event).ResumeCount);
+    }
+
+    private sealed class RewardCloneDecisionSource(Func<RewardsSet, Task> beforeReward) : IRunDecisionSource
+    {
+        private readonly LifecycleDecisionSource _inner = new();
+        public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options) => _inner.ChooseMapPointAsync(options);
+        public Task<EventOption> ChooseEventOptionAsync(IReadOnlyList<EventOption> options) => _inner.ChooseEventOptionAsync(options);
+        public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) => _inner.ChooseCombatActionAsync(state);
+        public async Task<RewardDecision> ChooseRewardActionAsync(RewardsSet rewards)
+        {
+            await beforeReward(rewards);
+            return await _inner.ChooseRewardActionAsync(rewards);
+        }
     }
     private static async Task<(RunState, Player, EventRoom)> EnterEvent<TEvent>(string seed)
         where TEvent : EventModel

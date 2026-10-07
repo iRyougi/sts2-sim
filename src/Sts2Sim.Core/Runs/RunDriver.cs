@@ -196,7 +196,20 @@ public sealed class RunDriver
                         await room.Exit(_runState);
                         _runState.PopCurrentRoom();
                         if (_runState.ForcedCombatResumeOutcome is { } outcome)
-                            parentEvent.Event.ResumeAfterForcedCombat(outcome);
+                        {
+                            switch ((parentEvent.Event.IsAwaitingForcedCombat, parentEvent.Event.IsFinished))
+                            {
+                                case (true, _):
+                                    parentEvent.Event.ResumeAfterForcedCombat(outcome);
+                                    break;
+                                case (false, true):
+                                    // Native shouldResumeAfterCombat:false: the parent has already finished.
+                                    break;
+                                default:
+                                    throw new InvalidOperationException(
+                                        "Forced combat parent event is neither awaiting combat nor finished.");
+                            }
+                        }
                         _runState.ForcedCombatResumeOutcome = null;
                         room = parentEvent;
                         roomType = room.RoomType;
