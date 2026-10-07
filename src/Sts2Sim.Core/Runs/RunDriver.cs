@@ -571,6 +571,31 @@ public sealed class RunDriver
         Player player = engine.State.Players[0];
         int lastPotionTurn = -1;
 
+        // Deviation #331: sampled results bypass turns only in reseeded imagination worlds.
+        if (engine.IsInProgress && _decisionSource is ICombatOutcomeOverride injector &&
+            injector.TryInject(_runState, combatRoom) is { } injected)
+        {
+            if (!_runState.IsImaginationClone)
+                throw new InvalidOperationException("Combat outcome injection is imagination-only.");
+            if (forcedEnemies is not null)
+                throw new NotSupportedException("Injected outcomes do not model event forced combats.");
+            if (injected.Died)
+            {
+                player.Creature.SetCurrentHpInternal(0);
+                engine.ConcludeForImagination(won: false);
+            }
+            else engine.ConcludeForImagination(won: true);
+            await combatRoom.ResolveOutcomeAsync(generateRewards);
+            if (!injected.Died)
+                player.Creature.SetCurrentHpInternal(Math.Clamp(injected.RemainingHp, 1, player.Creature.MaxHp));
+            combatObserver?.CaptureFinalState();
+            if (resolveRewards)
+                foreach (RewardsSet rewards in combatRoom.GeneratedRewards) await ResolveRewardsAsync(rewards);
+            combatObserver?.EndCombat(engine.Won, combatRoom.GeneratedRewards);
+            return;
+        }
+
+
         while (engine.IsInProgress)
         {
             engine.CheckWinCondition();

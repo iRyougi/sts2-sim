@@ -68,6 +68,17 @@ public sealed class CombatEngine
 
     public bool Won { get; private set; }
 
+    /// <summary>Deviation #331: conclude a model-sampled combat in an imagination world only.</summary>
+    public void ConcludeForImagination(bool won)
+    {
+        if (State.RunState is not Sts2Sim.Core.Runs.RunState { IsImaginationClone: true })
+            throw new InvalidOperationException("Combat outcome injection is imagination-only.");
+        if (!IsInProgress) throw new InvalidOperationException("Combat is not in progress.");
+        IsInProgress = false;
+        Won = won;
+    }
+
+
     /// <summary>战斗开局：把每个玩家的牌库洗进抽牌堆、初始化怪物 AI,然后进入玩家首回合。</summary>
     public Task StartCombatAsync() => StartCombatAsync(afterSetup: null);
 
