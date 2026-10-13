@@ -421,8 +421,8 @@ public sealed partial class CombatState : ICombatState
         return listeners;
     }
 
-    // Capacity hint only, so the snapshot list does not regrow on every dispatch. Enchantments,
-    // afflictions and inventory are not counted; an underestimate just costs one regrowth.
+    // Preallocate to reduce snapshot list growth. Enchantments, afflictions and inventory
+    // are not counted; if capacity is insufficient, the list grows normally.
     private int EstimateHookListenerCount()
     {
         int count = 0;
