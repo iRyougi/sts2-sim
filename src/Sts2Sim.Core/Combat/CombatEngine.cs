@@ -592,7 +592,7 @@ public sealed class CombatEngine
         }
         catch
         {
-            // Preserve the original core or observer callback exception.
+            // fail-open: Preserve the original core or observer callback exception.
         }
     }
 

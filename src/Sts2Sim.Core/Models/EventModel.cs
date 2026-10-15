@@ -506,10 +506,12 @@ public abstract class EventModel : AbstractModel
         }
         catch (OperationCanceledException exception)
         {
+            // fail-open: stored and forwarded to the choice completion task below
             cancellation = exception;
         }
         catch (Exception exception)
         {
+            // fail-open: stored and forwarded to the choice completion task below
             failure = exception;
         }
 

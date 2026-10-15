@@ -512,7 +512,7 @@ public sealed class Player
             }
             catch
             {
-                // Preserve the combat-entry exception; best-effort removal continues for remaining powers.
+                // fail-open: Preserve the combat-entry exception; best-effort removal continues for remaining powers.
             }
         }
 

@@ -210,7 +210,7 @@ public sealed class CardReward : Reward
         }
         catch (Exception exception)
         {
-            // Reward side effects are not transactional. Retain the failed task, never retry them.
+            // fail-open: Reward side effects are not transactional. Retain the failed task, never retry them.
             IsResolved = true;
             completion.SetException(exception);
         }

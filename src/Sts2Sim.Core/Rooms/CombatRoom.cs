@@ -451,10 +451,12 @@ public sealed class CombatRoom : AbstractRoom
         }
         catch (OperationCanceledException exception)
         {
+            // fail-open: forwarded to the lifecycle completion task
             completion.TrySetCanceled(exception.CancellationToken);
         }
         catch (Exception exception)
         {
+            // fail-open: forwarded to the lifecycle completion task
             completion.TrySetException(exception);
         }
         finally

@@ -1001,6 +1001,7 @@ public static class Hook
             }
             catch (Exception exception)
             {
+                // fail-open: collected and rethrown as one AggregateException after every compensation ran
                 failures.Add(exception);
             }
         }

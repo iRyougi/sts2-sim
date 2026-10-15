@@ -1084,7 +1084,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
         catch
         {
-            // Preserve the original core or observer callback exception.
+            // fail-open: Preserve the original core or observer callback exception.
         }
     }
 

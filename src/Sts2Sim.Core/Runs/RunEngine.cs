@@ -234,7 +234,7 @@ public sealed class RunEngine
                     }
                     catch
                     {
-                        // Preserve the original event/forced-combat failure.
+                        // fail-open: Preserve the original event/forced-combat failure.
                     }
 
                     try
@@ -246,7 +246,7 @@ public sealed class RunEngine
                     }
                     catch
                     {
-                        // Preserve the original event/forced-combat failure.
+                        // fail-open: Preserve the original event/forced-combat failure.
                     }
 
                     throw;

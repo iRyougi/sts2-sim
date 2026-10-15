@@ -76,7 +76,7 @@ internal static class HookOverrideIndex
         }
         catch (Exception error) when (error is not OutOfMemoryException and not AccessViolationException)
         {
-            // Metadata-only failure: retain every original call. Fatal failures propagate.
+            // fail-open: Metadata-only failure: retain every original call. Fatal failures propagate.
             return all;
         }
     }
