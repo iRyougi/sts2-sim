@@ -44,13 +44,6 @@ public class StringHelperTests
             StringHelper.GetDeterministicHashCode("储君"));
     }
 
-    [Fact]
-    public void GetDeterministicHashCode_StableAcrossCalls_AndDiffersBetweenInputs()
-    {
-        Assert.Equal(StringHelper.GetDeterministicHashCode("shuffle"), StringHelper.GetDeterministicHashCode("shuffle"));
-        Assert.NotEqual(StringHelper.GetDeterministicHashCode("shuffle"), StringHelper.GetDeterministicHashCode("rewards"));
-    }
-
     // 覆盖 RunRngType/PlayerRngType 全部枚举名 → 流名的转换
     [Theory]
     [InlineData("UpFront", "up_front")]

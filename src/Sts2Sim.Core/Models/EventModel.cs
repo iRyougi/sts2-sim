@@ -480,6 +480,7 @@ public abstract class EventModel : AbstractModel
         _suspendedRewardOffers = new Stack<Queue<RewardsSet>>();
         _pendingForcedCombatFactory = null;
         _pendingForcedCombatBatchFactory = null;
+        _pendingForcedCombatSlottedBatchFactory = null;
         CurrentOptions = EmptyOptions();
         IsFinished = false;
     }

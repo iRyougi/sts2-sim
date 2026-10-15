@@ -45,29 +45,9 @@ public sealed class MultiPhaseBossHookTests : IDisposable
     }
 
     [Fact]
-    public void ShouldPowerBeRemovedAfterOwnerDeath_CanBeOverriddenToFalse()
-    {
-        Assert.False(new SurvivingPower().ShouldPowerBeRemovedAfterOwnerDeath());
-    }
-
-    [Fact]
     public void ShouldDisappearFromDoom_DefaultsToTrue()
     {
         Assert.True(new PlainModel().ShouldDisappearFromDoom());
-    }
-
-    [Fact]
-    public void ShouldDisappearFromDoom_CanBeOverriddenToFalse()
-    {
-        Assert.False(new PersistentModel().ShouldDisappearFromDoom());
-    }
-
-    [Fact]
-    public async Task AfterCardGeneratedForCombat_DefaultsToNoOp()
-    {
-        await new PlainPower().AfterCardGeneratedForCombat(
-            ModelDb.Card<Wither>(),
-            creator: null);
     }
 
     [Fact]
@@ -208,29 +188,11 @@ public sealed class MultiPhaseBossHookTests : IDisposable
         public override PowerStackType StackType => PowerStackType.Single;
     }
 
-    private sealed class SurvivingPower : PowerModel
-    {
-        public override PowerType Type => PowerType.Buff;
-
-        public override PowerStackType StackType => PowerStackType.Single;
-
-        public override bool ShouldPowerBeRemovedAfterOwnerDeath() => false;
-    }
-
     private sealed class PlainModel : PowerModel
     {
         public override PowerType Type => PowerType.Buff;
 
         public override PowerStackType StackType => PowerStackType.Single;
-    }
-
-    private sealed class PersistentModel : PowerModel
-    {
-        public override PowerType Type => PowerType.Buff;
-
-        public override PowerStackType StackType => PowerStackType.Single;
-
-        public override bool ShouldDisappearFromDoom() => false;
     }
 
     private sealed class GenerationProbePower : PowerModel

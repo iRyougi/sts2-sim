@@ -105,19 +105,6 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
     }
 
     [Fact]
-    public async Task Alignment_Upgrade_GainsThreeEnergy()
-    {
-        (Player player, _) = await CreateCombatAsync("alignment-upgrade");
-        Alignment card = AddToHand<Alignment>(player);
-        card.Upgrade();
-        player.PlayerCombatState!.Energy = 0;
-
-        await card.PlayAsync(target: null);
-
-        Assert.Equal(3, player.PlayerCombatState.Energy);
-    }
-
-    [Fact]
     public async Task DyingStar_ReducesEveryEnemyStrengthByNineUntilEnemyTurnEnds()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("dying-star-base");

@@ -61,7 +61,7 @@ public sealed class CombatEngine
 
     public bool IsOverOrEnding => IsEnding || !IsInProgress;
 
-    private bool HasLost => !State.PlayerCreatures.Any(creature => creature.IsAlive);
+    private bool HasLost => !State.HasLivingPlayerCreature();
 
     private bool HasWon => !State.Enemies.Any(enemy => enemy.IsAlive && enemy.IsPrimaryEnemy) &&
         !Hook.ShouldStopCombatFromEnding(State);
