@@ -715,7 +715,7 @@ public sealed class RunDriver
             effectiveBefore = NonCombatPlayerSnapshot.Capture(eventRoom.Event.Owner);
         }
         var chosenOptionKeys = new List<string>();
-        for (int choices = 0; !eventRoom.Event.IsFinished; choices++)
+        for (int choices = 0; !_runState.IsGameOver && !eventRoom.Event.IsFinished; choices++)
         {
             if (choices >= MaximumEventChoices)
             {
@@ -751,7 +751,10 @@ public sealed class RunDriver
         }
 
         await DrainEventRewardOffersAsync(eventRoom);
-        await DrivePendingForcedCombatAsync(eventRoom);
+        if (!_runState.IsGameOver)
+        {
+            await DrivePendingForcedCombatAsync(eventRoom);
+        }
 
         if (_recorder is null)
         {
@@ -840,7 +843,7 @@ public sealed class RunDriver
 
     private async Task DrainEventRewardOffersAsync(EventRoom eventRoom)
     {
-        while (eventRoom.Event.TryDequeuePendingRewardOffer(out RewardsSet? rewards))
+        while (!_runState.IsGameOver && eventRoom.Event.TryDequeuePendingRewardOffer(out RewardsSet? rewards))
         {
             await ResolveRewardsAsync(rewards);
         }
@@ -955,7 +958,7 @@ public sealed class RunDriver
             using IDisposable? nestedOffers = eventRoom is null ? null
                 : resumeFrame ? eventRoom.Event.ResumeNestedRewardOffers()
                 : eventRoom.Event.BeginNestedRewardOffers();
-            while (true)
+            while (!_runState.IsGameOver)
             {
                 RewardDecision decision = await _decisionSource.ChooseRewardActionAsync(rewards);
                 switch (decision)

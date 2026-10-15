@@ -74,9 +74,18 @@ public class MapPathPruningTests
         var mapA = new StandardActMap(new Rng(13UL), numberOfRooms: 15, new MapPointTypeCounts(12, 7));
         var mapB = new StandardActMap(new Rng(13UL), numberOfRooms: 15, new MapPointTypeCounts(12, 7));
 
-        int countA = mapA.GetAllMapPoints().Count();
-        int countB = mapB.GetAllMapPoints().Count();
+        Assert.Equal(Snapshot(mapA), Snapshot(mapB));
 
-        Assert.Equal(countA, countB);
+        static string[] Snapshot(StandardActMap map) => map.GetAllMapPoints()
+            .Append(map.StartingMapPoint).Append(map.BossMapPoint)
+            .Concat(map.SecondBossMapPoint is { } secondBoss ? [secondBoss] : Array.Empty<MapPoint>())
+            .Distinct()
+            .OrderBy(point => point.coord.row).ThenBy(point => point.coord.col)
+            .Select(point => $"{point.coord.col},{point.coord.row}:{point.PointType}:{point.CanBeModified}"
+                + $":parents={string.Join(';', point.parents.OrderBy(parent => parent.coord)
+                    .Select(parent => $"{parent.coord.col},{parent.coord.row}"))}"
+                + $":children={string.Join(';', point.Children.OrderBy(child => child.coord)
+                    .Select(child => $"{child.coord.col},{child.coord.row}"))}")
+            .ToArray();
     }
 }

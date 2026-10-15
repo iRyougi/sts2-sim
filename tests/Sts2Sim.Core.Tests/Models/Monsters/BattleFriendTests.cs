@@ -72,9 +72,16 @@ public sealed class BattleFriendTests : IDisposable
         await Hook.AfterSideTurnEnd(state, CombatSide.Enemy, state.Enemies);
         await Hook.AfterSideTurnEnd(state, CombatSide.Enemy, state.Enemies);
         await Sts2Sim.Core.Commands.PowerCmd.Apply<WeakPower>(state, enemy, 2m, null, null);
+        WeakPower weak = enemy.GetPower<WeakPower>()!;
+        bool tickedBeforeEscape = false;
+        weak.ExecutionFinished += _ =>
+            tickedBeforeEscape |= weak.Amount == 1 && state.Enemies.Contains(enemy);
 
         await Hook.AfterSideTurnEnd(state, CombatSide.Enemy, state.Enemies);
 
+        Assert.True(tickedBeforeEscape, "Weak must tick while the enemy is still present, before escape removes its powers.");
+        Assert.Equal(1, weak.Amount);
+        Assert.Empty(enemy.Powers);
         Assert.False(enemy.IsDead);
         Assert.DoesNotContain(enemy, state.Enemies);
         Assert.Contains(enemy, state.EscapedCreatures);

@@ -272,13 +272,24 @@ public sealed class AutoPlayCardTests : IDisposable
         (Player player, _) = await CreateCombatAsync("decisions-decisions");
         var selection = new LegacySelectionDecisionSource();
         ((Sts2Sim.Core.Combat.CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
+        foreach (CardModel existing in player.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards).ToList())
+            CardPileCmd.Remove(existing);
+        DefendRegent[] draw = Enumerable.Range(0, 3)
+            .Select(_ => AddTo<DefendRegent>(player, PileType.Draw)).ToArray();
+        player.PlayerCombatState.GainStars(6);
         DecisionsDecisions card = AddToHand<DecisionsDecisions>(player);
         int blockBefore = player.Creature.Block;
+        int startedBefore = player.PlayerCombatState.CardPlaysStartedThisTurn;
+        int finishedBefore = player.PlayerCombatState.CardsPlayedThisTurn;
 
         await card.PlayAsync(target: null);
 
-        int defendPlays = (player.Creature.Block - blockBefore) / 5;
-        Assert.True(defendPlays == 0 || defendPlays == 3);
+        Assert.Equal(blockBefore + 15, player.Creature.Block);
+        Assert.Equal(startedBefore + 4, player.PlayerCombatState.CardPlaysStartedThisTurn);
+        Assert.Equal(finishedBefore + 4, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(draw.Skip(1), player.PlayerCombatState.Hand.Cards);
+        Assert.Same(draw[0], Assert.Single(player.PlayerCombatState.DiscardPile.Cards));
+        Assert.Same(card, Assert.Single(player.PlayerCombatState.ExhaustPile.Cards));
 
         // The first selected skill's AfterCardPlayed kills the last enemy; later repeats must stop.
         (Player endingPlayer, CombatRoom endingRoom) = await CreateCombatAsync("decisions-ending-bomb");

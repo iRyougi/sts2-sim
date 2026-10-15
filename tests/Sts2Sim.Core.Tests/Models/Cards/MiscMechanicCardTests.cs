@@ -90,17 +90,22 @@ public sealed class MiscMechanicCardTests : IDisposable
     public async Task Impatience_NoAttackInHand_DrawsTwo()
     {
         (Player player, _) = await CreateCombatAsync("impatience-empty");
-        foreach (CardModel attack in player.PlayerCombatState!.Hand.Cards.Where(c => c.Type == CardType.Attack).ToList())
+        foreach (CardModel existing in player.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards).ToList())
+            CardPileCmd.Remove(existing);
+        CardModel[] draw = Enumerable.Range(0, 3).Select(_ =>
         {
-            CardPileCmd.Add(attack, PileType.Discard);
-        }
-
+            DefendRegent defend = AddToHand<DefendRegent>(player);
+            CardPileCmd.Add(defend, PileType.Draw);
+            return (CardModel)defend;
+        }).ToArray();
         Impatience card = AddToHand<Impatience>(player);
         int drawPileBefore = player.PlayerCombatState!.DrawPile.Cards.Count;
 
         await card.PlayAsync(target: null);
 
-        Assert.True(player.PlayerCombatState!.DrawPile.Cards.Count <= drawPileBefore - 2 || player.PlayerCombatState!.DrawPile.Cards.Count < drawPileBefore);
+        Assert.Equal(drawPileBefore - 2, player.PlayerCombatState!.DrawPile.Cards.Count);
+        Assert.Equal(draw.Take(2), player.PlayerCombatState.Hand.Cards);
+        Assert.Equal(draw.Skip(2), player.PlayerCombatState.DrawPile.Cards);
     }
 
     [Fact]

@@ -144,6 +144,7 @@ public sealed class EventRewardOfferTests : IDisposable
             typeof(Sts2Sim.Core.Models.Powers.WeakPower),
             typeof(Sts2Sim.Core.Models.Powers.VulnerablePower),
             typeof(DivineRight),
+            typeof(SereTalon), typeof(Wish),
         });
     }
 
@@ -181,6 +182,28 @@ public sealed class EventRewardOfferTests : IDisposable
         Assert.Equal(0, decisions.SkipCardDecisionCount);
         Assert.Equal(1, decisions.DoneDecisionCount);
         Assert.False(room.Event.HasPendingRewardOffers);
+
+        // #527: death during a reward must also stop decisions within that same offer.
+        (RunState lethalRun, Player lethalPlayer) = CreateRunWithPlayer("event-reward-death-527");
+        lethalPlayer.Creature.SetMaxHpInternal(1);
+        EventRoom lethalRoom = await EnterRoom(lethalRun, new QueuesRewardsEvent());
+        var lethalEvent = Assert.IsType<QueuesRewardsEvent>(lethalRoom.Event);
+        var talon = new RelicReward((RelicModel)ModelDb.Relic<SereTalon>().MutableClone(), lethalPlayer);
+        var remainingGold = new GoldReward(50, lethalPlayer);
+        talon.Populate(lethalRun);
+        remainingGold.Populate(lethalRun);
+        lethalEvent.SetRewards(RewardsSet.CreateCustom(lethalPlayer, extraRewards: [talon, remainingGold]));
+        var lethalDecisions = new RecordingRewardDecisionSource();
+        int lethalGoldBefore = lethalPlayer.Gold;
+
+        await new RunDriver(lethalRun, lethalDecisions).DriveEventAsync(lethalRoom);
+
+        Assert.True(lethalRun.IsGameOver, "seed=event-reward-death-527 maxHp=1: SereTalon must be lethal");
+        Assert.True(talon.IsResolved);
+        Assert.False(remainingGold.IsResolved);
+        Assert.Equal(lethalGoldBefore, lethalPlayer.Gold);
+        Assert.Equal(0, lethalDecisions.DoneDecisionCount);
+        Assert.Empty(lethalRun.ActiveRewardOffers);
     }
 
     [Fact]

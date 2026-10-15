@@ -674,8 +674,10 @@ public class RunDriverTests : IDisposable
         PickFirstByCoord(runState.Map.StartingMapPoint.Children).PointType = MapPointType.Unknown;
     }
 
-    [Fact]
-    public async Task RunAsync_DrivesSelectedAct1EventToCompletionUsingDecisionSourceOption()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task RunAsync_DrivesSelectedAct1EventToCompletionUsingDecisionSourceOption(int initialHp)
     {
         RunState runState = NewRunState("room-factory-b");
         MakeFirstReachableRoomAnEvent(runState);
@@ -686,6 +688,40 @@ public class RunDriverTests : IDisposable
 
         Assert.Equal(1, result.FloorsVisited);
         Assert.Equal(1, decisionSource.EventDecisionCount);
+
+        // #527: the lethal option completes, but a dead player must not see its next page.
+        string seed = $"event-death-527-{initialHp}";
+        RunState lethalRun = NewRunState(seed);
+        Player player = lethalRun.Players[0];
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - initialHp, default);
+        lethalRun.AddVisitedMapCoord(lethalRun.Map.StartingMapPoint.coord);
+        var room = new EventRoom(() => (EventModel)ModelDb.Event<SlipperyBridge>().MutableClone());
+        lethalRun.PushRoom(room);
+        await room.Enter(lethalRun);
+        int goldBefore = player.Gold;
+        var lethalDecisions = new EventDecisionSource(options =>
+        {
+            Assert.True(!lethalRun.IsGameOver,
+                $"seed={seed} initialHp={initialHp} hp={player.Creature.CurrentHp}: requested an option after death");
+            // A queued offer on the lethal choice must not be awarded after death.
+            if (player.Creature.CurrentHp <= 4)
+                Assert.True(room.Event.TryOfferRewardsFromCurrentEvent(lethalRun,
+                    RewardsSet.CreateCustom(player, gold: new GoldReward(50, player))));
+            return options.Single(option => option.Key.Contains("HOLD_ON"));
+        });
+
+        RunDriver.Result lethalResult = await new RunDriver(lethalRun, lethalDecisions).ContinueAsync(1);
+
+        Assert.True(lethalResult.Outcome == RunOutcome.PlayerDefeated,
+            $"seed={seed} initialHp={initialHp} hp={player.Creature.CurrentHp}: outcome={lethalResult.Outcome}");
+        Assert.Equal(initialHp == 1 ? 1 : 2, lethalDecisions.EventDecisionCount);
+        Assert.Equal(0, player.Creature.CurrentHp);
+        Assert.Equal(initialHp == 1 ? 2 : 3, room.Event.Rng.Counter);
+        Assert.False(room.Event.IsFinished);
+        Assert.Equal(2, room.Event.CurrentOptions.Count);
+        Assert.True(room.Event.HasPendingRewardOffers);
+        Assert.Equal(goldBefore, player.Gold);
+        Assert.Null(lethalRun.CurrentRoom);
     }
 
     [Fact]
