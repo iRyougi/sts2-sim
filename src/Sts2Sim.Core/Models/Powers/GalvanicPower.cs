@@ -32,7 +32,9 @@ public sealed class GalvanicPower : PowerModel
 
     public override Task AfterCardPlayed(CardPlay cardPlay) =>
         cardPlay.Card.Affliction is Galvanized
-            ? CreatureCmd.Damage(Owner.CombatState!, new[] { cardPlay.Card.Owner.Creature }, Amount,
+            // Native CreatureCmd.Damage derives combat from the target, even when an earlier
+            // AfterCardPlayed listener killed and detached this power's owner.
+            ? CreatureCmd.Damage(cardPlay.Card.Owner.Creature.CombatState!, new[] { cardPlay.Card.Owner.Creature }, Amount,
                 Sts2Sim.Core.ValueProps.ValueProp.Unpowered | Sts2Sim.Core.ValueProps.ValueProp.Move,
                 null, null, null)
             : Task.CompletedTask;
