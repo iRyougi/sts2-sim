@@ -1,3 +1,4 @@
+using Sts2Sim.TestSupport;
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Content;
@@ -17,13 +18,7 @@ using Sts2Sim.Core.Rl;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs.Transplant;
 using Sts2Sim.Core.Runs;
-using System.Collections;
-using System.Globalization;
-using System.IO.Compression;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using Xunit;
 
 namespace Sts2Sim.Core.Tests.Runs;
@@ -178,7 +173,7 @@ public sealed partial class RunStateCloneTests
         }
 
         RunState hiddenVariant = source.CloneExact();
-        ChangeOnlyOldHiddenFuture(hiddenVariant);
+        HiddenFutureCounterfactual.Change(hiddenVariant);
         const ulong newSeed = 0x1001UL;
         RunState first = source.CloneReseeded(newSeed);
         // A collision with the old root seed must not choose an alternative new world.
@@ -226,8 +221,8 @@ public sealed partial class RunStateCloneTests
                 }
                 break;
             case "events":
-                List<Type> firstSequence = PrivateList<Type>(first, "_eventSequence");
-                List<Type> secondSequence = PrivateList<Type>(second, "_eventSequence");
+                List<Type> firstSequence = HiddenFutureCounterfactual.PrivateList<Type>(first, "_eventSequence");
+                List<Type> secondSequence = HiddenFutureCounterfactual.PrivateList<Type>(second, "_eventSequence");
                 Assert.Equal(firstSequence, secondSequence);
                 Assert.DoesNotContain(visitedEvent!, firstSequence);
                 Assert.Equal(source.Act.EffectiveEventPool.Except([visitedEvent!]).OrderBy(type => type.FullName),
@@ -238,27 +233,6 @@ public sealed partial class RunStateCloneTests
                 break;
         }
     }
-
-    private static void ChangeOnlyOldHiddenFuture(RunState run)
-    {
-        foreach (PropertyInfo property in run.Rng.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
-            if (property.PropertyType == typeof(Rng)) ((Rng)property.GetValue(run.Rng)!).NextInt(97);
-        foreach (PropertyInfo property in run.Players[0].PlayerRng.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
-            if (property.PropertyType == typeof(Rng)) ((Rng)property.GetValue(run.Players[0].PlayerRng)!).NextInt(97);
-        ReverseUnvisited<EncounterDefinition>(run, "_normalEncounterSequence", "_normalEncountersVisited");
-        ReverseUnvisited<EncounterDefinition>(run, "_eliteEncounterSequence", "_eliteEncountersVisited");
-        ReverseUnvisited<Type>(run, "_eventSequence", "_eventsVisited");
-    }
-
-    private static void ReverseUnvisited<T>(RunState run, string sequenceField, string cursorField)
-    {
-        List<T> sequence = PrivateList<T>(run, sequenceField);
-        int cursor = (int)typeof(RunState).GetField(cursorField, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(run)!;
-        sequence.Reverse(cursor, sequence.Count - cursor);
-    }
-
-    private static List<T> PrivateList<T>(RunState run, string field) =>
-        (List<T>)typeof(RunState).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(run)!;
 
     private static KeyValuePair<string, Sts2Sim.Core.Saves.SerializableRng>[] RngStates(object streams) =>
         streams.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
@@ -282,7 +256,7 @@ public sealed partial class RunStateCloneTests
             var source = NewVisibleRun("in-room-" + scenario);
             var room = await EnterEventAsync<TabletOfTruth>(source);
             RunState variant = source.CloneExact();
-            ChangeOnlyOldHiddenFuture(variant);
+            HiddenFutureCounterfactual.Change(variant);
             ((Rng)typeof(EventModel).GetField("_rng", PrivateFields)!.GetValue(variant.CurrentRoom is EventRoom e ? e.Event : null)!).NextInt(97);
             var before = RunCloneGraphSnapshot.Capture(source);
             RunState first = source.CloneReseeded(97);
@@ -313,7 +287,7 @@ public sealed partial class RunStateCloneTests
             var concealedItems = (List<CrystalSphereItem>)typeof(CrystalSphereMinigame).GetField("_items", PrivateFields)!.GetValue(variantGame)!;
             concealedItems.Reverse();
             ((Rng)typeof(CrystalSphereMinigame).GetField("_rng", PrivateFields)!.GetValue(variantGame)!).NextInt(97);
-            ChangeOnlyOldHiddenFuture(variant);
+            HiddenFutureCounterfactual.Change(variant);
             var before = RunCloneGraphSnapshot.Capture(source);
             RunState first = source.CloneReseeded(91);
             RunState second = variant.CloneReseeded(91);
@@ -389,7 +363,7 @@ public sealed partial class RunStateCloneTests
         var alternate = new CombatRoom(() => (encounter, encounter.CreateMonsters(new Rng(0xBEEFUL))), RoomType.Monster);
         alternate.Prepare(variant);
         typeof(EventRoom).GetField("_preparedCombatRoom", PrivateFields)!.SetValue(variantRoom, alternate);
-        ChangeOnlyOldHiddenFuture(variant);
+        HiddenFutureCounterfactual.Change(variant);
         string before = RunCloneGraphSnapshot.Capture(source);
         RunState first = source.CloneReseeded(97);
         RunState second = variant.CloneReseeded(97);
@@ -1103,144 +1077,3 @@ private static CardModel CapturedUpgradeCard(Sts2Sim.Core.Events.EventOption opt
 }
 
 }
-
-// Exact-world private state/alias snapshot used by the approved six consumer Theories.
-// Snapshots contain strings only, never mutable source-world entities or live delegates.
-internal static class RunCloneGraphSnapshot
-{
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, FieldInfo[]> Fields = new();
-
-    internal static string Capture(RunState run, object? candidates = null, object? selected = null)
-    {
-        var text = new StringBuilder();
-        var identities = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
-        var pending = new Queue<object>();
-        Append(run);
-        Append(candidates);
-        Append(selected);
-        while (pending.TryDequeue(out object? item))
-        {
-            int id = identities[item];
-            Type type = item.GetType();
-            text.Append('\n').Append(id).Append(':').Append(type.FullName).Append('{');
-            if (item is Delegate callback)
-            {
-                foreach (Delegate invocation in Delegate.EnumerateInvocationList(callback))
-                {
-                    text.Append(invocation.GetType().FullName).Append(':')
-                        .Append(invocation.Method.DeclaringType?.FullName).Append(':')
-                        .Append(invocation.Method.Name).Append(':').Append(invocation.Method.MetadataToken);
-                    Append(invocation.Target);
-                }
-            }
-            else if (item is IEnumerable sequence)
-            {
-                // Enumerate logical slots in their consumer order, not Dictionary hash buckets
-                // or the private layout/capacity of a .NET collection.
-                foreach (object? value in sequence) Append(value);
-            }
-            else
-            {
-                foreach (FieldInfo field in InstanceFields(type))
-                {
-                    if (IsRuntimeControl(field)) continue;
-                    text.Append(field.DeclaringType?.FullName).Append('.').Append(field.Name).Append('=');
-                    Append(field.GetValue(item));
-                }
-            }
-            text.Append('}');
-        }
-        // Retain every UTF-16 code unit, including unpaired surrogates. This is
-        // lossless storage, not a digest or a reduced state projection.
-        // Write builder chunks directly so a second full-size string is not allocated.
-        using var compressed = new MemoryStream();
-        using (var deflate = new DeflateStream(compressed, CompressionLevel.Fastest, leaveOpen: true))
-            foreach (ReadOnlyMemory<char> chunk in text.GetChunks())
-                deflate.Write(MemoryMarshal.AsBytes(chunk.Span));
-        return Convert.ToBase64String(compressed.GetBuffer(), 0, checked((int)compressed.Length));
-
-        void Append(object? value)
-        {
-            if (value is null) { text.Append("null;"); return; }
-            Type type = value.GetType();
-            if (type.IsPrimitive || type.IsEnum || value is decimal or Guid or DateTime or DateTimeOffset or TimeSpan)
-            {
-                text.Append(type.FullName).Append(':')
-                    .Append(Convert.ToString(value, CultureInfo.InvariantCulture)).Append(';');
-                return;
-            }
-            if (value is string stringValue)
-            {
-                text.Append('s').Append(stringValue.Length).Append(':').Append(stringValue).Append(';');
-                return;
-            }
-            if (value is Type metadata)
-            {
-                text.Append("type:").Append(metadata.FullName).Append(';');
-                return;
-            }
-            if (value is AbstractModel { IsCanonical: true } canonical)
-            {
-                text.Append("canonical:").Append(type.FullName).Append(':').Append(canonical.Id).Append(';');
-                return;
-            }
-            if (value is MemberInfo member)
-            {
-                text.Append("member:").Append(member.DeclaringType?.FullName).Append(':')
-                    .Append(member.Name).Append(':').Append(member.MetadataToken).Append(';');
-                return;
-            }
-            if (value is Task || value is IAsyncStateMachine)
-                throw new InvalidOperationException($"Unclassified runtime handle in exact-world snapshot: {type.FullName}.");
-            if (value is StringComparer || ReferenceEquals(value, ReferenceEqualityComparer.Instance)
-                || type.Assembly == typeof(EqualityComparer<>).Assembly && type.Namespace == "System.Collections.Generic"
-                    && type.GetInterfaces().Any(i => i.IsGenericType && (i.GetGenericTypeDefinition() == typeof(IEqualityComparer<>) || i.GetGenericTypeDefinition() == typeof(IComparer<>))))
-            {
-                text.Append("comparer:").Append(type.FullName).Append(';');
-                return;
-            }
-            if (type != typeof(object) && type.Assembly != typeof(RunState).Assembly && value is not IEnumerable && value is not Delegate
-                && !type.IsValueType && !type.IsDefined(typeof(CompilerGeneratedAttribute), false))
-                throw new InvalidOperationException($"Unclassified mutable graph data: {type.FullName}.");
-            if (type.IsValueType)
-            {
-                text.Append(type.FullName).Append('(');
-                foreach (FieldInfo field in InstanceFields(type))
-                {
-                    text.Append(field.Name).Append('=');
-                    Append(field.GetValue(value));
-                }
-                text.Append(");");
-                return;
-            }
-            if (!identities.TryGetValue(value, out int identity))
-            {
-                identity = identities.Count;
-                identities.Add(value, identity);
-                pending.Enqueue(value);
-            }
-            text.Append('@').Append(identity).Append(';');
-        }
-    }
-
-    private static bool IsRuntimeControl(FieldInfo field) =>
-        field.Name is "_stateLock" or "_lifecycleLock" or "_rewardLock" or "_takeLock" or "_resolutionLock"
-            or "_purchaseGate" or "_revealGate" or "_interactionGate" or "_insideLifecycle" or "_observer"
-            or "_cardSelectionSource" or "<CardSelectionSource>k__BackingField"
-            or "_activeChoiceTask" or "_activeChoiceOption" or "_activeChoicePageVersion"
-            or "_takeTask" or "_resolutionTask" or "_outcomeTask" or "_exitTask" or "_completionTask"
-        || field.DeclaringType == typeof(CombatState) && field.Name == "_hookListenerSnapshotCache"
-        || field.DeclaringType == typeof(AbstractModel) && field.Name == "ExecutionFinished"
-        || field.DeclaringType == typeof(RelicModel) && field.Name == "Flashed";
-
-    private static FieldInfo[] InstanceFields(Type type) => Fields.GetOrAdd(type, static root =>
-    {
-        var fields = new List<FieldInfo>();
-        for (Type? current = root; current is not null && current != typeof(object); current = current.BaseType)
-            fields.AddRange(current.GetFields(BindingFlags.Instance | BindingFlags.Public
-                | BindingFlags.NonPublic | BindingFlags.DeclaredOnly));
-        return fields.OrderBy(field => field.DeclaringType?.FullName, StringComparer.Ordinal)
-            .ThenBy(field => field.Name, StringComparer.Ordinal).ToArray();
-    });
-}
-

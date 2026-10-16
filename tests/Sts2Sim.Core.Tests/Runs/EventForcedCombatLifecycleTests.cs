@@ -1,4 +1,5 @@
 using Sts2Sim.Core.Combat;
+using Sts2Sim.TestSupport;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Players;

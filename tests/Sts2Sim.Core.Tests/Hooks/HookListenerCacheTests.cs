@@ -288,9 +288,9 @@ public sealed class HookListenerCacheTests : IDisposable
     {
         var world = NewWorld("clone-isolation");
         world.Player.PlayerCombatState!.Hand.AddInternal(NewCard(world.Player));
-        string coldProjection = Sts2Sim.Core.Tests.Runs.RunCloneGraphSnapshot.Capture(world.Run);
+        string coldProjection = Sts2Sim.TestSupport.RunCloneGraphSnapshot.Capture(world.Run);
         var source = Snapshot(world.State, world.Run, "source warm");
-        Assert.Equal(coldProjection, Sts2Sim.Core.Tests.Runs.RunCloneGraphSnapshot.Capture(world.Run));
+        Assert.Equal(coldProjection, Sts2Sim.TestSupport.RunCloneGraphSnapshot.Capture(world.Run));
         CombatState child = world.State.Clone();
         CombatState sibling = world.State.Clone();
         Assert.Null(CacheField.GetValue(child));
@@ -324,11 +324,11 @@ public sealed class HookListenerCacheTests : IDisposable
         Assert.Contains(ghost, stale.Full);
         int powerClones = GhostPower.CloneCount;
         int relicClones = GhostRelic.CloneCount;
-        string sourceProjection = Sts2Sim.Core.Tests.Runs.RunCloneGraphSnapshot.Capture(world.Run);
+        string sourceProjection = Sts2Sim.TestSupport.RunCloneGraphSnapshot.Capture(world.Run);
         RunState stableRun = world.Run.CloneExact();
         Assert.Equal(powerClones, GhostPower.CloneCount);
         Assert.Equal(relicClones, GhostRelic.CloneCount);
-        Assert.Equal(sourceProjection, Sts2Sim.Core.Tests.Runs.RunCloneGraphSnapshot.Capture(stableRun));
+        Assert.Equal(sourceProjection, Sts2Sim.TestSupport.RunCloneGraphSnapshot.Capture(stableRun));
         var stable = Assert.IsType<CombatState>(stableRun.Players[0].Creature.CombatState);
         Assert.Null(CacheField.GetValue(stable));
         Assert.Same(stale, CacheField.GetValue(world.State)); // Clone itself must not refresh source.
