@@ -12,8 +12,8 @@ namespace Sts2Sim.Core.Runs;
 /// Supplies map, combat, reward, shop, rest-site, and event choices when requested by <see cref="RunDriver"/>.
 /// 偏离 #79（已解决，2026-08-31，Plan08a）：Plan05 当时只在 C# 核心层新增奖励/商店/事件决策，
 /// 未扩展 RL 协议与 Python 动作空间；Plan08a 已把这三类决策及 Rest Site 完整接入统一 RL 链路。
-/// 见 <c>docs/superpowers/plans/2026-08-30-plan-08a-rl-action-space-completion.md</c> 与
-/// <c>docs/superpowers/reviews/2026-08-31-plan-08a-rl-action-space-completion-report.md</c>。
+/// 见 <c>docs/superpowers/archive/plans/2026-08-30-plan-08a-rl-action-space-completion.md</c> 与
+/// <c>docs/superpowers/archive/reviews/2026-08-31-plan-08a-rl-action-space-completion-report.md</c>。
 /// </summary>
 public interface IRunDecisionSource : ICardSelectionDecisionSource
 {
