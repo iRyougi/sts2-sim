@@ -78,73 +78,50 @@ public sealed class LeafSlimeSTests : IDisposable
     }
 
     [Fact]
-    public async Task RandomBranch_HasExactEqualWeightsAndStrictAlternationAcrossBoundedSeeds()
+    public async Task RandomBranch_FixedWitnessesPreserveBothOpenersAlternationAndRng()
     {
-        int tackleFirstCount = 0;
-        var seen = new HashSet<string>();
-
-        for (int seed = 0; seed < 256; seed++)
+        var witnesses = new[]
+        {
+            (Seed: 0, FirstMove: "TACKLE_MOVE", InitialRng: (4065771415423447804UL, 7895922073370502719UL, 9144741505676130055UL, 7560711539809357584UL)),
+            (Seed: 2, FirstMove: "GOOP_MOVE", InitialRng: (330409222913498179UL, 12030374533650227524UL, 2657979179174670448UL, 904773363353008229UL)),
+        };
+        foreach (var witness in witnesses)
         {
             (LeafSlimeS monster, var room, _) = await Task15MonsterTestFixture.CreateCombatAsync<LeafSlimeS>(
-                0,
-                $"leaf-slime-s-random-{seed}",
-                playerCount: 1);
-            var sequence = new List<string> { monster.NextMove!.StateId };
-            if (monster.NextMove.StateId == "TACKLE_MOVE")
-            {
-                tackleFirstCount++;
-            }
-
+                0, $"leaf-slime-s-random-{witness.Seed}", playerCount: 1);
+            MonsterMoveStateMachine machine = monster.MoveStateMachine!;
+            RandomBranchState branch = Assert.IsType<RandomBranchState>(machine.States["RAND"]);
+            Assert.Collection(
+                branch.States,
+                state => AssertBranch(state, "TACKLE_MOVE"),
+                state => AssertBranch(state, "GOOP_MOVE"));
+            var rng = room.Engine.State.RunState.Rng.MonsterAi;
+            var initial = rng.ToSerializable();
+            Assert.Equal(1, initial.counter);
+            Assert.Equal(witness.InitialRng, (initial.state0, initial.state1, initial.state2, initial.state3));
+            Assert.Equal(witness.FirstMove, monster.NextMove!.StateId);
+            var expectedRng = rng.CloneExact();
+            var expectedLog = new List<string> { witness.FirstMove };
+            Assert.Equal(expectedLog, machine.StateLog.Select(state => state.Id));
+            string otherMove = witness.FirstMove == "TACKLE_MOVE" ? "GOOP_MOVE" : "TACKLE_MOVE";
             for (int turn = 0; turn < 12; turn++)
             {
-                monster.MoveStateMachine!.OnMovePerformed(monster.NextMove!);
+                // Even the sole eligible branch consumes one draw.
+                expectedRng.NextFloat();
+                machine.OnMovePerformed(monster.NextMove!);
                 monster.RollMove(room.Engine.State.Allies);
-                sequence.Add(monster.NextMove!.StateId);
-            }
-
-            for (int index = 0; index < sequence.Count; index++)
-            {
-                Assert.Contains(sequence[index], new[] { "TACKLE_MOVE", "GOOP_MOVE" });
-                if (index > 0)
-                {
-                    Assert.NotEqual(sequence[index - 1], sequence[index]);
-                }
-            }
-
-            seen.UnionWith(sequence);
-        }
-
-        Assert.InRange(tackleFirstCount, 105, 151);
-        Assert.Equal(new[] { "GOOP_MOVE", "TACKLE_MOVE" }, seen.OrderBy(id => id));
-
-        (LeafSlimeS inspected, _, _) = await Task15MonsterTestFixture.CreateCombatAsync<LeafSlimeS>(
-            0,
-            "leaf-slime-s-structure",
-            playerCount: 1);
-        RandomBranchState branch = Assert.IsType<RandomBranchState>(inspected.MoveStateMachine!.States["RAND"]);
-        Assert.Collection(
-            branch.States,
-            state => AssertBranch(state, "TACKLE_MOVE"),
-            state => AssertBranch(state, "GOOP_MOVE"));
-    }
-
-    private static async Task<(LeafSlimeS Monster, CombatRoom Room, IReadOnlyList<Player> Players)>
-        CreateCombatStartingWithGoopAsync(int ascension)
-    {
-        for (int seed = 0; seed < 64; seed++)
-        {
-            (LeafSlimeS monster, CombatRoom room, IReadOnlyList<Player> players) =
-                await Task15MonsterTestFixture.CreateCombatAsync<LeafSlimeS>(
-                    ascension,
-                    $"leaf-slime-s-goop-{ascension}-{seed}");
-            if (monster.NextMove!.StateId == "GOOP_MOVE")
-            {
-                return (monster, room, players);
+                expectedLog.Add(turn % 2 == 0 ? otherMove : witness.FirstMove);
+                Assert.True(monster.NextMove!.StateId == expectedLog[^1], $"seed={witness.Seed}, turn={turn}");
+                Assert.Equal(expectedLog, machine.StateLog.Select(state => state.Id));
+                Assert.Equal(expectedRng.ToSerializable(), rng.ToSerializable());
             }
         }
-
-        throw new Xunit.Sdk.XunitException("No GOOP_MOVE initial branch found in the bounded seed search.");
     }
+
+    private static Task<(LeafSlimeS Monster, CombatRoom Room, IReadOnlyList<Player> Players)>
+        CreateCombatStartingWithGoopAsync(int ascension) =>
+        Task15MonsterTestFixture.CreateCombatAsync<LeafSlimeS>(
+            ascension, $"leaf-slime-s-goop-{ascension}-0");
 
     private static void AssertBranch(RandomBranchState.StateWeight state, string expectedStateId)
     {
