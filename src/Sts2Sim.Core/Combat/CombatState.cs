@@ -260,6 +260,14 @@ public sealed partial class CombatState : ICombatState
         AddCreature(creature);
     }
 
+    /// <summary>Current visible map location shared by live runs and exact combat snapshots; unknown facades have no location.</summary>
+    internal static MapLocation? GetCurrentMapLocation(IRunState runState) => runState switch
+    {
+        Runs.RunState concreteRun => concreteRun.MapLocation,
+        CombatRunStateSnapshot snapshot => snapshot.MapLocation,
+        _ => null,
+    };
+
     /// <summary>
     /// 创建并附着怪物但不加入任一方列表；调用 AddCreature 后才参与目标选择与钩子枚举。
     /// 怪物个体 RNG 按原生公式由 run 种子、当前地图列/行、
@@ -280,12 +288,8 @@ public sealed partial class CombatState : ICombatState
         creature.AssignSlotName(slotName);
         monster.AssignCreature(creature);
         monster.RunRng = RunState.Rng;
-        MapLocation location = RunState switch
-        {
-            Runs.RunState concreteRun => concreteRun.MapLocation,
-            CombatRunStateSnapshot snapshot => snapshot.MapLocation,
-            _ => default,
-        };
+        MapLocation location = GetCurrentMapLocation(RunState) ?? default;
+
         monster.Rng = new Rng((ulong)(
             (long)RunState.Rng.Seed
             + (long)(location.coord?.col ?? 0)

@@ -62,11 +62,14 @@ public sealed class FurCoat : RelicModel
             ? CreatureCmd.SetCurrentHp(creature, 1m)
             : Task.CompletedTask;
 
-    private bool IsMarkedCurrentMapPoint() =>
-        Owner.RunState is RunState runState &&
-        _actIndex == runState.CurrentActIndex &&
-        runState.CurrentMapPoint is { } point &&
-        _markedCoordinates.Contains(point.coord);
+    private bool IsMarkedCurrentMapPoint()
+    {
+        MapLocation? location = CombatState.GetCurrentMapLocation(Owner.RunState);
+        return location is { } current &&
+            _actIndex == current.actIndex &&
+            current.coord is { } coordinate &&
+            _markedCoordinates.Contains(coordinate);
+    }
 
     protected override void DeepCloneFields()
     {
