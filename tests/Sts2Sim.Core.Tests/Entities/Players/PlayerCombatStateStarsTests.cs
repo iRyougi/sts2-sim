@@ -54,8 +54,10 @@ public class PlayerCombatStateStarsTests : IDisposable
         protected override int CanonicalEnergyCost => 1;
     }
 
-    private sealed class StarsSpentSpy : AbstractModel
+    private sealed class StarsSpentSpy : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public int CallCount { get; private set; }
@@ -73,8 +75,10 @@ public class PlayerCombatStateStarsTests : IDisposable
         }
     }
 
-    private class StarsGainedSpy : AbstractModel
+    private class StarsGainedSpy : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
         public int CallCount { get; private set; }
         public int Amount { get; private set; }

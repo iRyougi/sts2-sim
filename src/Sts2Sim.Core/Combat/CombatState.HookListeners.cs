@@ -76,6 +76,8 @@ public sealed partial class CombatState
             _witness = witness;
             Full = full;
             Version = version;
+            // Energy projections preserve unknown candidates for dispatch-time fail-closed.
+            // Star cost remains its separately registered legacy adapter contract.
             var energy = new List<AbstractModel>();
             var late = new List<AbstractModel>();
             var star = new List<AbstractModel>();
@@ -83,8 +85,8 @@ public sealed partial class CombatState
             for (int i = 0; i < full.Length; i++)
             {
                 AbstractModel model = full[i];
-                if (HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Energy)) energy.Add(model);
-                if (HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.EnergyLate)) late.Add(model);
+                if (!Hook.IsKnownHookModelType(model) || HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Energy)) energy.Add(model);
+                if (!Hook.IsKnownHookModelType(model) || HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.EnergyLate)) late.Add(model);
                 if (HookOverrideIndex.MayOverride(model, HookOverrideIndex.CostSlot.Star)) star.Add(model);
                 if (HookOverrideIndex.MayOverride(model, HookOverrideIndex.PileSlot.Normal))
                     _pileCoverage[i] |= (byte)HookOverrideIndex.PileSlot.Normal;

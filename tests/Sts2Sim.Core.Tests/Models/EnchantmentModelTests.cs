@@ -138,8 +138,10 @@ public sealed class EnchantmentModelTests : IDisposable
         }
     }
 
-    private sealed class TraceListener(List<string> trace) : AbstractModel
+    private sealed class TraceListener(List<string> trace) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override Task AfterCardPlayed(CardPlay cardPlay)

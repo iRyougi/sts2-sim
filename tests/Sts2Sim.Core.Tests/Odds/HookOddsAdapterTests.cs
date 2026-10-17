@@ -25,16 +25,20 @@ public class HookOddsAdapterTests
     }
 
     /// <summary>模拟"强制药水掉落"类遗物效果。</summary>
-    private sealed class PotionMagnet : AbstractModel
+    private sealed class PotionMagnet : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => false;
 
         public override bool ShouldForcePotionReward(RoomType roomType) => true;
     }
 
     /// <summary>模拟"?房间不再出怪物战"类效果。</summary>
-    private sealed class PeacefulCharm : AbstractModel
+    private sealed class PeacefulCharm : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => false;
 
         public override IReadOnlySet<RoomType> ModifyUnknownMapPointRoomTypes(IReadOnlySet<RoomType> roomTypes)
@@ -44,8 +48,10 @@ public class HookOddsAdapterTests
     }
 
     /// <summary>模拟"未 roll 中房型概率增长翻倍"类效果。</summary>
-    private sealed class LuckyCoin : AbstractModel
+    private sealed class LuckyCoin : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => false;
 
         public override float ModifyOddsIncreaseForUnrolledRoomType(RoomType roomType, float oddsIncrease)
@@ -55,8 +61,10 @@ public class HookOddsAdapterTests
     }
 
     /// <summary>把 roomTypes 清空的恶性 hook——用于锁定游戏固有崩溃面。</summary>
-    private sealed class VoidCharm : AbstractModel
+    private sealed class VoidCharm : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => false;
 
         public override IReadOnlySet<RoomType> ModifyUnknownMapPointRoomTypes(IReadOnlySet<RoomType> roomTypes)

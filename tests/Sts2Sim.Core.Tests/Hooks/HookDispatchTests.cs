@@ -3,6 +3,7 @@ namespace Sts2Sim.Core.Tests.Hooks;
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
@@ -15,6 +16,170 @@ using Xunit.Abstractions;
 [Collection("ModelDb")] // 创建 AbstractModel 子类实例(构造器读 ModelDb),须与注册表变更测试串行
 public class HookDispatchTests(ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData("materialized-energy")]
+    [InlineData("cost-normal")]
+    [InlineData("cost-late")]
+    [InlineData("piles-normal")]
+    [InlineData("piles-late")]
+    [InlineData("card-entry")]
+    public async Task CapturedCombatCandidates_RecheckEligibilityAtDispatch(string route)
+    {
+        ModelDb.ResetForTests();
+        ModelDb.Init(Sts2Sim.Core.Content.ContentRegistry.AllTypes);
+        try
+        {
+            var run = new RunState("dispatch-eligibility-" + route, new Overgrowth());
+            Player player = Player.CreateForNewRun(ModelDb.Character<Sts2Sim.Core.Models.Characters.Regent>(), run);
+            run.AddPlayer(player);
+            player.ResetCombatState();
+            var state = new CombatState(run);
+            state.AddPlayerCreature(player.Creature);
+            var victim = state.AddMonster((MonsterModel)ModelDb.Monster<Sts2Sim.Core.Models.Monsters.TrainingDummy>().MutableClone(), CombatSide.Enemy);
+            state.AddMonster((MonsterModel)ModelDb.Monster<Sts2Sim.Core.Models.Monsters.TrainingDummy>().MutableClone(), CombatSide.Enemy);
+            var card = (CardModel)ModelDb.Card<Sts2Sim.Core.Models.Cards.StrikeRegent>().MutableClone();
+            card.AssignOwner(player);
+            Sts2Sim.Core.Commands.CardPileCmd.Add(card, PileType.Hand);
+            var first = (EligibilityPower)new EligibilityPower().MutableClone();
+            var removedButAttached = (EligibilityPower)new EligibilityPower().MutableClone();
+            var detached = (EligibilityPower)new EligibilityPower().MutableClone();
+            var added = (EligibilityPower)new EligibilityPower().MutableClone();
+            foreach (var power in new[] { first, removedButAttached, detached, added }) power.Route = route;
+            first.ApplyInternal(player.Creature, 1m);
+            removedButAttached.ApplyInternal(player.Creature, 1m);
+            detached.ApplyInternal(victim, 1m);
+            EligibilityOrb? orb = null;
+            EligibilityMonster? deadButAttached = null;
+            if (route == "materialized-energy")
+            {
+                orb = (EligibilityOrb)new EligibilityOrb().MutableClone();
+                orb.Owner = player;
+                player.PlayerCombatState.OrbQueue.AddCapacity(1);
+                Assert.True(await player.PlayerCombatState.OrbQueue.TryEnqueue(orb));
+                deadButAttached = (EligibilityMonster)new EligibilityMonster().MutableClone();
+                var creature = state.AddMonster(deadButAttached, CombatSide.Enemy);
+                first.RetainDead = creature;
+                await Sts2Sim.Core.Commands.CreatureCmd.Kill(creature);
+                Assert.False(creature.IsAlive);
+                Assert.Same(state, creature.CombatState);
+            }
+            bool changed = false;
+            void ChangeMembership()
+            {
+                Assert.False(changed);
+                changed = true;
+                removedButAttached.RemoveInternal();
+                added.ApplyInternal(player.Creature, 1m);
+                orb?.RemoveInternal();
+            }
+            first.OnSync = () => { state.RemoveCreature(victim); ChangeMembership(); };
+            first.OnAsync = async () => { await Sts2Sim.Core.Commands.CreatureCmd.Kill(victim); ChangeMembership(); };
+            if (route == "materialized-energy") await Hook.AfterEnergySpent(state, card, 1);
+            else if (route.StartsWith("cost-", StringComparison.Ordinal))
+                Assert.Equal(2m, Hook.ModifyEnergyCostInCombat(state, card, 0m));
+            else if (route.StartsWith("piles-", StringComparison.Ordinal))
+                await Hook.AfterCardChangedPiles(run, state, card, PileType.Hand, null);
+            else
+            {
+                // Same raw capture / beforeEntryHook / actual dispatch boundary as CardPileCmd.
+                var candidates = Hook.SnapshotCardEnteredCombatListeners(state);
+                await first.OnAsync();
+                first.OnAsync = null;
+                var invoked = new List<AbstractModel>();
+                await Hook.AfterCardEnteredCombat(candidates, card, invoked);
+                Assert.DoesNotContain(invoked, model => ReferenceEquals(model, detached));
+                // Compensation follows actual invocation even if its owner detached afterwards.
+                state.RemoveCreature(player.Creature);
+                await Hook.AfterCardEntryAborted(invoked, card);
+                Assert.Equal(1, first.Aborts);
+                Assert.Equal(1, removedButAttached.Aborts);
+                Assert.Equal(0, detached.Aborts);
+            }
+            Assert.True(changed, route);
+            Assert.Null(victim.CombatState);
+            Assert.Equal(1, first.Calls);
+            Assert.Equal(1, removedButAttached.Calls);
+            Assert.Equal(0, detached.Calls);
+            Assert.Equal(0, added.Calls);
+            if (orb is not null)
+            {
+                Assert.True(orb.HasBeenRemovedFromState);
+                Assert.Equal(0, orb.Calls);
+                Assert.Equal(1, deadButAttached!.Calls);
+            }
+            if (route == "cost-normal")
+            {
+                // Unknown neutral types must reach qualification, not disappear in override projection.
+                var unknown = new NeutralUnknownCostListener();
+                var unknownState = new CombatState(new FakeRunState(unknown));
+                Assert.Throws<ArgumentOutOfRangeException>(() => Hook.ModifyEnergyCostInCombat(unknownState, card, 0m));
+            }
+        }
+        finally { ModelDb.ResetForTests(); }
+    }
+
+    private sealed class NeutralUnknownCostListener : AbstractModel
+    {
+        public override bool ShouldReceiveCombatHooks => false;
+    }
+
+    private sealed class EligibilityPower : PowerModel
+    {
+        public override Sts2Sim.Core.Entities.Powers.PowerType Type => Sts2Sim.Core.Entities.Powers.PowerType.Buff;
+        public override Sts2Sim.Core.Entities.Powers.PowerStackType StackType => Sts2Sim.Core.Entities.Powers.PowerStackType.Counter;
+        public string Route { get; set; } = "";
+        public int Calls { get; private set; }
+        public int Aborts { get; private set; }
+        public Action? OnSync { get; set; }
+        public Func<Task>? OnAsync { get; set; }
+        public Sts2Sim.Core.Entities.Creatures.Creature? RetainDead { get; set; }
+        public override bool ShouldCreatureBeRemovedFromCombatAfterDeath(Sts2Sim.Core.Entities.Creatures.Creature creature) => creature != RetainDead;
+        private async Task Visit(string route)
+        {
+            if (Route != route) return;
+            Calls++;
+            if (OnAsync is not null) await OnAsync();
+        }
+        private bool Cost(string route, decimal original, out decimal modified)
+        {
+            modified = original;
+            if (Route != route) return false;
+            Calls++;
+            OnSync?.Invoke();
+            modified++;
+            return true;
+        }
+        public override Task AfterEnergySpent(CardModel card, int amount) => Visit("materialized-energy");
+        public override bool TryModifyEnergyCostInCombat(CardModel card, decimal originalCost, out decimal modifiedCost) => Cost("cost-normal", originalCost, out modifiedCost);
+        public override bool TryModifyEnergyCostInCombatLate(CardModel card, decimal originalCost, out decimal modifiedCost) => Cost("cost-late", originalCost, out modifiedCost);
+        public override Task AfterCardChangedPiles(CardModel card, PileType oldPileType, AbstractModel? clonedBy) => Visit("piles-normal");
+        public override Task AfterCardChangedPilesLate(CardModel card, PileType oldPileType, AbstractModel? clonedBy) => Visit("piles-late");
+        public override Task AfterCardEnteredCombat(CardModel card) => Visit("card-entry");
+        public override Task AfterCardEntryAborted(CardModel card) { Aborts++; return Task.CompletedTask; }
+    }
+
+    private sealed class EligibilityOrb : OrbModel
+    {
+        public override decimal PassiveVal => 0m;
+        public override decimal EvokeVal => 0m;
+        public int Calls { get; private set; }
+        public override Task AfterEnergySpent(CardModel card, int amount) { Calls++; return Task.CompletedTask; }
+    }
+
+    private sealed class EligibilityMonster : MonsterModel
+    {
+        public override int MinInitialHp => 10;
+        public override int MaxInitialHp => 10;
+        public int Calls { get; private set; }
+        public override Task AfterEnergySpent(CardModel card, int amount) { Calls++; return Task.CompletedTask; }
+        protected override Sts2Sim.Core.MonsterMoves.MonsterMoveStateMachine GenerateMoveStateMachine()
+        {
+            var move = new Sts2Sim.Core.MonsterMoves.MoveState("WAIT", _ => Task.CompletedTask, new Sts2Sim.Core.MonsterMoves.Intents.SingleAttackIntent(0));
+            move.FollowUpState = move;
+            return new Sts2Sim.Core.MonsterMoves.MonsterMoveStateMachine(new[] { move }, move);
+        }
+    }
+
     private delegate bool CostHook(CardModel card, decimal originalCost, out decimal modifiedCost);
     private delegate Task PileHook(CardModel card, PileType oldPileType, AbstractModel? clonedBy);
 
@@ -71,8 +236,10 @@ public class HookDispatchTests(ITestOutputHelper output)
     }
 
     /// <summary>可编程 fake 监听器:用委托配置每个 hook 的行为,并记录调用。</summary>
-    private sealed class ProbeModel : AbstractModel
+    private sealed class ProbeModel : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => false;
 
         public int Invocations { get; private set; }

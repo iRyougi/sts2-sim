@@ -332,8 +332,10 @@ internal sealed class PileObserverCard : CardModel
     }
 }
 
-file sealed class DrawGateModel : AbstractModel
+file sealed class DrawGateModel : RelicModel
 {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
     public override bool ShouldReceiveCombatHooks => true;
 
     public List<bool> FromHandDrawArguments { get; } = new();

@@ -302,8 +302,10 @@ internal static class OrbFixture
                 .Concat(childCombatState?.IterateHookListeners() ?? []);
     }
 
-    internal sealed class Probe : AbstractModel
+    internal sealed class Probe : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public List<string> Events { get; } = [];
         public override bool ShouldReceiveCombatHooks => true;
         public override Task AfterOrbChanneled(Player player, OrbModel orb)

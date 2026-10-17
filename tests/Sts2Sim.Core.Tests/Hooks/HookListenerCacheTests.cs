@@ -252,13 +252,14 @@ public sealed class HookListenerCacheTests : IDisposable
         beforeNull.Energy = cost => { effects.Add("cost"); return cost + 1m; };
         ((List<PowerModel>)malformed.Player.Creature.Powers).Add(null!);
         Assert.Null(malformed.State.GetHookListenerSnapshot(malformed.Run, CombatState.HookListenerPhase.AfterPiles));
-        await Assert.ThrowsAsync<NullReferenceException>(() => Hook.AfterCardChangedPiles(
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Hook.AfterCardChangedPiles(
             malformed.Run, malformed.State, NewCard(malformed.Player), PileType.Hand, null));
         Assert.Equal(new[] { "hook", "finished" }, effects);
         effects.Clear();
-        Assert.Throws<NullReferenceException>(() => Hook.ModifyEnergyCostInCombat(
+        Assert.Throws<ArgumentOutOfRangeException>(() => Hook.ModifyEnergyCostInCombat(
             malformed.State, NewCard(malformed.Player), 1m, out _));
-        Assert.Empty(effects); // Cost Where/ToArray fails before any cost Hook.
+        Assert.Equal(new[] { "cost" }, effects); // Unknown stays in raw order until actual qualification.
+        effects.Clear();
         ((List<Creature>)malformed.State.Enemies).Add(null!);
         await Assert.ThrowsAsync<NullReferenceException>(() => Hook.AfterCardChangedPiles(
             malformed.Run, malformed.State, NewCard(malformed.Player), PileType.Hand, null));
