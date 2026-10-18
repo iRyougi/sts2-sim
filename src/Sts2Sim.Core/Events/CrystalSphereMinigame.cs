@@ -128,54 +128,12 @@ public sealed class CrystalSphereMinigame
             return CloneResolvedVisibleForRun(owner, rng, mapVisibleItem, mapReward, registerGame);
         }
 
-        var observed = new Dictionary<CrystalSphereItem, int>(ReferenceEqualityComparer.Instance);
-        foreach (CrystalSphereItem item in _revealed)
-            observed[item] = observed.GetValueOrDefault(item) + 1;
-        while (true)
-        {
-            // A fresh native constructor determines its own placements, short-circuit
-            // failures, ten-batch limit and accumulated subscriptions. Never read the
-            // source's _items, _occupants, batch count or RNG state to drive generation.
-            var candidate = new CrystalSphereMinigame(owner, rng, DivinationCount);
-            if (candidate.PlacedAllItems != PlacedAllItems) continue;
-            var visible = new Dictionary<CrystalSphereItem, CrystalSphereItem>(ReferenceEqualityComparer.Instance);
-            bool matches = true;
-            foreach (CrystalSphereItem item in candidate._items)
-            {
-                if (item.Position is not { } position) continue;
-                bool fullyVisible = true;
-                for (int dx = 0; dx < item.Width; dx++)
-                    for (int dy = 0; dy < item.Height; dy++)
-                        if (_hidden[position.X + dx, position.Y + dy]) fullyVisible = false;
-                if (!fullyVisible) continue;
-                CrystalSphereItem? prior = null;
-                foreach (var observation in observed)
-                {
-                    CrystalSphereItem known = observation.Key;
-                    if (known.Position != item.Position || known.Kind != item.Kind ||
-                        known.CardRarity != item.CardRarity || known.PotionRarity != item.PotionRarity ||
-                        known.IsBigGold != item.IsBigGold || known.Width != item.Width ||
-                        known.Height != item.Height || observation.Value != item.RevealSubscriptions) continue;
-                    prior = known;
-                    break;
-                }
-                if (prior is null || !visible.TryAdd(prior, item)) { matches = false; break; }
-            }
-            if (!matches || visible.Count != observed.Count) continue;
-
-            registerGame(this, candidate);
-            Array.Copy(_hidden, candidate._hidden, _hidden.Length);
-            foreach (var pair in visible)
-            {
-                pair.Value.IsRevealed = true;
-                registerVisibleItem(pair.Key, pair.Value);
-            }
-            foreach (CrystalSphereItem item in _revealed) candidate._revealed.Add(visible[item]);
-            candidate.Rewards = Array.AsReadOnly(Rewards.Select(mapReward).ToArray());
-            // No Clear/RevealAsync/CreateReward is invoked: visible curse/card side effects
-            // already occurred in the source and must not execute again in the branch.
-            return candidate;
-        }
+        // #563: this event's layout (including fixed gold/Doubt) is an approved
+        // information-boundary exception. Copy it through the existing identity map;
+        // future potion/card/relic content still uses this clone's RNG at settlement.
+        // The copy constructor creates a fresh reveal gate and invokes no reveal,
+        // reward, curse or RNG side effects. Never rejection-sample a late board.
+        return new CrystalSphereMinigame(this, owner, rng, mapVisibleItem, mapReward, registerGame);
     }
 
     private CrystalSphereMinigame(Player owner, Rng rng)

@@ -86,7 +86,7 @@ internal static class ImaginationHiddenStateRegistry
         Event("BattlewornDummy", V, history, "_selectedTier");
         Event("ColossalFlower", V, history, "_dig");
         Event("CrystalSphere", V, visible, "<UncoverFutureCost>k__BackingField");
-        Event("CrystalSphere", H, "Game contains concealed pre-placed board occupants; reroll them while retaining revealed cells and items.", "<Game>k__BackingField");
+        Event("CrystalSphere", V, "#563 layout exception includes fixed 10/30 gold and Doubt; future random rewards use the clone RNG at native settlement time.", "<Game>k__BackingField");
         Event("DenseVegetation", V, "Displayed event gold DynamicVar.", "_gold");
         Event("EndlessConveyor", V, history, "_lastDishId _currentDishId _numOfGrabs");
         Event("FakeMerchant", N, runtime, "_interactionGate");

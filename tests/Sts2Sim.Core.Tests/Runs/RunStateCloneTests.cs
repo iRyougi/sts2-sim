@@ -247,6 +247,8 @@ public sealed partial class RunStateCloneTests
     [Theory]
     [InlineData("tablet-decipher")]
     [InlineData("hidden-preroll")]
+    [InlineData("sphere-late-1")]
+    [InlineData("sphere-late-2")]
     [InlineData("reward-visible")]
     [InlineData("registry-coverage")]
     public async Task CloneReseeded_InRoomUsesOnlyVisibleConditions(string scenario)
@@ -274,37 +276,94 @@ public sealed partial class RunStateCloneTests
             Assert.Equal(before, RunCloneGraphSnapshot.Capture(source));
             return;
         }
-        if (scenario == "hidden-preroll")
+        if (scenario is "hidden-preroll" or "sphere-late-1" or "sphere-late-2")
         {
-            var source = NewVisibleRun("in-room-" + scenario);
+            var source = NewVisibleRun("in-room-hidden-preroll");
             source.Players[0].Gold = 500;
             var room = await EnterEventAsync<CrystalSphere>(source);
-            await room.Event.ChooseOption(room.Event.CurrentOptions[0]);
+            await room.Event.ChooseOption(room.Event.CurrentOptions[1]);
             var original = Assert.IsType<CrystalSphere>(room.Event);
-            await original.RevealAsync(1, 1, big: false);
+            var game = original.Game!;
+            var potion = game.Items.First(i => i.Kind == CrystalSphereItemKind.Potion && i.Position.HasValue);
+            var card = game.Items.First(i => i.Kind == CrystalSphereItemKind.CardReward && i.Position.HasValue);
+            if (scenario != "hidden-preroll")
+            {
+                foreach (var gold in game.Items.Where(i => i.Kind == CrystalSphereItemKind.Gold &&
+                    !i.IsBigGold && i.Position.HasValue).Take(2).ToArray())
+                    await original.RevealAsync(gold.Position!.Value.X, gold.Position.Value.Y, big: false);
+                await original.RevealAsync(potion.Position!.Value.X, potion.Position.Value.Y + 1);
+                await original.RevealAsync(card.Position!.Value.X, card.Position.Value.Y);
+                if (scenario == "sphere-late-1") await original.RevealAsync(0, 0, big: false);
+                Assert.Equal(scenario == "sphere-late-1" ? 1 : 2, game.DivinationCount);
+                Assert.True(game.RevealedItems.Count >= 3, $"{scenario}: late board must have multiple revealed items");
+            }
             RunState variant = source.CloneExact();
+
             var variantGame = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(variant.CurrentRoom).Event).Game!;
-            var concealedItems = (List<CrystalSphereItem>)typeof(CrystalSphereMinigame).GetField("_items", PrivateFields)!.GetValue(variantGame)!;
-            concealedItems.Reverse();
+            // Layout is the #563 exception; only old RNG/hidden future may vary here.
             ((Rng)typeof(CrystalSphereMinigame).GetField("_rng", PrivateFields)!.GetValue(variantGame)!).NextInt(97);
             HiddenFutureCounterfactual.Change(variant);
             var before = RunCloneGraphSnapshot.Capture(source);
+            var timer = System.Diagnostics.Stopwatch.StartNew();
             RunState first = source.CloneReseeded(91);
+            timer.Stop();
+            Console.WriteLine($"#563 {scenario}: CloneReseeded {timer.Elapsed.TotalMilliseconds:F3} ms");
+            Assert.True(timer.Elapsed < TimeSpan.FromMilliseconds(100),
+                $"{scenario}: one clone took {timer.Elapsed.TotalMilliseconds:F3} ms");
             RunState second = variant.CloneReseeded(91);
+            RunState different = source.CloneReseeded(92);
             var a = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(first.CurrentRoom).Event);
             var b = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(second.CurrentRoom).Event);
+            var c = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(different.CurrentRoom).Event);
             Assert.Equal(original.UncoverFutureCost, a.UncoverFutureCost);
-            Assert.Equal(original.Game!.DivinationCount, a.Game!.DivinationCount);
-            Assert.Equal(original.Game.PlacedAllItems, a.Game.PlacedAllItems);
-            Assert.Equal(original.Game.RevealedItems.Select(SphereItemState), a.Game.RevealedItems.Select(SphereItemState));
-            for (int x = 0; x < 11; x++) for (int y = 0; y < 11; y++)
-                Assert.Equal(original.Game.IsHidden(x, y), a.Game.IsHidden(x, y));
-            Assert.Equal(a.Game.Items.Select(SphereItemState), b.Game!.Items.Select(SphereItemState));
-            await a.RevealAsync(5, 5);
-            await b.RevealAsync(5, 5);
-            Assert.Equal(a.Game.RevealedItems.Select(SphereItemState), b.Game.RevealedItems.Select(SphereItemState));
-            Assert.Equal(first.Players[0].Deck.Cards.Select(c => c.Id), second.Players[0].Deck.Cards.Select(c => c.Id));
-            Assert.Equal(before, RunCloneGraphSnapshot.Capture(source));
+            foreach (var clone in new[] { a, b, c })
+            {
+                Assert.Equal(game.DivinationCount, clone.Game!.DivinationCount);
+                Assert.Equal(game.PlacedAllItems, clone.Game.PlacedAllItems);
+                Assert.Equal(game.Items.Select(SphereItemState), clone.Game.Items.Select(SphereItemState));
+                Assert.Equal(game.RevealedItems.Select(SphereItemState), clone.Game.RevealedItems.Select(SphereItemState));
+                for (int x = 0; x < 11; x++) for (int y = 0; y < 11; y++)
+                    Assert.Equal(game.IsHidden(x, y), clone.Game.IsHidden(x, y));
+                for (int i = 0; i < game.Items.Count; i++) Assert.NotSame(game.Items[i], clone.Game.Items[i]);
+                Assert.Empty(clone.Game.Rewards);
+            }
+            // Fully uncover the same potion/card and finish at the same cell in every world.
+            var outcomes = new List<string>();
+            foreach (var ev in new[] { a, b, c, original })
+            {
+                if (ReferenceEquals(ev, original)) Assert.Equal(before, RunCloneGraphSnapshot.Capture(source));
+                var current = ev.Game!;
+                var rng = (Rng)typeof(CrystalSphereMinigame).GetField("_rng", PrivateFields)!.GetValue(current)!;
+                var probe = rng.CloneExact();
+                int counter = rng.Counter;
+                if (scenario == "hidden-preroll")
+                {
+                    await ev.RevealAsync(potion.Position!.Value.X, potion.Position.Value.Y + 1);
+                    await ev.RevealAsync(card.Position!.Value.X, card.Position.Value.Y);
+                    Assert.Empty(current.Rewards);
+                    Assert.Equal(counter, rng.Counter);
+                }
+                while (current.DivinationCount > 1) await ev.RevealAsync(0, 0, big: false);
+                await ev.RevealAsync(0, 0, big: false);
+                var expectedPotions = current.RevealedItems.Where(i => i.Kind == CrystalSphereItemKind.Potion)
+                    .Select(i => probe.NextItem(Sts2Sim.Core.Factories.PotionFactory.GetOutOfCombatPool(ev.Owner)
+                        .Where(p => p.Rarity == i.PotionRarity))!.Id).ToArray();
+                Assert.NotEmpty(expectedPotions);
+                Assert.Equal(expectedPotions, current.Rewards.OfType<PotionReward>().Select(r => r.Potion!.Id));
+                outcomes.Add(string.Join(";", current.Rewards.Select(r => r switch
+                {
+                    PotionReward p => "potion:" + p.Potion!.Id,
+                    CardReward reward => "cards:" + string.Join(",", reward.Options.Select(o => (o.Id, o.IsUpgraded))),
+                    RelicReward relic => "relic:" + relic.Relic!.Id,
+                    GoldReward gold => "gold:" + gold.Amount,
+                    _ => r.GetType().Name,
+                })));
+            }
+            Assert.Equal(outcomes[0], outcomes[1]); // Same new seed ignores old RNG/future.
+            Assert.NotEqual(outcomes[0], outcomes[2]); // Different new seeds can change actual content.
+            Assert.NotEqual(outcomes[0], outcomes[3]); // Source result is not copied.
+            // Only the explicit source continuation above may mutate the source world.
+            Assert.NotEqual(before, RunCloneGraphSnapshot.Capture(source));
             await AssertPreparedEventCounterfactualAsync<TheLanternKey>();
             await AssertPreparedEventCounterfactualAsync<PunchOff>();
             return;
