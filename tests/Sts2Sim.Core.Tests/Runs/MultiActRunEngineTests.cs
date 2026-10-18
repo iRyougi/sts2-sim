@@ -133,6 +133,37 @@ public sealed class MultiActRunEngineTests : IDisposable
         Assert.Equal([0, 1], mapDecisionActIndices);
         Assert.Equal([1], ancientFactoryActIndices);
         Assert.Equal(2, runState.VisitedMapCoords.Count);
+
+        if (obtainCompass)
+        {
+            // #557: clone inside an Ancient choice, then replace its map on continuation.
+            RunState? pending = null;
+            for (int fixture = 0; fixture < 32 && pending is null; fixture++)
+            {
+                var candidate = new RunState($"resume-ancient-compass-{fixture}",
+                    new ActDefinition[] { new MultiActTestAct(0), new Hive() });
+                candidate.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Regent>(), candidate));
+                candidate.AdvanceToNextAct();
+                candidate.AddVisitedMapCoord(candidate.Map.StartingMapPoint.coord);
+                var room = new EventRoom(() => (EventModel)ModelDb.Event<Tezcatara>().MutableClone());
+                candidate.PushRoom(room);
+                await room.Enter(candidate);
+                if (room.Event.CurrentOptions.Any(option => option.Key == nameof(GoldenCompass)))
+                    pending = candidate;
+            }
+            Assert.NotNull(pending);
+            RunState clone = pending.CloneExact();
+            var oldMap = clone.Map;
+            var continuedMapDecisions = new List<int>();
+            RunDriver.Result continued = await new RunDriver(clone,
+                new MultiActDriverDecisionSource(clone, continuedMapDecisions, obtainCompass: true))
+                .ContinueAsync(maxFloors: 2);
+            Assert.NotSame(oldMap, clone.Map);
+            Assert.Equal(2, continued.FloorsVisited);
+            Assert.Equal([1], continuedMapDecisions);
+            Assert.Same(clone.Map.GetPoint(clone.CurrentMapPoint!.coord), clone.CurrentMapPoint);
+            Assert.DoesNotContain(pending.Players[0].Relics, relic => relic is GoldenCompass);
+        }
     }
 
     [Fact]
@@ -357,7 +388,7 @@ public sealed class MultiActRunEngineTests : IDisposable
             Task.FromResult<CombatDecision>(new CombatDecision.EndTurn());
 
         public Task<EventOption> ChooseEventOptionAsync(IReadOnlyList<EventOption> options) =>
-            Task.FromResult(options[0]);
+            Task.FromResult(options.FirstOrDefault(option => obtainCompass && option.Key == nameof(GoldenCompass)) ?? options[0]);
 
         public Task<RewardDecision> ChooseRewardActionAsync(RewardsSet rewards) =>
             Task.FromResult(RewardDecisionPolicy.Choose(rewards));

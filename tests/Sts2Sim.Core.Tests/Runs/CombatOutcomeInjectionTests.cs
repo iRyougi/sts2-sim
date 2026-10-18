@@ -5,6 +5,9 @@ using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Relics;
+using Sts2Sim.Core.Models.Potions;
+using Sts2Sim.Core.Models.Powers;
+using Sts2Sim.Core.Reporting;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 
@@ -27,8 +30,19 @@ public sealed class CombatOutcomeInjectionTests
         RunState run = row == "live-rejected" ? original.CloneExact() : original.CloneReseeded(42);
         MapPoint target = run.Map.StartingMapPoint.Children.OrderBy(point => point.coord.col).First();
         Assert.True(target.PointType == MapPointType.Monster, $"seed={seed}, coord={target.coord}");
-        var source = new InjectionSource(row == "died");
-        var driver = new RunDriver(run, source);
+        RunRecorder? recorder = null;
+        if (row == "survived")
+        {
+            run.Players[0].AddPotionInternal(ModelDb.Potion<DexterityPotion>());
+            run.Players[0].AddPotionInternal(ModelDb.Potion<FirePotion>());
+            var relic = (ReptileTrinket)ModelDb.Relic<ReptileTrinket>().MutableClone();
+            relic.AssignOwner(run.Players[0]);
+            run.Players[0].AddRelicInternal(relic);
+            recorder = new RunRecorder();
+            recorder.BeginRun(run);
+        }
+        var source = new InjectionSource(row == "died", row == "survived" ? [0] : []);
+        var driver = new RunDriver(run, source, recorder: recorder);
         if (row == "live-rejected")
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => driver.RunOneCombatFromTransplantAsync(target));
@@ -44,6 +58,13 @@ public sealed class CombatOutcomeInjectionTests
             Assert.NotEmpty(room.GeneratedRewards);
             Assert.True(run.Players[0].Creature.CurrentHp == 7, $"seed={seed}, hp={run.Players[0].Creature.CurrentHp}");
             Assert.True(run.Players[0].PlayerCombatState!.TurnNumber == source.StartTurn, $"seed={seed}");
+            Assert.True(run.Players[0].PotionSlots[0] is null && run.Players[0].PotionSlots[1] is FirePotion,
+                $"seed={seed}: consume only the specified slot before rewards");
+            Assert.True(!run.Players[0].Creature.HasPower<DexterityPower>() &&
+                !run.Players[0].Creature.HasPower<ReptileTrinketPower>(), $"seed={seed}: silent removal must not apply potion effects/hooks");
+            recorder!.ExitFloor();
+            recorder.EndRun(false, 1, 7, survived: true, truncated: true);
+            Assert.Empty(recorder.CombatLogs.Values.SelectMany(log => log.Turns).SelectMany(turn => turn.Actions).OfType<UsePotionAction>());
             // Approved missing invariant: an opening victory must keep its real result,
             // with no sampling, HP overwrite, or second conclusion.
             RunState opening = original.CloneReseeded(43);
@@ -65,7 +86,7 @@ public sealed class CombatOutcomeInjectionTests
         }
     }
 
-    private sealed class InjectionSource(bool died) : IRunDecisionSource, ICombatOutcomeOverride
+    private sealed class InjectionSource(bool died, IReadOnlyList<int>? consumed = null) : IRunDecisionSource, ICombatOutcomeOverride
     {
         public int StartTurn { get; private set; }
         public int Calls { get; private set; }
@@ -73,7 +94,7 @@ public sealed class CombatOutcomeInjectionTests
         {
             Calls++;
             StartTurn = run.Players[0].PlayerCombatState!.TurnNumber;
-            return new InjectedCombatOutcome(died, 7);
+            return new InjectedCombatOutcome(died, 7) { ConsumedPotionSlots = consumed ?? [] };
         }
         public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options) => Task.FromResult(options[0]);
         public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) =>

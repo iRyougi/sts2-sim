@@ -178,6 +178,9 @@ public sealed class RunDriver
             NonCombatPlayerSnapshot? eventBefore = null;
             CombatRecordingObserver? combatObserver = null;
             bool resumingRoom = resumedRoom is not null;
+            bool resumingAncientStart = resumingRoom &&
+                current.PointType == MapPointType.Ancient &&
+                ReferenceEquals(current, _runState.Map.StartingMapPoint);
             if (resumingRoom)
             {
                 chosen = current;
@@ -407,7 +410,8 @@ public sealed class RunDriver
                 continue;
             }
 
-            current = chosen;
+            // A resumed Ancient choice can replace the map just like normal act entry.
+            current = resumingAncientStart ? _runState.Map.StartingMapPoint : chosen;
         }
 
         return CompleteRun(
@@ -584,7 +588,16 @@ public sealed class RunDriver
                 player.Creature.SetCurrentHpInternal(0);
                 engine.ConcludeForImagination(won: false);
             }
-            else engine.ConcludeForImagination(won: true);
+            else
+            {
+                engine.ConcludeForImagination(won: true);
+                foreach (int slot in injected.ConsumedPotionSlots)
+                {
+                    if (slot < 0 || slot >= player.PotionSlots.Count || player.PotionSlots[slot] is not { } potion)
+                        throw new InvalidOperationException($"Injected consumed potion slot is empty or out of range: {slot}.");
+                    player.RemovePotionInternal(potion);
+                }
+            }
             await combatRoom.ResolveOutcomeAsync(generateRewards);
             if (!injected.Died)
                 player.Creature.SetCurrentHpInternal(Math.Clamp(injected.RemainingHp, 1, player.Creature.MaxHp));
