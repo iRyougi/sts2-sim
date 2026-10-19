@@ -146,20 +146,24 @@ public sealed class GeneratedCardRepairTask2Tests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, 14)]
-    [InlineData(true, 21)]
+    [InlineData(false, 14, "none")]
+    [InlineData(true, 21, "none")]
+    [InlineData(false, 14, "add")]
+    [InlineData(false, 14, "remove")]
     public async Task MeteorShower_DebuffsOnlyEnemiesStillHittableAfterDamage(
         bool upgraded,
-        int expectedDamage)
+        int expectedDamage,
+        string mutation)
     {
         (Player[] players, CombatRoom room) = await CreateCombatAsync(
-            $"task2-meteor-{upgraded}",
+            $"task2-meteor-{upgraded}-{mutation}",
             playerCount: 1,
-            enemyCount: 3);
+            enemyCount: mutation == "none" ? 3 : 4);
         Player owner = players[0];
         Creature defeated = room.Engine.State.Enemies[0];
         Creature becameUnhittable = room.Engine.State.Enemies[1];
         Creature hittable = room.Engine.State.Enemies[2];
+        Creature? laterTarget = mutation == "none" ? null : room.Engine.State.Enemies[3];
         defeated.LoseHpInternal(defeated.CurrentHp - 1m, ValueProp.Unblockable);
         await PowerCmd.Apply<Task2UnhittableAfterDamagePower>(
             room.Engine.State,
@@ -169,6 +173,23 @@ public sealed class GeneratedCardRepairTask2Tests : IDisposable
             cardSource: null);
         int unhittableHpBefore = becameUnhittable.CurrentHp;
         int hittableHpBefore = hittable.CurrentHp;
+        var changes = new List<(bool Weak, Creature Target)>();
+        Creature? spawned = null;
+        bool mutated = false;
+        Task2UnhittableAfterDamagePower probe = Assert.Single(
+            becameUnhittable.Powers.OfType<Task2UnhittableAfterDamagePower>());
+        probe.OnPowerChanged = power =>
+        {
+            if (power is not (WeakPower or VulnerablePower)) return;
+            changes.Add((power is WeakPower, power.Owner));
+            if (mutated || power is not WeakPower || power.Owner != hittable) return;
+            mutated = true;
+            if (mutation == "add")
+                spawned = room.Engine.State.AddMonster(
+                    (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+            else if (mutation == "remove")
+                room.Engine.State.RemoveCreature(laterTarget!);
+        };
         MeteorShower card = AddToHand<MeteorShower>(owner);
         if (upgraded)
         {
@@ -185,6 +206,19 @@ public sealed class GeneratedCardRepairTask2Tests : IDisposable
         AssertNoWeakOrVulnerable(becameUnhittable);
         Assert.Equal(2, Assert.Single(hittable.Powers.OfType<WeakPower>()).Amount);
         Assert.Equal(2, Assert.Single(hittable.Powers.OfType<VulnerablePower>()).Amount);
+        Assert.True(mutated, $"mutation={mutation}: first Weak hook must run");
+        Creature[] weakTargets = laterTarget is not null && mutation != "remove"
+            ? [hittable, laterTarget] : [hittable];
+        Creature[] vulnerableTargets = mutation == "add"
+            ? [hittable, laterTarget!, Assert.IsType<Creature>(spawned)] : [hittable];
+        Assert.Equal(weakTargets.Select(target => (true, target))
+            .Concat(vulnerableTargets.Select(target => (false, target))), changes);
+        if (spawned is not null)
+        {
+            Assert.Null(spawned.GetPower<WeakPower>());
+            Assert.Equal(2, spawned.GetPower<VulnerablePower>()?.Amount);
+        }
+        if (mutation == "remove") AssertNoWeakOrVulnerable(laterTarget!);
     }
 
     [Theory]
@@ -369,12 +403,21 @@ file sealed class Task2AlwaysUnhittablePower : PowerModel
 
 file sealed class Task2UnhittableAfterDamagePower : PowerModel
 {
+    public Action<PowerModel>? OnPowerChanged { get; set; }
+
     public override PowerType Type => PowerType.Buff;
 
     public override PowerStackType StackType => PowerStackType.Single;
 
     public override bool ShouldAllowHitting(Creature creature) =>
         creature != Owner || Owner.CurrentHp == Owner.MaxHp;
+
+    public override Task AfterPowerAmountChanged(
+        PowerModel power, decimal amount, Creature? applier, CardModel? cardSource)
+    {
+        if (cardSource is MeteorShower) OnPowerChanged?.Invoke(power);
+        return Task.CompletedTask;
+    }
 }
 
 file sealed class Task2DamageObserver : ICombatObserver

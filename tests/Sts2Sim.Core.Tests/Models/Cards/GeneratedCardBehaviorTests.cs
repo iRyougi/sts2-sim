@@ -299,6 +299,34 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
         await PlayerCmd.GainStars(2, resonancePlayer);
         await resonance.PlayAsync(target: null);
         Assert.Equal(2m, resonancePlayer.Creature.GetPower<StrengthPower>()!.Amount);
+
+        // Ruling #580: roster add/remove during a power hook is outside single-player scope.
+        if (mutation is "add" or "remove") return;
+
+        (Player sharedOwner, CombatRoom sharedRoom) = await CreateCombatAsync(
+            $"one-for-all-{mutation}", playerCount: 2);
+        var sharedRun = (RunState)sharedRoom.Engine.State.RunState;
+        Player sharedAlly = sharedRun.Players[1];
+        var runPlayers = (List<Player>)sharedRun.Players;
+        // Native Players is the combat projection, even when the run roster changes.
+        if (mutation == "none") runPlayers.Remove(sharedAlly);
+        var sharedProbe = (GeneratedDebuffMutationRelic)ModelDb.Relic<GeneratedDebuffMutationRelic>().MutableClone();
+        sharedProbe.AssignOwner(sharedOwner);
+        sharedOwner.AddRelicInternal(sharedProbe);
+        bool sharedMutated = false;
+        sharedProbe.OnPowerChanged = power =>
+        {
+            if (sharedMutated || power is not OneForAllPower || power.Owner != sharedOwner.Creature) return;
+            sharedMutated = true;
+            if (mutation == "kill") sharedAlly.Creature.SetCurrentHpInternal(0);
+        };
+        OneForAll shared = AddToHand<OneForAll>(sharedOwner);
+        shared.Upgrade();
+        await shared.PlayAsync(target: null);
+        Assert.True(sharedMutated, $"mutation={mutation}: OneForAll hook must run");
+        Assert.Equal(4, sharedOwner.Creature.GetPower<OneForAllPower>()?.Amount);
+        Assert.Equal(4, sharedAlly.Creature.GetPower<OneForAllPower>()?.Amount);
+        Assert.True(sharedRoom.Engine.State.ContainsCreature(sharedAlly.Creature));
     }
 
     [Fact]
@@ -429,11 +457,13 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
         Assert.Equal(expectedDraw, player.PlayerCombatState.Hand.Cards.Count);
     }
 
-    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed)
+    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed, int playerCount = 1)
     {
         var runState = new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
+        for (int index = 1; index < playerCount; index++)
+            runState.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Regent>(), runState));
         var room = new CombatRoom(() => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);
         return (player, room);
@@ -449,7 +479,7 @@ file sealed class GeneratedDebuffMutationRelic : RelicModel
     public override Task AfterPowerAmountChanged(
         PowerModel power, decimal amount, Creature? applier, CardModel? cardSource)
     {
-        if (cardSource is Shockwave)
+        if (cardSource is Shockwave or OneForAll)
             OnPowerChanged?.Invoke(power);
         return Task.CompletedTask;
     }
