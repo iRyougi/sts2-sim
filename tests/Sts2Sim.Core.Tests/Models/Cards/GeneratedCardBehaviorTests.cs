@@ -1,10 +1,12 @@
 using System.Reflection;
 using Sts2Sim.Core.Commands;
+using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
@@ -22,7 +24,7 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
     public GeneratedCardBehaviorTests()
     {
         ModelDb.ResetForTests();
-        ModelDb.Init(ContentRegistry.AllTypes);
+        ModelDb.Init(ContentRegistry.AllTypes.Append(typeof(GeneratedDebuffMutationRelic)));
     }
 
     public void Dispose() => ModelDb.ResetForTests();
@@ -202,8 +204,12 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
         Assert.Empty(offenders);
     }
 
-    [Fact]
-    public async Task UpgradedGeneratedCards_ApplyTransferredResourceAndPowerAmounts()
+    [Theory]
+    [InlineData("none")]
+    [InlineData("add")]
+    [InlineData("remove")]
+    [InlineData("kill")]
+    public async Task UpgradedGeneratedCards_ApplyTransferredResourceAndPowerAmounts(string mutation)
     {
         (Player energyPlayer, _) = await CreateCombatAsync("upgrade-energy");
         BelieveInYou energy = AddToHand<BelieveInYou>(energyPlayer);
@@ -222,10 +228,56 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
         Shockwave debuff = AddToHand<Shockwave>(debuffPlayer);
         debuff.Upgrade();
         debuffPlayer.PlayerCombatState!.Energy = 2;
+        CombatState combat = debuffRoom.Engine.State;
+        Creature enemy = combat.HittableEnemies.Single();
+        Creature laterTarget = combat.AddMonster(
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+        Creature alreadyDead = combat.AddMonster(
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+        alreadyDead.SetCurrentHpInternal(0);
+        Creature? spawned = null;
+        var probe = (GeneratedDebuffMutationRelic)ModelDb.Relic<GeneratedDebuffMutationRelic>().MutableClone();
+        probe.AssignOwner(debuffPlayer);
+        debuffPlayer.AddRelicInternal(probe);
+        bool mutated = false;
+        probe.OnPowerChanged = power =>
+        {
+            if (mutated || power is not WeakPower || power.Owner != enemy)
+                return;
+            mutated = true;
+            switch (mutation)
+            {
+                case "add":
+                    spawned = combat.AddMonster(
+                        (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+                    break;
+                case "remove":
+                    combat.RemoveCreature(laterTarget);
+                    break;
+                case "kill":
+                    // Native CanReceivePowers permits a dead target still attached to combat.
+                    laterTarget.SetCurrentHpInternal(0);
+                    break;
+            }
+        };
+
         await debuff.PlayAsync(target: null);
-        Creature enemy = debuffRoom.Engine.State.HittableEnemies.Single();
+
+        Assert.True(mutated, $"mutation={mutation}: power hook must execute");
         Assert.Equal(5m, enemy.GetPower<WeakPower>()!.Amount);
         Assert.Equal(5m, enemy.GetPower<VulnerablePower>()!.Amount);
+        Assert.Equal(mutation == "remove" ? null : (decimal?)5m, laterTarget.GetPower<WeakPower>()?.Amount);
+        Assert.Equal(mutation == "remove" ? null : (decimal?)5m, laterTarget.GetPower<VulnerablePower>()?.Amount);
+        Assert.Null(alreadyDead.GetPower<WeakPower>());
+        Assert.Null(alreadyDead.GetPower<VulnerablePower>());
+        if (mutation == "add")
+        {
+            Assert.NotNull(spawned);
+            Assert.Null(spawned.GetPower<WeakPower>());
+            Assert.Null(spawned.GetPower<VulnerablePower>());
+        }
+        Assert.Equal(mutation != "remove", combat.ContainsCreature(laterTarget));
+        Assert.Equal(mutation == "kill", laterTarget.IsDead);
 
         (Player vigorPlayer, _) = await CreateCombatAsync("upgrade-vigor");
         Terraforming vigor = AddToHand<Terraforming>(vigorPlayer);
@@ -385,5 +437,20 @@ public sealed class GeneratedCardBehaviorTests : IDisposable
         var room = new CombatRoom(() => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);
         return (player, room);
+    }
+}
+
+file sealed class GeneratedDebuffMutationRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.None;
+
+    public Action<PowerModel>? OnPowerChanged { get; set; }
+
+    public override Task AfterPowerAmountChanged(
+        PowerModel power, decimal amount, Creature? applier, CardModel? cardSource)
+    {
+        if (cardSource is Shockwave)
+            OnPowerChanged?.Invoke(power);
+        return Task.CompletedTask;
     }
 }
