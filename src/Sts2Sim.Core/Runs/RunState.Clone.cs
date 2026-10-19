@@ -30,6 +30,7 @@ public sealed partial class RunState
             ? act.CloneForVisibleHistory() : act.CloneForRun()).ToArray();
         _readOnlyActs = Array.AsReadOnly(_acts);
         CurrentActIndex = source.CurrentActIndex;
+        EntryPhase = source.EntryPhase;
         Ascension = source.Ascension; // AscensionManager contains only an immutable level.
         Progress = source.Progress; // Immutable record.
         WongoPointsEarned = source.WongoPointsEarned;
@@ -95,7 +96,7 @@ public sealed partial class RunState
             if (original is CardModel sourceCard) cardMap.TryAdd(sourceCard, (CardModel)copied);
         }
         Map = source.Map.CloneForRun(modelMap, imagination
-            ? new Rng(rng.Seed, source.Map is SpoilsActMap
+            ? new Rng(rng.Seed, source.Map is SpoilsActMap or ActEntryMapState { Kind: nameof(SpoilsActMap) }
                 ? "spoils_map" : $"act_{CurrentActIndex + 1}_map") : null);
 
         if (!imagination && source._generatedRooms is not null)

@@ -17,7 +17,7 @@ internal static class RunCloneFieldRegistry
     {
         var fields = new Dictionary<string, (RunCloneFieldClass, string)>();
         Register<RunState>(fields,
-            cloned: "_players _acts _readOnlyActs _generatedRooms _visitedMapCoords _completedActFloors _selectingMapEventBeforeHistoryAppend _currentMapPointHasShop <PreviousMapPointHasShop>k__BackingField _currentRooms _visibleMapVisits _unknownMapPointEntriesThisAct _activeRewardOffers <ForcedCombatResumeOutcome>k__BackingField _eventSequence _visitedEventIds _visitedAncientTypes _hasVisibleAncientHistory _normalEncounterSequence _eliteEncounterSequence _bossEncounter _secondBossEncounter _bossEncountersVisited _eventsVisited _normalEncountersVisited _eliteEncountersVisited _nextRoomId <Rng>k__BackingField <Odds>k__BackingField <WongoPointsEarned>k__BackingField <FreedRepy>k__BackingField _completedQuests _currentAncientEventType <SharedRelicGrabBag>k__BackingField <Map>k__BackingField <CurrentActIndex>k__BackingField <IsImaginationClone>k__BackingField",
+            cloned: "_players _acts _readOnlyActs _generatedRooms _visitedMapCoords _completedActFloors _selectingMapEventBeforeHistoryAppend _currentMapPointHasShop <PreviousMapPointHasShop>k__BackingField _currentRooms _visibleMapVisits _unknownMapPointEntriesThisAct _activeRewardOffers <ForcedCombatResumeOutcome>k__BackingField _eventSequence _visitedEventIds _visitedAncientTypes _hasVisibleAncientHistory _normalEncounterSequence _eliteEncounterSequence _bossEncounter _secondBossEncounter _bossEncountersVisited _eventsVisited _normalEncountersVisited _eliteEncountersVisited _nextRoomId <Rng>k__BackingField <Odds>k__BackingField <WongoPointsEarned>k__BackingField <FreedRepy>k__BackingField _completedQuests _currentAncientEventType <SharedRelicGrabBag>k__BackingField <Map>k__BackingField <CurrentActIndex>k__BackingField <EntryPhase>k__BackingField <IsImaginationClone>k__BackingField",
             shared: "<Ascension>k__BackingField <Progress>k__BackingField",
             rejected: "<CardSelectionSource>k__BackingField _nextEncounterForTransplant");
         Register<Player>(fields,
@@ -26,6 +26,8 @@ internal static class RunCloneFieldRegistry
         Register<ActDefinition>(fields,
             cloned: "_weakMonsterEncounterState _regularMonsterEncounterState _eliteEncounterState _lastMonsterEncounter _monsterEncountersPicked");
         Register<ActMap>(fields, cloned: "startMapPoints");
+        Register<RunState.ActEntryMapState>(fields,
+            cloned: "<Kind>k__BackingField <StartingMapPoint>k__BackingField <BossMapPoint>k__BackingField <SecondBossMapPoint>k__BackingField <Grid>k__BackingField");
         Register<StandardActMap>(fields,
             cloned: "_pointTypeCounts _mapLength _rng <BossMapPoint>k__BackingField <StartingMapPoint>k__BackingField <SecondBossMapPoint>k__BackingField <Grid>k__BackingField");
         Register<SpoilsActMap>(fields,

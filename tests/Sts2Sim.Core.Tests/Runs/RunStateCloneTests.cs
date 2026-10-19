@@ -376,7 +376,7 @@ public sealed partial class RunStateCloneTests
         }
         ImaginationHiddenStateRegistry.ValidateCoverage();
         Type[] audited = [typeof(RunState), typeof(Player), typeof(ActDefinition), typeof(ActMap),
-            typeof(StandardActMap), typeof(SpoilsActMap), typeof(GoldenPathActMap), typeof(MapPoint),
+            typeof(StandardActMap), typeof(SpoilsActMap), typeof(GoldenPathActMap), typeof(RunState.ActEntryMapState), typeof(MapPoint),
             typeof(Sts2Sim.Core.Odds.AbstractOdds), typeof(Sts2Sim.Core.Odds.UnknownMapPointOdds), typeof(Sts2Sim.Core.Odds.RunOddsSet)];
         foreach (Type type in audited)
             for (Type? parent = type; parent is not null && parent != typeof(object); parent = parent.BaseType)

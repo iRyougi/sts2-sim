@@ -112,6 +112,8 @@ public sealed partial class RunState : IRunState
 
     public int CurrentActIndex { get; private set; }
 
+    public RunEntryPhase EntryPhase { get; internal set; }
+
     public IReadOnlyList<MapCoord> VisitedMapCoords => _visitedMapCoords;
 
     /// <summary>跨幕累计的已访问房间数。对应真实游戏
@@ -228,6 +230,7 @@ public sealed partial class RunState : IRunState
         _unknownMapPointEntriesThisAct = 0;
         InitializeCurrentAct();
         GenerateCurrentMap();
+        EntryPhase = RunEntryPhase.Legacy; // Existing direct callers retain their room-based continuation contract.
     }
 
     private static void ValidateActs(ActDefinition[] acts, string parameterName)

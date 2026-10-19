@@ -107,13 +107,45 @@ public sealed class RunDriver
 
     public event Action<MapPoint, RoomType>? OnRoomResolved;
 
+    /// <summary>Passive offline capture point, before Ancient construction/entry. Default is disabled.</summary>
+    public event Action<RunState>? ActEntryInitialized;
+
     public Task<Result> RunAsync(int maxFloors) => RunCoreAsync(maxFloors, continueFromCurrentState: false);
 
     /// <summary>Continue the current displayed state without re-entering a completed Starting/Ancient room.</summary>
     public Task<Result> ContinueAsync(int maxFloors = int.MaxValue) =>
         RunCoreAsync(maxFloors, continueFromCurrentState: true);
 
-    private async Task<Result> RunCoreAsync(int maxFloors, bool continueFromCurrentState)
+    /// <summary>Stops after act initialization and before any Ancient room construction or entry.</summary>
+    public async Task<ActEntryContinuation> ContinueToActEntryAsync(int targetActIndex, int maxFloors = int.MaxValue)
+    {
+        if (targetActIndex < _runState.CurrentActIndex || targetActIndex >= _runState.Acts.Count)
+            throw new ArgumentOutOfRangeException(nameof(targetActIndex));
+        if (_runState.CurrentActIndex == targetActIndex && _runState.EntryPhase == RunEntryPhase.Legacy)
+            _runState.MarkUnenteredActBoundary();
+        try
+        {
+            Result terminal = await RunCoreAsync(maxFloors, true, targetActIndex);
+            return new(false, terminal);
+        }
+        // fail-open: this private signal is emitted only at the requested stable act-entry boundary.
+        catch (ActEntryReached)
+        {
+            return new(true, null);
+        }
+    }
+
+    private sealed class ActEntryReached : Exception { }
+
+    private void StopAtEntry(int? target)
+    {
+        if (_runState.EntryPhase != RunEntryPhase.InitializedBeforeAncient) return;
+        if (_runState.CurrentRoomCount != 0 || _runState.ActiveRewardOffers.Count != 0)
+            throw new InvalidOperationException("Act entry has an unresolved room or reward.");
+        ActEntryInitialized?.Invoke(_runState);
+        if (target == _runState.CurrentActIndex) throw new ActEntryReached();
+    }
+    private async Task<Result> RunCoreAsync(int maxFloors, bool continueFromCurrentState, int? stopAtActEntry = null)
     {
         _recorder?.BeginRun(_runState);
 
@@ -124,7 +156,11 @@ public sealed class RunDriver
                 outcome: RunOutcome.AlreadyOver);
         }
 
-        bool startingAlreadyEntered = continueFromCurrentState && _runState.VisitedMapCoords.Count > 0;
+        StopAtEntry(stopAtActEntry);
+        if (_runState.EntryPhase == RunEntryPhase.AncientInProgress && _runState.CurrentRoom is null)
+            throw new InvalidOperationException("Ancient entry was interrupted outside a resumable room.");
+        bool startingAlreadyEntered = continueFromCurrentState && _runState.VisitedMapCoords.Count > 0 &&
+            _runState.EntryPhase != RunEntryPhase.InitializedBeforeAncient;
         if (!startingAlreadyEntered)
         {
             MapPoint startingPoint = _runState.Map.StartingMapPoint;
@@ -371,6 +407,8 @@ public sealed class RunDriver
 
                 actsCleared++;
                 _runState.AdvanceToNextAct();
+                _runState.EntryPhase = RunEntryPhase.InitializedBeforeAncient;
+                StopAtEntry(stopAtActEntry);
                 current = _runState.Map.StartingMapPoint;
                 _runState.AddVisitedMapCoord(current.coord);
                 if (current.PointType == MapPointType.Ancient)
@@ -393,6 +431,9 @@ public sealed class RunDriver
                     recorderFloorsVisited++;
                 }
 
+                if (_runState.EntryPhase == RunEntryPhase.InitializedBeforeAncient)
+                    _runState.EntryPhase = RunEntryPhase.ReadyForMap;
+
                 // Ancient choices such as GoldenCompass may replace the generated map.
                 current = _runState.Map.StartingMapPoint;
 
@@ -411,6 +452,7 @@ public sealed class RunDriver
             }
 
             // A resumed Ancient choice can replace the map just like normal act entry.
+            if (resumingAncientStart) _runState.EntryPhase = RunEntryPhase.ReadyForMap;
             current = resumingAncientStart ? _runState.Map.StartingMapPoint : chosen;
         }
 
@@ -505,8 +547,10 @@ public sealed class RunDriver
 
     private async Task DriveAncientStartingRoomAsync()
     {
+        _runState.EntryPhase = RunEntryPhase.AncientInProgress;
         if (_runState.Map.StartingMapPoint.PointType != MapPointType.Ancient)
         {
+            _runState.EntryPhase = RunEntryPhase.ReadyForMap;
             return;
         }
 
@@ -548,6 +592,7 @@ public sealed class RunDriver
                 }
             }
         }
+        _runState.EntryPhase = RunEntryPhase.ReadyForMap;
     }
 
     private CombatRecordingObserver? ConfigureCombatObserver(CombatRoom combatRoom)

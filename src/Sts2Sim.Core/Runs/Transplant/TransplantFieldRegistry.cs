@@ -179,6 +179,9 @@ public static class TransplantFieldRegistry
         AddDeclaredFields(result, typeof(RunState),
             ["<IsImaginationClone>k__BackingField"], TransplantFieldClass.Ignored,
             "Clone provenance marker has no simulator consumer; imports construct a new non-imagination run.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["<EntryPhase>k__BackingField"], TransplantFieldClass.Derived,
+            "Legacy combat imports retain Legacy continuation; the separate act-entry codec persists the explicit phase.");
         AddDeclaredFields(result, typeof(Player), PlayerSnapshotFields, TransplantFieldClass.Snapshot,
             "Preserved in PlayerSnapshot or explicitly validated before export.");
         AddDeclaredFields(result, typeof(Player), PlayerDerivedFields, TransplantFieldClass.Derived,
