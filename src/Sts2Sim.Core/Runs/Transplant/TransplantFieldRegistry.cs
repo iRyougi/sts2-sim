@@ -102,9 +102,17 @@ public static class TransplantFieldRegistry
                 if (type.Name == "SpoilsMap" && field.Name == "<SpoilsCoord>k__BackingField")
                     (fieldClass, reason) = (TransplantFieldClass.Snapshot,
                         "Host exports the unsaved live coordinate explicitly at combat entry.");
-                if (type.Name == "Whistle" && field.Name == "_damage")
+                // Native Fetch queries this combat's CardPlayFinished history. These simulator
+                // caches are cleared when the next combat's card copies are created.
+                if (type.Name == "Fetch" && field.Name is
+                        "_finishedRound" or "_finishedSide" or "_finishedTurnNumbers")
+                    (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
+                        "Native history is combat-local; fresh combat copies reset the Fetch cache.");
+                // Native Rampage/Thrash/Claw mutate combat copies, not their persistent DeckVersion.
+                if ((type.Name is "Whistle" or "Rampage" or "Thrash" or "Claw" && field.Name == "_damage") ||
+                    (type.Name == "Claw" && field.Name == "_increase"))
                     (fieldClass, reason) = (TransplantFieldClass.Derived,
-                        "Derived from canonical card vars and upgrade level.");
+                        "Persistent deck values derive from canonical card vars and upgrade level.");
                 result.Add(Key(field), (fieldClass, reason));
             }
         }
