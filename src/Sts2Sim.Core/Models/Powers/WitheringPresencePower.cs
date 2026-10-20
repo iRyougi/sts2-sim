@@ -31,7 +31,7 @@ public sealed class WitheringPresencePower : PowerModel
         _cardsPlayed = 0;
         var wither = (Wither)ModelDb.Card<Wither>().MutableClone();
         wither.AssignOwner(Target.Player!);
-        await CardPileCmd.Generate(Owner.CombatState!, wither, PileType.Hand, creator: null);
+        await CardPileCmd.Generate(cardPlay.Card.Owner.Creature.CombatState!, wither, PileType.Hand, creator: null);
     }
 
     internal override void RestoreCombatCloneReferencesFrom(
