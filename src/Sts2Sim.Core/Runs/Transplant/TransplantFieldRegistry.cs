@@ -113,6 +113,10 @@ public static class TransplantFieldRegistry
                     (type.Name == "Claw" && field.Name == "_increase"))
                     (fieldClass, reason) = (TransplantFieldClass.Derived,
                         "Persistent deck values derive from canonical card vars and upgrade level.");
+                // Native Monologue's Power var is always 1; upgrading only adds Retain.
+                if (type.Name == "Monologue" && field.Name == "_power")
+                    (fieldClass, reason) = (TransplantFieldClass.Derived,
+                        "Persistent deck Power derives from the canonical Monologue var; no saved mutation.");
                 result.Add(Key(field), (fieldClass, reason));
             }
         }
