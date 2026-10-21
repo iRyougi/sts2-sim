@@ -416,8 +416,21 @@ public sealed partial class RunStateCloneTests
     {
         var source = NewVisibleRun("prepared-" + typeof(T).Name);
         EventRoom sourceRoom = await EnterEventAsync<T>(source);
+        string sourceBefore = RunCloneGraphSnapshot.Capture(source);
         RunState variant = source.CloneExact();
         EventRoom variantRoom = Assert.IsType<EventRoom>(variant.CurrentRoom);
+        // Keep this assertion closure out of the alternate encounter factory below.
+        {
+            var exactPrepared = Assert.IsType<CombatRoom>(typeof(EventRoom)
+                .GetField("_preparedCombatRoom", PrivateFields)!.GetValue(variantRoom));
+            Assert.Null(exactPrepared.Engine);
+            var selector = new FirstChoiceDecisionSource();
+            exactPrepared.ConfigureCardSelectionSource(selector);
+            Assert.Equal("A card selection source has already been configured.",
+                Assert.Throws<InvalidOperationException>(() => exactPrepared.ConfigureCardSelectionSource(selector)).Message);
+            Assert.Null(exactPrepared.Engine);
+        }
+        Assert.Equal(sourceBefore, RunCloneGraphSnapshot.Capture(source));
         EncounterDefinition encounter = sourceRoom.Event.CanonicalEncounter!;
         var alternate = new CombatRoom(() => (encounter, encounter.CreateMonsters(new Rng(0xBEEFUL))), RoomType.Monster);
         alternate.Prepare(variant);

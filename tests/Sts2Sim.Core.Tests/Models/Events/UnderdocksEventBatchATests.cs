@@ -219,14 +219,21 @@ public sealed class UnderdocksEventBatchATests : IDisposable
     // 原版 Punch Off 是 Combat 布局事件：进房就 CreateCreature 两只 PunchConstruct 并抽 HP，选 Fight 复用它们，
     // 选 Nab 也已经抽过；额外奖励战后才掷骰（#46）。
     [Theory]
-    [InlineData("nab")]
-    [InlineData("fight-driver")]
-    [InlineData("fight-engine")]
-    public async Task PunchOff_PrecreatesEnemiesOnEntryLikeNative(string scenario)
+    [InlineData("nab", null)]
+    [InlineData("fight-driver", null)]
+    [InlineData("fight-engine", null)]
+    [InlineData("fight-driver-exact", "TH4EKDTY2LZM")]
+    [InlineData("fight-driver-exact", "8W92XJR9VSTA")]
+    [InlineData("fight-driver-exact", "WDSCR6LVKT7E")]
+    [InlineData("fight-engine-exact", "TH4EKDTY2LZM")]
+    [InlineData("fight-driver-reseeded", "TH4EKDTY2LZM")]
+    public async Task PunchOff_PrecreatesEnemiesOnEntryLikeNative(string scenario, string? seed)
     {
-        var run = new RunState($"punchoff-precreate-{scenario}", new Overgrowth());
+        var run = new RunState(seed ?? $"punchoff-precreate-{scenario}", new Overgrowth());
+        bool cloned = scenario.EndsWith("-exact", StringComparison.Ordinal) || scenario.EndsWith("-reseeded", StringComparison.Ordinal);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
+        if (cloned) _ = run.CurrentAncientEventType;
         var probe = (PunchOffCombatStartProbe)new PunchOffCombatStartProbe().MutableClone();
         probe.AssignOwner(player);
         player.AddRelicInternal(probe);
@@ -258,6 +265,29 @@ public sealed class UnderdocksEventBatchATests : IDisposable
         // PunchConstruct 的 A0 HP 区间只有 55：第二只的候选被第一只占满，原版走 NextInt(min, max + 1)。
         Assert.Equal(new[] { (0d, 1d), (55d, 56d) }, hpBounds);
         Assert.Equal(2, run.Rng.Niche.Counter - nicheBefore);
+        if (cloned)
+        {
+            // The new continuation owns card routing; cloning a prepared room must not preconfigure it.
+            _ = new RunDriver(run, new PunchOffAttackDecisionSource());
+            RunState original = run;
+            Player originalPlayer = player;
+            EventRoom originalRoom = room;
+            run = scenario.EndsWith("-reseeded", StringComparison.Ordinal) ? original.CloneReseeded(97) : original.CloneExact();
+            player = run.Players[0];
+            room = Assert.IsType<EventRoom>(run.CurrentRoom);
+            probe = Assert.Single(player.Relics.OfType<PunchOffCombatStartProbe>());
+            if (scenario.EndsWith("-reseeded", StringComparison.Ordinal))
+            {
+                expectedReductions = encounter.CreateMonsters(new Rng(
+                        RoomFactory.EncounterMonsterSeed(run.Rng.Seed, run.TotalFloor, encounter)))
+                    .Select(entry => ((PunchConstruct)entry.Monster).StartingHpReduction).ToArray();
+                nicheBefore = 0; // Fresh reseeded Niche consumes only the two native prepared-creature draws.
+                Assert.Equal(2, run.Rng.Niche.Counter);
+            }
+            Assert.NotSame(originalPlayer, player);
+            Assert.NotSame(originalRoom, room);
+            Assert.NotSame(originalPlayer.Creature.CombatState, player.Creature.CombatState);
+        }
         var ev = Assert.IsType<PunchOff>(room.Event);
         Assert.Equal(new[] { "NAB", "I_CAN_TAKE_THEM" }, ev.CurrentOptions.Select(option => option.Key));
 
@@ -276,7 +306,7 @@ public sealed class UnderdocksEventBatchATests : IDisposable
         Assert.Equal("FIGHT", Assert.Single(ev.CurrentOptions).Key);
         probe.WatchExtraRewards(ev);
         int rewardsBefore = player.PlayerRng.Rewards.Counter;
-        if (scenario == "fight-driver")
+        if (scenario.StartsWith("fight-driver", StringComparison.Ordinal))
         {
             await new RunDriver(run, new PunchOffAttackDecisionSource()).DriveEventAsync(room);
         }
@@ -294,7 +324,9 @@ public sealed class UnderdocksEventBatchATests : IDisposable
         Assert.Equal(2, probe.NicheAtStart - nicheBefore);
         Assert.Equal(rewardsBefore, probe.RewardsAtFirstTurnEnd);
         Assert.False(probe.ExtrasPopulatedAtFirstTurnEnd);
-        Assert.Equal(2, run.Rng.Niche.Counter - nicheBefore);
+        // New seeds can pick up WarPaint after combat, legitimately consuming Niche.
+        // Their prepared-room draws are checked exactly at combat start above.
+        if (!cloned) Assert.Equal(2, run.Rng.Niche.Counter - nicheBefore);
         Assert.True(ev.IsFinished);
     }
     private sealed class LastCardsSelectionSource : ICardSelectionDecisionSource

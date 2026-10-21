@@ -188,7 +188,9 @@ public sealed class CombatRoom : AbstractRoom
         CopyEntryStateFrom(source);
         _preparedCombatState = source._preparedCombatState is null ? null : mapState(source._preparedCombatState);
         Engine = source.Engine is null ? null! : mapState(source.Engine.State).Engine!;
-        _cardSelectionSource = targetRun.CardSelectionSource;
+        // Prepared rooms are configured by the new driver before entry, like fresh rooms.
+        if (Engine is not null)
+            _cardSelectionSource = targetRun.CardSelectionSource;
         _monsterFactory = source._monsterFactory is null ? null : (Func<MonsterModel>)mapCallback(source._monsterFactory);
         _monsterBatchFactory = source._monsterBatchFactory is null ? null : (Func<IReadOnlyList<MonsterModel>>)mapCallback(source._monsterBatchFactory);
         _encounterFactory = source._encounterFactory is null ? null : (Func<(EncounterDefinition Encounter, IReadOnlyList<(MonsterModel Monster, string? SlotName)> Monsters)>)mapCallback(source._encounterFactory);
