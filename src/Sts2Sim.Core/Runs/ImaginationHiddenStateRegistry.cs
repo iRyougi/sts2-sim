@@ -87,8 +87,8 @@ internal static class ImaginationHiddenStateRegistry
         Event("ColossalFlower", V, history, "_dig");
         Event("CrystalSphere", V, visible, "<UncoverFutureCost>k__BackingField");
         Event("CrystalSphere", V, "#563 layout exception includes fixed 10/30 gold and Doubt; future random rewards use the clone RNG at native settlement time.", "<Game>k__BackingField");
-        Event("DenseVegetation", V, "Displayed event gold DynamicVar.", "_gold");
-        Event("EndlessConveyor", V, history, "_lastDishId _currentDishId _numOfGrabs");
+        Event("DenseVegetation", V, "Displayed event gold and initialization-time heal preview; output-only cache never executes healing.", "_gold _visibleHeal");
+        Event("EndlessConveyor", V, history, "_lastDishId _currentDishId _numOfGrabs _visibleLastDishId");
         Event("FakeMerchant", N, runtime, "_interactionGate");
         Event("FakeMerchant", V, visible, "_combatRewards <Inventory>k__BackingField <IsInventoryOpen>k__BackingField <StartedFight>k__BackingField");
         Event("JungleMazeAdventure", V, "Displayed event gold DynamicVars.", "_soloGold _joinForcesGold");
@@ -147,7 +147,7 @@ internal static class ImaginationHiddenStateRegistry
         Room("MerchantRoom", V, reward,
             "_inventories _inventoryRunState _displayPlayer _isActive _rewardOffers <IsInventoryOpen>k__BackingField");
         Room("RestSiteRoom", N, runtime, "_rewardLock");
-        Room("RestSiteRoom", V, history, "_pendingRewardOffers _remainingDecisions");
+        Room("RestSiteRoom", V, history, "_pendingRewardOffers _remainingDecisions _displayedOptionIds");
         Room("TreasureRoom", V, reward, "_goldAmount _resolutions");
         Room("TreasureRoomResolution", V, reward,
             "<Player>k__BackingField <GoldGained>k__BackingField <RelicGained>k__BackingField");

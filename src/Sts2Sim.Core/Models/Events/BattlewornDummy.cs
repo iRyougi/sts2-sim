@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Factories;
@@ -12,6 +13,12 @@ namespace Sts2Sim.Core.Models.Events;
 public sealed class BattlewornDummy : EventModel
 {
     private BattlewornRewardTier? _selectedTier;
+
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([VisibleValue.Int("TurnLimit", 3)], [
+        new("SETTING_1", [VisibleValue.Int("Setting1Hp", 75), VisibleValue.Int("PotionCount", 1)]),
+        new("SETTING_2", [VisibleValue.Int("Setting2Hp", 150), VisibleValue.Int("RandomUpgradeCount", 2)]),
+        new("SETTING_3", [VisibleValue.Int("Setting3Hp", 300), VisibleValue.Int("RelicCount", 1)])
+    ]);
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [

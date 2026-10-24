@@ -21,6 +21,10 @@ public sealed class ArchaicTooth : RelicModel
     /// <summary>原版 <c>GetTranscendenceStarterCard</c> 的判定：Orobas 据此决定是否提供本遗物。</summary>
     internal static bool IsTranscendenceStarter(CardModel card) => TranscendenceUpgrades.ContainsKey(card.Id);
 
+    /// <summary>Read-only reuse of the native deterministic starter-card mapping.</summary>
+    internal static CardModel? TryGetTranscendenceUpgrade(CardModel card) =>
+        TranscendenceUpgrades.TryGetValue(card.Id, out CardModel? upgrade) ? upgrade : null;
+
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override bool HasUponPickupEffect => true;
 

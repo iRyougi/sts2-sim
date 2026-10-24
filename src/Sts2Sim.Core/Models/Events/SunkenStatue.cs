@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Relics;
@@ -10,6 +11,12 @@ namespace Sts2Sim.Core.Models.Events;
 public sealed class SunkenStatue : EventModel
 {
     private decimal _gold;
+
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("DIVE_INTO_WATER", [VisibleValue.Int("Gold", (int)_gold), VisibleValue.Int("HpLoss", 7)]),
+        new("GRAB_SWORD", [VisibleValue.Id("Relic", ModelDb.GetId<SwordOfStone>().Entry), VisibleValue.Int("RequiredElites", 5)])
+            { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<SwordOfStone>())] },
+    ]);
 
     protected override void CalculateVars() => _gold = 111m + Rng.NextInt(-10, 11);
 

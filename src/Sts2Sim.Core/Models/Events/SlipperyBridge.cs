@@ -8,6 +8,18 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class SlipperyBridge : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => VisibleDecisionMetadata.Empty;
+
+    protected override VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) => option.Key switch
+    {
+        "OVERCOME" => new(option.Key, [VisibleValue.Id("CardId", RandomCardToLose.Id.Entry), VisibleValue.Int("RemoveCount", 1),
+            VisibleValue.Key("DescriptionKey", "SLIPPERY_BRIDGE.pages.INITIAL.options.OVERCOME.description")])
+            { Contents = [VisibleContentProjection.ForCard(RandomCardToLose)] },
+        _ when option.Key.StartsWith("HOLD_ON_", StringComparison.Ordinal) => new(option.Key, [VisibleValue.Int("HpLoss", CurrentHpLoss),
+            VisibleValue.Key("DescriptionKey", $"SLIPPERY_BRIDGE.pages.{(_holdOns == 0 ? "INITIAL" : _holdOns >= 8 ? "HOLD_ON_LOOP" : "HOLD_ON_" + (_holdOns - 1))}.options.{option.Key}.description")]),
+        _ => base.DescribeVisibleOption(option, displayIndex, declared),
+    };
+
     private HashSet<CardModel> _skipped = [];
     private CardModel? _randomCard;
     private int _holdOns;

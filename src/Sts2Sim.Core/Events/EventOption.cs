@@ -1,3 +1,5 @@
+using Sts2Sim.Core.Runs;
+
 namespace Sts2Sim.Core.Events;
 
 /// <summary>A selectable event option identified by its event-local key. 偏离 #82：省略真实游戏里
@@ -10,14 +12,17 @@ public sealed class EventOption
 
     public string Key { get; }
 
+    public VisibleContent? OfferedContent { get; }
+
     public bool IsLocked => _onChosen is null;
 
     public bool IsEnabled => _onChosen is not null;
 
-    public EventOption(string key, Func<Task>? onChosen)
+    public EventOption(string key, Func<Task>? onChosen, VisibleContent? offeredContent = null)
     {
         Key = key ?? throw new ArgumentNullException(nameof(key));
         _onChosen = onChosen;
+        OfferedContent = offeredContent;
     }
 
     internal EventOption RebindForRun(Func<Delegate, Delegate> mapCallback)
@@ -25,7 +30,7 @@ public sealed class EventOption
         // One graph mapper owns all Method/Target and invocation-list reconstruction.
         Func<Task>? rebound = _onChosen is null
             ? null : (Func<Task>)mapCallback(_onChosen);
-        return new EventOption(Key, rebound);
+        return new EventOption(Key, rebound, OfferedContent);
     }
 
     public Task Invoke() => _onChosen?.Invoke()

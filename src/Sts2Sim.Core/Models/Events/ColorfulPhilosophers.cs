@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Models.CardPools;
@@ -17,6 +18,12 @@ public sealed class ColorfulPhilosophers : EventModel
 {
     public override bool IsAllowed(IRunState runState) =>
         ModelDb.All<CharacterModel>().Count(character => character.IsPlayable) > 1;
+
+    protected override VisibleDecisionMetadata BuildVisibleState() => new(
+        [VisibleValue.Int("StatueCount", 3)],
+        CurrentOptions.Select(option => new VisibleOption(option.Key,
+            [VisibleValue.Int("Cards", 3), VisibleValue.Id("Character", option.Key),
+             VisibleValue.Scope("RewardRarities", "Common,Uncommon,Rare")])).ToImmutableArray());
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {

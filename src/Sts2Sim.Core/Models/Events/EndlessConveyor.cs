@@ -23,11 +23,32 @@ public sealed class EndlessConveyor : EventModel
     private string _lastDishId = string.Empty;
     private string _currentDishId = string.Empty;
     private int _numOfGrabs;
+    private string _visibleLastDishId = string.Empty;
 
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Gold >= 120);
 
-    protected override void CalculateVars() => RollDish();
+    protected override VisibleDecisionMetadata BuildVisibleState() => new(
+        string.IsNullOrEmpty(_visibleLastDishId)
+            ? [VisibleValue.Int("Gold", 40)]
+            : [VisibleValue.Key("LastDishTitle", $"ENDLESS_CONVEYOR.DISHES.{_visibleLastDishId}.title")],
+        [
+            new("CAVIAR", [VisibleValue.Int("Gold", 40), VisibleValue.Int("CaviarMaxHp", 4)]),
+            new("CLAM_ROLL", [VisibleValue.Int("Gold", 40), VisibleValue.Int("ClamRollHeal", 10)]),
+            new("GOLDEN_FYSH", [VisibleValue.Int("GoldenFyshGold", 75)]),
+            new("SPICY_SNAPPY", [VisibleValue.Int("Gold", 40), VisibleValue.Int("RandomUpgradeCount", 1)]),
+            new("JELLY_LIVER", [VisibleValue.Int("Gold", 40), VisibleValue.Int("TransformCount", 1)]),
+            new("FRIED_EEL", [VisibleValue.Int("Gold", 40), VisibleValue.Int("ObtainCardCount", 1), VisibleValue.Scope("CardPool", "Colorless")]),
+            new("SEAPUNK_SALAD", [VisibleValue.Int("Gold", 40), VisibleValue.Int("ObtainCount", 1), VisibleValue.Id("Card", "FEEDING_FRENZY")]) { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<FeedingFrenzy>())] },
+            new("OBSERVE_CHEF", [VisibleValue.Int("RandomUpgradeCount", 1)]),
+            new("SUSPICIOUS_CONDIMENT", [VisibleValue.Int("Gold", 40), VisibleValue.Int("ObtainPotionCount", 1)]),
+        ]);
+
+    protected override void CalculateVars()
+    {
+        _visibleLastDishId = string.Empty;
+        RollDish();
+    }
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
@@ -37,6 +58,7 @@ public sealed class EndlessConveyor : EventModel
 
     private async Task GrabSomethingOffTheBelt()
     {
+        string displayedDishId = _currentDishId;
         if (_currentDishId != "GOLDEN_FYSH")
             await PlayerCmd.LoseGold(GrabCost, Owner, GoldLossType.Spent);
 
@@ -47,6 +69,7 @@ public sealed class EndlessConveyor : EventModel
             GrabOption(),
             new("LEAVE", Leave),
         ]);
+        _visibleLastDishId = displayedDishId;
     }
 
     private EventOption GrabOption() =>
@@ -164,5 +187,6 @@ public sealed class EndlessConveyor : EventModel
         _lastDishId = string.Empty;
         _currentDishId = string.Empty;
         _numOfGrabs = 0;
+        _visibleLastDishId = string.Empty;
     }
 }

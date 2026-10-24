@@ -10,6 +10,13 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class WarHistorianRepy : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("UNLOCK_CAGE", [VisibleValue.Id("ConsumedCard", ModelDb.GetId<LanternKey>().Entry), VisibleValue.Id("Relic", ModelDb.GetId<HistoryCourse>().Entry), VisibleValue.Int("RelicCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<LanternKey>()), VisibleContentProjection.ForRelic(ModelDb.Relic<HistoryCourse>())] },
+        new("UNLOCK_CHEST", [VisibleValue.Id("ConsumedCard", ModelDb.GetId<LanternKey>().Entry), VisibleValue.Int("PotionCount", 2), VisibleValue.Int("RelicCount", 2), VisibleValue.Condition("Potion", "Random"), VisibleValue.Condition("Relic", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<LanternKey>())] },
+    ]);
+
     public override bool CanAppearNaturally => false;
     public override bool IsAllowed(IRunState runState) => false;
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>

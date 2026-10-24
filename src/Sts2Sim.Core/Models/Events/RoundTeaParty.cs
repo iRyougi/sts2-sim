@@ -9,6 +9,12 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class RoundTeaParty : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("ENJOY_TEA", [VisibleValue.Id("RelicId", "ROYAL_POISON"), VisibleValue.Scope("HealMode", "Full"), VisibleValue.Int("RelicDamage", 4), VisibleValue.Condition("RelicTrigger", "CombatStart")])
+            { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<RoyalPoison>())] },
+        new("PICK_FIGHT", [VisibleValue.Int("Damage", 11), VisibleValue.Int("RandomRelicCount", 1)]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Creature.CurrentHp >= 12);
 

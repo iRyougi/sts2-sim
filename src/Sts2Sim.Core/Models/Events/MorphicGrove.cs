@@ -9,6 +9,12 @@ namespace Sts2Sim.Core.Models.Events;
 /// 容器，直接使用玩法常量；#150 的 IsAllowed predicate 已在此实现，事件池选择由 Task 3 集成。</summary>
 public sealed class MorphicGrove : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("GROUP", [VisibleValue.Scope("GoldLossScope", "All"), VisibleValue.Int("TransformCount", 2),
+            VisibleValue.Condition("TransformResults", "Random")]),
+        new("LONER", [VisibleValue.Int("MaxHp", 5)]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Gold >= 100m &&
                                        player.Deck.Cards.Count(card => card.IsTransformable) >= 2);

@@ -21,6 +21,11 @@ public sealed class JungleMazeAdventure : EventModel
     private decimal _soloGold;
     private decimal _joinForcesGold;
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("SOLO_QUEST", [VisibleValue.Int("SoloGold", (int)_soloGold), VisibleValue.Int("SoloHp", 18)]),
+        new("JOIN_FORCES", [VisibleValue.Int("JoinForcesGold", (int)_joinForcesGold)]),
+    ]);
+
     protected override void CalculateVars()
     {
         _soloGold = 150m + (decimal)Rng.NextFloat(-15f, 15f);

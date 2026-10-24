@@ -10,6 +10,12 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class RoomFullOfCheese : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("GORGE", [VisibleValue.Int("SelectCount", 2), VisibleValue.Int("OfferCount", 8), VisibleValue.Scope("CardRarity", "Common"), VisibleValue.Scope("Effect", "AddCard")]),
+        new("SEARCH", [VisibleValue.Int("Damage", 14), VisibleValue.Id("RelicId", "CHOSEN_CHEESE"), VisibleValue.Int("RelicCount", 1), VisibleValue.Int("RelicMaxHp", 1), VisibleValue.Condition("RelicTrigger", "CombatEnd")])
+            { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<ChosenCheese>())] },
+    ]);
+
     public override bool IsAllowed(IRunState runState) => runState is not RunState { CurrentActIndex: >= 2 };
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
         [new("GORGE", Gorge), new("SEARCH", Search)];

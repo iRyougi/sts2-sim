@@ -8,6 +8,13 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class FieldOfManSizedHoles : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("RESIST", [VisibleValue.Int("RemoveCount", 2), VisibleValue.Id("ResistCurse", "NORMALITY"), VisibleValue.Int("CurseCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Normality>())] },
+        new("ENTER_YOUR_HOLE", [VisibleValue.Int("EnchantCount", 1), VisibleValue.Id("Enchantment", "PERFECT_FIT")])
+        { Contents = [VisibleContentProjection.ForEnchantment(ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>()))] },
+    ]);
+
     public override bool IsAllowed(IRunState runState)
     {
         PerfectFit perfectFit = ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>());

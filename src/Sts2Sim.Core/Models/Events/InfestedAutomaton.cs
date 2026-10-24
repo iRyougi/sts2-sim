@@ -9,6 +9,13 @@ namespace Sts2Sim.Core.Models.Events;
 /// <summary>Hive automaton event. Reward filtering follows the authoritative Power / non-X zero-cost predicates.</summary>
 public sealed class InfestedAutomaton : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("STUDY", [VisibleValue.Scope("RewardKind", "Card"), VisibleValue.Int("Count", 1),
+            VisibleValue.Scope("CardType", "Power"), VisibleValue.Condition("Targets", "Random")]),
+        new("TOUCH_CORE", [VisibleValue.Scope("RewardKind", "Card"), VisibleValue.Int("Count", 1),
+            VisibleValue.Int("EnergyCost", 0), VisibleValue.Condition("CostsX", "False"), VisibleValue.Condition("Targets", "Random")]),
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]
     {
         new EventOption("STUDY", () => AddRandomAsync(card => card.Type == CardType.Power)),

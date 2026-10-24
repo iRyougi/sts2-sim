@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Events;
@@ -12,6 +13,14 @@ namespace Sts2Sim.Core.Models.Events
     public sealed class LostWisp : EventModel
     {
         private int _gold;
+
+        protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+            new("SEARCH", [VisibleValue.Int("Gold", _gold)]),
+            new("CLAIM", [VisibleValue.Id("Curse", "DECAY"), VisibleValue.Int("CurseCount", 1),
+                VisibleValue.Id("Relic", "LOST_WISP"), VisibleValue.Int("RelicCount", 1)])
+            { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Decay>()),
+                VisibleContentProjection.ForRelic(ModelDb.Relic<Sts2Sim.Core.Models.Relics.LostWisp>())] },
+        ]);
 
         protected override void CalculateVars() => _gold = 60 + Rng.NextInt(-15, 16);
 

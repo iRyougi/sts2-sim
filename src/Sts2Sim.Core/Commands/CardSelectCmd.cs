@@ -15,6 +15,7 @@ namespace Sts2Sim.Core.Commands;
 public static class CardSelectCmd
 {
     private static readonly AsyncLocal<ICardSelectionDecisionSource?> ScopedSelector = new();
+    private static readonly AsyncLocal<ICardSelectionTraceObserver?> ScopedTraceObserver = new();
 
     /// <summary>Overrides card choices only for the current asynchronous call chain. Automatic effects
     /// such as WhisperingEarring use this instead of replacing the run or combat decision source.</summary>
@@ -24,6 +25,28 @@ public static class CardSelectCmd
         ICardSelectionDecisionSource? previous = ScopedSelector.Value;
         ScopedSelector.Value = selector;
         return new SelectorScope(previous);
+    }
+
+    /// <summary>Observes selections in the current asynchronous call chain independently of selector
+    /// overrides. Nested scopes use the innermost observer and restore the enclosing observer.</summary>
+    public static IDisposable PushTraceObserver(ICardSelectionTraceObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        ICardSelectionTraceObserver? previous = ScopedTraceObserver.Value;
+        ScopedTraceObserver.Value = observer;
+        return new TraceObserverScope(previous);
+    }
+
+    private sealed class TraceObserverScope(ICardSelectionTraceObserver? previous) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            ScopedTraceObserver.Value = previous;
+            _disposed = true;
+        }
     }
 
     private static ICardSelectionDecisionSource ResolveSelector(ICardSelectionDecisionSource ordinarySource) =>
@@ -113,17 +136,21 @@ public static class CardSelectCmd
             effectiveMax,
             source,
             cancelable);
+        ICardSelectionTraceObserver? traceObserver = ScopedTraceObserver.Value;
+        traceObserver?.BeforeSelection(request);
         if (options.Count == 0)
         {
             IReadOnlyList<CardModel> empty = Array.Empty<CardModel>();
             if (decisionSource is IAutomaticCardSelectionObserver observer)
                 observer.ObserveAutomaticSelection(request, empty);
+            traceObserver?.AfterSelection(request, empty, automatic: true);
             return empty;
         }
         if (options.Count <= minCount && !(requireManualConfirmation ?? cancelable))
         {
             if (decisionSource is IAutomaticCardSelectionObserver observer)
                 observer.ObserveAutomaticSelection(request, request.Candidates);
+            traceObserver?.AfterSelection(request, request.Candidates, automatic: true);
             return request.Candidates;
         }
         IReadOnlyList<CardModel> selected =
@@ -147,7 +174,9 @@ public static class CardSelectCmd
             }
         }
 
-        return selected.ToList().AsReadOnly();
+        IReadOnlyList<CardModel> result = selected.ToList().AsReadOnly();
+        traceObserver?.AfterSelection(request, result, automatic: false);
+        return result;
     }
 
     /// <summary>Native pile selection: only Draw's visible choice list is sorted; automatic
@@ -230,12 +259,15 @@ public static class CardSelectCmd
         var representatives = options.Select(bundle => bundle[0]).ToArray();
         var request = new CardSelectionRequest(player, representatives, 1, 1, source,
             Bundles: options);
+        ICardSelectionTraceObserver? traceObserver = ScopedTraceObserver.Value;
+        traceObserver?.BeforeSelection(request);
         IReadOnlyList<CardModel> selected = await ResolveSelector(player.RunState.CardSelectionSource)
             .ChooseCardsAsync(request);
         int index = selected.Count == 1
             ? Array.FindIndex(representatives, card => ReferenceEquals(card, selected[0])) : -1;
         if (index < 0)
             throw new InvalidOperationException("Bundle selection must return exactly one offered bundle representative.");
+        traceObserver?.AfterSelection(request, options[index], automatic: false);
         return options[index];
     }
 

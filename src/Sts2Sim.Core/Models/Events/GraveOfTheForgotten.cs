@@ -9,6 +9,18 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class GraveOfTheForgotten : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        CurrentOptions.FirstOrDefault(option => option.Key == "CONFRONT") is { IsLocked: true }
+            ? new("CONFRONT", [VisibleValue.Condition("LockReason", "NoEnchantableExhaustCard")])
+            : new("CONFRONT", [VisibleValue.Id("Curse", "DECAY"), VisibleValue.Int("CurseCount", 1),
+                VisibleValue.Int("EnchantCount", 1), VisibleValue.Id("Enchantment", "SOULS_POWER"),
+                VisibleValue.Condition("EligibleCards", "EnchantableExhaust")])
+            { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Decay>()),
+                VisibleContentProjection.ForEnchantment(ModelDb.GetById<SoulsPower>(ModelDb.GetId<SoulsPower>()))] },
+        new("ACCEPT", [VisibleValue.Id("Relic", "FORGOTTEN_SOUL"), VisibleValue.Int("RelicCount", 1)])
+        { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<ForgottenSoul>())] },
+    ]);
+
     public override bool IsAllowed(IRunState runState)
     {
         SoulsPower souls = ModelDb.GetById<SoulsPower>(ModelDb.GetId<SoulsPower>());

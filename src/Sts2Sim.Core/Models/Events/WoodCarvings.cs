@@ -11,6 +11,15 @@ namespace Sts2Sim.Core.Models.Events;
 /// #150 的 IsAllowed predicate 已在此实现，事件池选择由 Task 3 集成。</summary>
 public sealed class WoodCarvings : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([VisibleValue.Int("CarvingCount", 3)], [
+        new("BIRD", [VisibleValue.Int("TransformCount", 1), VisibleValue.Condition("TargetFilter", "BasicStarter"), VisibleValue.Id("BirdCard", ModelDb.GetId<Peck>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Peck>())] },
+        new("SNAKE", [VisibleValue.Int("EnchantCount", 1), VisibleValue.Id("SnakeEnchantment", ModelDb.GetId<Slither>().Entry)])
+        { Contents = [VisibleContentProjection.ForEnchantment(ModelDb.GetById<Slither>(ModelDb.GetId<Slither>()))] },
+        new("TORUS", [VisibleValue.Int("TransformCount", 1), VisibleValue.Condition("TargetFilter", "BasicStarter"), VisibleValue.Id("ToricCard", ModelDb.GetId<ToricToughness>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<ToricToughness>())] },
+    ]);
+
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Deck.Cards.Any(card => card.Rarity == CardRarity.Basic && card.IsRemovable));
 

@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Models.Cards;
@@ -6,6 +7,14 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class Reflections : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("TOUCH_A_MIRROR", [VisibleValue.Int("DowngradeCount", 2), VisibleValue.Int("UpgradeCount", 4),
+            VisibleValue.Condition("Targets", "Random")]),
+        new("SHATTER", [VisibleValue.Scope("DuplicateScope", "Deck"), VisibleValue.Int("CopiesPerCard", 1),
+            VisibleValue.Id("Curse", "BAD_LUCK"), VisibleValue.Int("CurseCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<BadLuck>())] },
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
         new EventOption("TOUCH_A_MIRROR", TouchAMirrorAsync),

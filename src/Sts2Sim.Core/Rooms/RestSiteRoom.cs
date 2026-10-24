@@ -15,6 +15,8 @@ public sealed class RestSiteRoom : AbstractRoom
     private readonly object _rewardLock = new();
     private readonly Queue<RewardsSet> _pendingRewardOffers = new();
     private readonly Dictionary<Player, List<RestSiteDecision>> _remainingDecisions = new();
+    // Metadata-only counterpart of native RestSiteOption.Options; never used to choose an action.
+    private readonly Dictionary<Player, List<string>> _displayedOptionIds = new();
 
     public override RoomType RoomType => RoomType.RestSite;
 
@@ -40,8 +42,20 @@ public sealed class RestSiteRoom : AbstractRoom
         foreach (CardModel card in GetUpgradableCards(player)) decisions.Add(new RestSiteDecision.Smith(card));
         Hooks.Hook.ModifyAvailableRestSiteDecisions(runState, player, decisions);
         _remainingDecisions[player] = decisions;
+        // Native RestSiteOption.Generate always adds Smith, even with no eligible target.
+        // Native MeatCleaver adds Cook regardless of its current removable-card threshold.
+        // Capture these display-only families here, beside the one existing generation step.
+        List<string> displayed = decisions.Select(decision => decision.OptionId).Distinct().ToList();
+        if (!displayed.Contains("smith")) displayed.Insert(Math.Min(1, displayed.Count), "smith");
+        if (player.Relics.Any(relic => relic is Models.Relics.MeatCleaver) && !displayed.Contains("cook"))
+            displayed.Add("cook");
+        _displayedOptionIds[player] = displayed;
         return decisions.ToArray();
     }
+
+    /// <summary>Returns the already-captured display lifecycle, without generating decisions or executing hooks.</summary>
+    public IReadOnlyList<string> GetDisplayedOptionIds(Player player) =>
+        _displayedOptionIds.TryGetValue(player, out List<string>? displayed) ? displayed.ToArray() : [];
 
     public async Task ResolveAsync(Player player, RestSiteDecision decision)
     {
@@ -59,9 +73,12 @@ public sealed class RestSiteRoom : AbstractRoom
             if (Hooks.Hook.ShouldDisableRemainingRestSiteOptions(player.RunState, player))
             {
                 remaining.Clear();
+                if (_displayedOptionIds.TryGetValue(player, out List<string>? displayed)) displayed.Clear();
             }
             else
             {
+                if (_displayedOptionIds.TryGetValue(player, out List<string>? displayed))
+                    displayed.Remove(decision.OptionId);
                 if (decision is RestSiteDecision.Smith)
                 {
                     // Smith is flattened to one record per equivalent card target for the
@@ -115,6 +132,8 @@ public sealed class RestSiteRoom : AbstractRoom
         var clone = new RestSiteRoom();
         registerRoom(this, clone);
         clone.CopyEntryStateFrom(this);
+        foreach ((Player player, List<string> displayed) in _displayedOptionIds)
+            clone._displayedOptionIds.Add(mapPlayer(player), displayed.ToList());
         foreach ((Player player, List<RestSiteDecision> remaining) in _remainingDecisions)
             clone._remainingDecisions.Add(mapPlayer(player), remaining.Select(mapDecision).ToList());
         lock (_rewardLock)
@@ -123,5 +142,10 @@ public sealed class RestSiteRoom : AbstractRoom
         return clone;
     }
 
-    public override Task Exit(RunState? runState) { _remainingDecisions.Clear(); return Task.CompletedTask; }
+    public override Task Exit(RunState? runState)
+    {
+        _remainingDecisions.Clear();
+        _displayedOptionIds.Clear();
+        return Task.CompletedTask;
+    }
 }

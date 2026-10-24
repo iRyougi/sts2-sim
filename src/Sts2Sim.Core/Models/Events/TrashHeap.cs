@@ -11,6 +11,11 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class TrashHeap : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("DIVE_IN", [VisibleValue.Int("HpLoss", 8), VisibleValue.Int("RelicCount", 1), VisibleValue.Condition("Relic", "RandomForgotten")]),
+        new("GRAB", [VisibleValue.Int("Gold", 100), VisibleValue.Int("CardCount", 1), VisibleValue.Condition("Card", "RandomForgotten")]),
+    ]);
+
     private static readonly Type[] RelicPool =
     [
         typeof(DarkstonePeriapt),

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Players;
@@ -40,6 +41,48 @@ public abstract class EventModel : AbstractModel
 
     public bool IsFinished { get; private set; }
 
+    /// <summary>Returns only values already displayed by the current event page.</summary>
+    public VisibleDecisionSnapshot GetVisibleState()
+    {
+        lock (_stateLock)
+        {
+            if (!_hasBegun || IsFinished) return new(VisibleDecisionMetadata.Empty, []);
+            VisibleDecisionMetadata state = BuildVisibleState();
+            var declaredByKey = state.DisplayOptions
+                .GroupBy(option => option.OptionKey)
+                .ToDictionary(group => group.Key, group => new Queue<VisibleOption>(group));
+            var rows = ImmutableArray.CreateBuilder<VisibleOption>(CurrentOptions.Count);
+            for (int i = 0; i < CurrentOptions.Count; i++)
+            {
+                EventOption option = CurrentOptions[i];
+                VisibleOption declared = declaredByKey.TryGetValue(option.Key, out Queue<VisibleOption>? matches) && matches.Count > 0
+                    ? matches.Dequeue() : new VisibleOption(option.Key, []);
+                rows.Add(DescribeVisibleOption(option, i, declared) with { IsEnabled = option.IsEnabled });
+            }
+            return new(state with { DisplayOptions = rows.ToImmutable() }, CurrentOptions.Cast<object>().ToArray());
+        }
+    }
+
+    protected virtual VisibleDecisionMetadata BuildVisibleState() =>
+        VisibleDecisionMetadata.Empty with { CoverageGapIds = ["Unsupported.EventMetadata"] };
+
+    protected virtual VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) =>
+        option.OfferedContent is { } content
+            ? declared with { Contents = declared.Contents.Add(content) }
+            : declared;
+
+    public VisibleDecisionSnapshot GetCustomVisibleState(IReadOnlyList<CustomEventDecision> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        lock (_stateLock)
+        {
+            if (!_hasBegun || IsFinished) return new(VisibleDecisionMetadata.Empty, []);
+            return new(BuildCustomVisibleState(candidates), candidates.Cast<object>().ToArray());
+        }
+    }
+
+    protected virtual VisibleDecisionMetadata BuildCustomVisibleState(IReadOnlyList<CustomEventDecision> candidates) =>
+        throw new NotSupportedException($"Event {Id} does not describe custom visible decisions.");
     public bool IsAwaitingForcedCombat { get { lock (_stateLock) { return _isAwaitingForcedCombat; } } }
 
     public bool HasPendingRewardOffers

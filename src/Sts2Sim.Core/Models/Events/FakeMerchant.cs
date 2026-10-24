@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Gold;
 using Sts2Sim.Core.Entities.Merchant;
@@ -29,6 +30,47 @@ public sealed class FakeMerchant : EventModel
 
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: >= 1 } &&
         runState.Players.Count == 1 && runState.Players.All(p => p.Gold >= 100 || p.PotionSlots.Any(x => x is FoulPotion));
+
+    // The native current page contains no dynamic placeholders.
+    protected override VisibleDecisionMetadata BuildVisibleState() => VisibleDecisionMetadata.Empty;
+
+    protected override VisibleDecisionMetadata BuildCustomVisibleState(IReadOnlyList<CustomEventDecision> candidates)
+    {
+        var context = ImmutableArray.CreateBuilder<VisibleValue>();
+        var gaps = ImmutableArray.CreateBuilder<string>();
+        // Opening native inventory is free, reversible UI: stock is visible from event entry.
+        // Include unaffordable and already purchased entries independently of legal actions.
+        foreach (MerchantRelicEntry entry in Inventory.Relics)
+        {
+            string prefix = "Stock." + entry.Relic.Id.Entry;
+            context.Add(VisibleValue.Int(prefix + ".Price", entry.Price));
+            context.Add(VisibleValue.Condition(prefix + ".Purchased", entry.Purchased ? "true" : "false"));
+            AddContent(prefix, VisibleContentProjection.ForRelic(entry.Relic));
+        }
+        return new(context.ToImmutable(), candidates.Select(candidate => candidate switch
+        {
+            CustomEventDecision.BuyRelic buy => new VisibleOption("BUY_RELIC",
+                [VisibleValue.Id("Relic", buy.Entry.Relic.Id.Entry), VisibleValue.Int("Price", buy.Entry.Price),
+                 VisibleValue.Int("Count", 1)])
+                { Contents = [VisibleContentProjection.ForRelic(buy.Entry.Relic)] },
+
+            CustomEventDecision.UsePotion use => new VisibleOption("USE_POTION",
+                [VisibleValue.Id("Potion", use.Potion.Id.Entry), VisibleValue.Int("UseCount", 1)])
+                { Contents = [VisibleContentProjection.ForPotion(use.Potion)] },
+            CustomEventDecision.Leave => new VisibleOption("LEAVE", []),
+            _ => throw new NotSupportedException($"Unsupported fake merchant decision {candidate.GetType().Name}."),
+        }).ToImmutableArray()) { CoverageGapIds = gaps.Distinct().ToImmutableArray() };
+
+        void AddContent(string prefix, VisibleContent content)
+        {
+            context.Add(VisibleValue.Id(prefix + ".Content", content.ContentId));
+            foreach (VisibleValue value in content.Values)
+                context.Add(value with { Name = prefix + "." + value.Name });
+            gaps.AddRange(content.CoverageGapIds);
+            foreach (VisibleContent child in content.Children)
+                AddContent(prefix + ".Hover." + child.ContentId, child);
+        }
+    }
 
     protected override void CalculateVars()
     {

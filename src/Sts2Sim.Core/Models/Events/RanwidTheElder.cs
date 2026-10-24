@@ -8,6 +8,26 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class RanwidTheElder : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState()
+    {
+        var options = new List<VisibleOption>
+        {
+            new("GOLD", [VisibleValue.Int("Gold", 100), VisibleValue.Int("RelicCount", 1),
+                VisibleValue.Condition("Relic", "Random")]),
+            new("POTION_LOCKED", [VisibleValue.Condition("LockReason", "NoPotion")]),
+            new("RELIC_LOCKED", [VisibleValue.Condition("LockReason", "NoTradableRelic")]),
+        };
+        if (PotionOffered is { } potion)
+            options.Add(new("POTION", [VisibleValue.Id("Potion", potion.Id.Entry), VisibleValue.Int("GiveCount", 1),
+                VisibleValue.Int("RelicCount", 1), VisibleValue.Condition("Relic", "Random")])
+            { Contents = [VisibleContentProjection.ForPotion(potion)] });
+        if (RelicOffered is { } relic)
+            options.Add(new("RELIC", [VisibleValue.Id("Relic", relic.Id.Entry), VisibleValue.Int("GiveCount", 1),
+                VisibleValue.Int("RelicCount", 2), VisibleValue.Condition("RewardRelics", "Random")])
+            { Contents = [VisibleContentProjection.ForRelic(relic)] });
+        return new([], [.. options]);
+    }
+
     protected override bool LocksPotions => true;
     public PotionModel? PotionOffered { get; private set; }
     public RelicModel? RelicOffered { get; private set; }

@@ -12,6 +12,19 @@ public sealed class DrowningBeacon : EventModel
 {
     private const decimal MaxHpLoss = 13m;
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("BOTTLE", [VisibleValue.Int("PotionCount", 1), VisibleValue.Id("Potion", "GLOWWATER_POTION")]),
+        new("CLIMB", [VisibleValue.Int("RelicCount", 1), VisibleValue.Int("HpLoss", 13), VisibleValue.Id("Relic", "FRESNEL_LENS"), VisibleValue.Scope("LossKind", "MaxHp")])
+    ]);
+
+    protected override VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) =>
+        option.Key switch
+        {
+            "BOTTLE" => declared with { Contents = [VisibleContentProjection.ForPotion(ModelDb.Potion<GlowwaterPotion>())] },
+            "CLIMB" => declared with { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<FresnelLens>())] },
+            _ => base.DescribeVisibleOption(option, displayIndex, declared),
+        };
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
         new("BOTTLE", Bottle),

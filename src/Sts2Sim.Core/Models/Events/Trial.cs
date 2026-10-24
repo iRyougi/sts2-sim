@@ -9,6 +9,25 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class Trial : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("DOUBLE_DOWN", [VisibleValue.Condition("Lethal", "true")]),
+        new("MERCHANT_GUILTY", [VisibleValue.Id("Curse", ModelDb.GetId<Regret>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("RelicCount", 2), VisibleValue.Condition("Relic", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Regret>())] },
+        new("MERCHANT_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Shame>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("UpgradeCount", 2)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Shame>())] },
+        new("NOBLE_GUILTY", [VisibleValue.Int("Heal", 10)]),
+        new("NOBLE_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Regret>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("Gold", 300)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Regret>())] },
+        new("NONDESCRIPT_GUILTY", [VisibleValue.Id("Curse", ModelDb.GetId<Doubt>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("CardRewardCount", 2), VisibleValue.Condition("CardReward", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Doubt>())] },
+        new("NONDESCRIPT_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Doubt>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("TransformCount", 2), VisibleValue.Condition("TransformResult", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Doubt>())] },
+    ])
+    {
+        // #637: narrative entrant number is absent in Core; metadata must not draw Chaotic RNG.
+        CoverageGapIds = CurrentOptions.Any(option => option.Key == "REJECT") ? ["G1.TrialNarrative"] : [],
+    };
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
         new EventOption("ACCEPT", AcceptAsync),

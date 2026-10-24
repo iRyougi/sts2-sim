@@ -8,6 +8,21 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class ZenWeaver : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        DescribeBreathing(),
+        DescribeRemoval("EMOTIONAL_AWARENESS", "EmotionalAwarenessCost", 125, 1),
+        DescribeRemoval("ARACHNID_ACUPUNCTURE", "ArachnidAcupunctureCost", 250, 2),
+    ]);
+
+    private VisibleOption DescribeBreathing() => CurrentOptions.First(option => option.Key == "BREATHING_TECHNIQUES").IsLocked
+        ? new("BREATHING_TECHNIQUES", [])
+        : new("BREATHING_TECHNIQUES", [VisibleValue.Int("BreathingTechniquesCost", 50), VisibleValue.Int("CardCount", 2), VisibleValue.Id("Card", ModelDb.GetId<Enlightenment>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Enlightenment>())] };
+
+    private VisibleOption DescribeRemoval(string key, string costName, int cost, int count) =>
+        CurrentOptions.First(option => option.Key == key).IsLocked ? new(key, [])
+            : new(key, [VisibleValue.Int(costName, cost), VisibleValue.Int("RemoveCount", count)]);
+
     public override bool IsAllowed(IRunState runState) => runState.Players.All(player => player.Gold >= 125);
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>

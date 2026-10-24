@@ -9,6 +9,13 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class PotionCourier : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("GRAB_POTIONS", [VisibleValue.Id("Potion", "FOUL_POTION"), VisibleValue.Int("Count", 3)])
+        { Contents = [VisibleContentProjection.ForPotion(ModelDb.Potion<FoulPotion>())] },
+        new("RANSACK", [VisibleValue.Scope("RewardKind", "Potion"), VisibleValue.Int("Count", 1),
+            VisibleValue.Scope("Rarity", "Uncommon"), VisibleValue.Condition("Targets", "Random")]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: > 0 };
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
         [new("GRAB_POTIONS", GrabPotions), new("RANSACK", Ransack)];

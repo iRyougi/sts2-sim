@@ -10,6 +10,12 @@ namespace Sts2Sim.Core.Models.Events;
 /// 偏离 #148：不移植 DynamicVars，使用源码常量 8；#150 的 IsAllowed predicate 已在此实现，事件池选择由 Task 3 集成。</summary>
 public sealed class UnrestSite : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("REST", [VisibleValue.Condition("HealToFull", "true"), VisibleValue.Id("Curse", ModelDb.GetId<PoorSleep>().Entry), VisibleValue.Int("CurseCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<PoorSleep>())] },
+        new("KILL", [VisibleValue.Int("MaxHpLoss", 8), VisibleValue.Int("RelicCount", 1), VisibleValue.Condition("Relic", "Random")]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Creature.CurrentHp <= player.Creature.MaxHp * 0.70m);
 
