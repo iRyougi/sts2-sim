@@ -14,6 +14,7 @@ public sealed record VisibleDecisionMetadata(
 
 public sealed record VisibleOption(string OptionKey, ImmutableArray<VisibleValue> Values)
 {
+    public string? SemanticKey { get; init; }
     public bool IsEnabled { get; init; } = true;
     public ImmutableArray<VisibleContent> Contents { get; init; } = [];
     public ImmutableArray<string> CoverageGapIds { get; init; } = [];
@@ -24,6 +25,7 @@ public sealed record VisibleContent(
     ImmutableArray<VisibleValue> Values,
     ImmutableArray<VisibleContent> Children)
 {
+    public string? Role { get; init; }
     public ImmutableArray<string> CoverageGapIds { get; init; } = [];
 }
 

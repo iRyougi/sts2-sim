@@ -15,15 +15,18 @@ public sealed class RelicTrader : EventModel
     protected override VisibleDecisionMetadata BuildVisibleState()
     {
         string[] keys = ["TOP", "MIDDLE", "BOTTOM"];
-        string[] names = ["Top", "Middle", "Bottom"];
         // Only the displayed trades are public; extra pre-generated new relics stay hidden.
         return new([], [.. Enumerable.Range(0, Math.Min(keys.Length, Math.Min(OwnedRelics.Count, NewRelics.Count))).Select(index =>
             new VisibleOption(keys[index], [
-                VisibleValue.Id(names[index] + "RelicOwned", OwnedRelics[index].Id.Entry),
-                VisibleValue.Id(names[index] + "RelicNew", NewRelics[index].Id.Entry),
+                VisibleValue.Id("GiveRelic", OwnedRelics[index].Id.Entry),
+                VisibleValue.Id("ReceiveRelic", NewRelics[index].Id.Entry),
                 VisibleValue.Int("GiveCount", 1), VisibleValue.Int("ReceiveCount", 1),
             ])
-            { Contents = [VisibleContentProjection.ForRelic(OwnedRelics[index]), VisibleContentProjection.ForRelic(NewRelics[index])] }),
+            {
+                SemanticKey = "TRADE",
+                Contents = [VisibleContentProjection.ForRelic(OwnedRelics[index]) with { Role = "Give" },
+                    VisibleContentProjection.ForRelic(NewRelics[index]) with { Role = "Receive" }]
+            }),
             new("PROCEED", [])]);
     }
 

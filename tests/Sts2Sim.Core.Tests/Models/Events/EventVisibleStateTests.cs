@@ -152,7 +152,7 @@ public sealed class EventVisibleStateTests : IDisposable
             "JungleMazeAdventure" => ["JoinForcesGold", "SoloGold", "SoloHp"],
             "LostWisp" => ["Curse", "Gold", "Relic"],
             "LuminousChoir" => ["Gold"],
-            "RelicTrader" => ["BottomRelicNew", "BottomRelicOwned", "MiddleRelicNew", "MiddleRelicOwned", "TopRelicNew", "TopRelicOwned"],
+            "RelicTrader" => ["GiveRelic", "GiveRelic", "GiveRelic", "ReceiveRelic", "ReceiveRelic", "ReceiveRelic"],
             "SpiralingWhirlpool" => ["Heal"],
             "SunkenStatue" => ["Gold", "HpLoss", "Relic"],
             "SunkenTreasury" => ["LargeChestGold", "SmallChestGold"],
@@ -214,12 +214,16 @@ public sealed class EventVisibleStateTests : IDisposable
                 break;
             case "RelicTrader":
                 var trader = (RelicTrader)ev;
-                string[] positions = ["Top", "Middle", "Bottom"];
                 for (int i = 0; i < 3; i++)
                 {
                     string key = ev.CurrentOptions[i].Key;
-                    AssertValue(initial, key, positions[i] + "RelicOwned", trader.OwnedRelics[i].Id.Entry, EventVisibleValueKind.ContentId);
-                    AssertValue(initial, key, positions[i] + "RelicNew", trader.NewRelics[i].Id.Entry, EventVisibleValueKind.ContentId);
+                    AssertValue(initial, key, "GiveRelic", trader.OwnedRelics[i].Id.Entry, EventVisibleValueKind.ContentId);
+                    AssertValue(initial, key, "ReceiveRelic", trader.NewRelics[i].Id.Entry, EventVisibleValueKind.ContentId);
+                    VisibleOption row = initial.DisplayOptions.Single(option => option.OptionKey == key);
+                    Assert.Equal("TRADE", row.SemanticKey);
+                    Assert.Equal(new[] { "Give", "Receive" }, row.Contents.Select(content => content.Role));
+                    Assert.Equal(new[] { trader.OwnedRelics[i].Id.Entry, trader.NewRelics[i].Id.Entry },
+                        row.Contents.Select(content => content.ContentId));
                 }
                 break;
             case "SpiralingWhirlpool": AssertValue(initial, "DRINK", "Heal", "33"); break;
