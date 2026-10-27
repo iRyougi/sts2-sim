@@ -11,7 +11,17 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class ThievingHopper : MonsterModel
 {
-    public bool IsHovering { get; private set; }
+    private bool _isHovering;
+
+    public bool IsHovering
+    {
+        get => _isHovering;
+        set
+        {
+            AssertMutable();
+            _isHovering = value;
+        }
+    }
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 84, 79);
     public override int MaxInitialHp => MinInitialHp;
     private int TheftDamage => Ascension(AscensionLevel.DeadlyEnemies, 19, 17);

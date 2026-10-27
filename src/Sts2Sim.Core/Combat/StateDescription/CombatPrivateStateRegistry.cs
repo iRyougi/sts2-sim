@@ -135,9 +135,9 @@ internal static class CombatPrivateStateRegistry
                 "Initial branch input already materialized into the fingerprinted current move.",
             ["Nibbit._isAlone"] =
                 "Initial branch input already materialized into the fingerprinted current move.",
-            ["ThievingHopper.<IsHovering>k__BackingField"] =
+            ["ThievingHopper._isHovering"] =
                 "Presentation flag; FlutterPower and current move state contain all future behavior.",
-            ["Tunneler.<IsStunned>k__BackingField"] =
+            ["Tunneler._isStunned"] =
                 "Presentation flag; the transient STUNNED move encodes the future transition.",
             ["Wriggler._startStunned"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
