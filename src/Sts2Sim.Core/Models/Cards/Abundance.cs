@@ -22,6 +22,8 @@ public sealed class Abundance : CardModel
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords =>
         new[] { CardKeyword.Exhaust };
 
+    protected override void OnUpgrade() => ReduceEnergyCost(1);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         _generatedCandidates = CardFactory.GetDistinctForCombat(

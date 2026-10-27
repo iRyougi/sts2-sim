@@ -33,6 +33,9 @@ public sealed class AbundanceTests : IDisposable
         Assert.Equal(TargetType.Self, card.TargetType);
         Assert.Equal(new[] { CardKeyword.Exhaust }, card.Keywords);
         Assert.False(card.CanBeGeneratedInCombat);
+
+        card.Upgrade();
+        Assert.Equal(0, card.EnergyCost);
     }
 
     [Theory]

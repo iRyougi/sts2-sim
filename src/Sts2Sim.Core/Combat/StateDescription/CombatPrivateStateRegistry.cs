@@ -123,13 +123,13 @@ internal static class CombatPrivateStateRegistry
                 "Native hurt-animation flag; its presentation reader is omitted in the headless simulator.",
             ["CeremonialBeast._isInSecondPhase"] =
                 "Native background-animation flag; its presentation reader is omitted in the headless simulator.",
-            ["Chomper.<ScreamFirst>k__BackingField"] =
+            ["Chomper._screamFirst"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["Inklet._middleInklet"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["KinFollower._startsWithDance"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
-            ["LouseProgenitor.<Curled>k__BackingField"] =
+            ["LouseProgenitor._curled"] =
                 "Presentation flag; no simulator behavior reads it after assignment.",
             ["Nibbit._isFront"] =
                 "Initial branch input already materialized into the fingerprinted current move.",
@@ -141,7 +141,7 @@ internal static class CombatPrivateStateRegistry
                 "Presentation flag; the transient STUNNED move encodes the future transition.",
             ["Wriggler._startStunned"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
-            ["ScrollOfBiting.<StarterMoveIdx>k__BackingField"] =
+            ["ScrollOfBiting._starterMoveIdx"] =
                 "Initial rotation is materialized into the fingerprinted current move state.",
             ["TestSubject._deadState"] =
                 "Stable reference to RESPAWN_MOVE in the fingerprinted move-state machine.",
