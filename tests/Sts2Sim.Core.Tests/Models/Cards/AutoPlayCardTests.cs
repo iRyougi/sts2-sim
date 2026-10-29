@@ -28,7 +28,7 @@ public sealed class AutoPlayCardTests : IDisposable
             typeof(IAmInvincible), typeof(MakeItSo), typeof(Catastrophe), typeof(BeatDown),
             typeof(DecisionsDecisions), typeof(Bombardment), typeof(Clash), typeof(Neutralize), typeof(Dash),
             typeof(Ricochet), typeof(DaggerSpray),
-            typeof(WeakPower), typeof(TheBomb), typeof(TheBombPower), typeof(SerpentFormPower),
+            typeof(WeakPower), typeof(TheBomb), typeof(TheBombPower), typeof(SerpentFormPower), typeof(BurstPower),
         });
     }
 
@@ -309,6 +309,24 @@ public sealed class AutoPlayCardTests : IDisposable
         Assert.Equal(2, endingPlayer.PlayerCombatState.CardsPlayedThisTurn);
         Assert.Equal(PileType.Discard, bomb.Pile!.Type);
         Assert.Single(endingPlayer.Creature.Powers.OfType<TheBombPower>());
+
+        // #686: a manual Burst replay must stop the same way (it used to dereference a null TheBombPower).
+        (Player burstPlayer, CombatRoom burstRoom) = await CreateCombatAsync("burst-ending-bomb");
+        foreach (CardModel c in burstPlayer.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards).ToList())
+            CardPileCmd.Remove(c);
+        TheBomb burstBomb = AddToHand<TheBomb>(burstPlayer);
+        Creature burstEnemy = burstRoom.Engine.State.HittableEnemies.Single();
+        burstEnemy.LoseHpInternal(burstEnemy.CurrentHp - 1, default);
+        await PowerCmd.Apply<SerpentFormPower>(burstRoom.Engine.State, burstPlayer.Creature,
+            1m, burstPlayer.Creature, null);
+        await PowerCmd.Apply<BurstPower>(burstRoom.Engine.State, burstPlayer.Creature,
+            1m, burstPlayer.Creature, null);
+
+        await burstBomb.PlayAsync(target: null);
+
+        Assert.True(burstEnemy.IsDead);
+        Assert.Equal(1, burstPlayer.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Single(burstPlayer.Creature.Powers.OfType<TheBombPower>());
     }
 
     [Fact]

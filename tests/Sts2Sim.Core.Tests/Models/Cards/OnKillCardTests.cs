@@ -70,7 +70,12 @@ public sealed class OnKillCardTests : IDisposable
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         enemy.LoseHpInternal(enemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
         if (killedMinion)
+        {
+            // A lone minion leaves no living primary enemy: native combat is already ending and skips the play.
+            room.Engine.State.AddMonster((WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
+                Sts2Sim.Core.Combat.CombatSide.Enemy);
             await PowerCmd.Apply<MinionPower>(room.Engine.State, enemy, 1m, enemy, null);
+        }
         int goldBefore = player.Gold;
 
         await card.PlayAsync(enemy);

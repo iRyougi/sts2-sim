@@ -990,6 +990,13 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         {
             for (int playIndex = 0; playIndex < playCount; playIndex++)
             {
+                // 原版 OnPlayWrapper：每次打出前战斗已结束或正在结束就停止（#686：Burst 重放前，
+                // 上一次打出的 AfterCardPlayed 已打死最后一个敌人）。setup 窗口与 Hook 守卫一致不拦。
+                if (combatState.IsOverOrEnding() && !combatState.IsStarting())
+                {
+                    break;
+                }
+
                 var cardPlay = new CardPlay
                 {
                     Card = this,
