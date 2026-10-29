@@ -86,6 +86,8 @@ public static class VisibleDecisionProjection
                 { Contents = RewardContents(alternative.Reward) },
                 RewardDecision.ResolveExtra extra => RewardRow(extra.Skip ? "skip_extra" : "resolve_extra", extra.Reward) with
                 {
+                    // Native custom reward screens keep Skip enabled when a full belt blocks the potion (#687).
+                    IsEnabled = extra.Skip || CanTake(extra.Reward),
                     Values = RewardValues(extra.Reward).Add(Flag("Skip", extra.Skip)),
                     Contents = extra.SelectedCard is { } card ? [VisibleContentProjection.ForCard(card)] : RewardContents(extra.Reward),
                 },
@@ -282,8 +284,9 @@ public static class VisibleDecisionProjection
     }
 
     private static VisibleOption RewardRow(string key, Reward reward) =>
-        new(key, RewardValues(reward)) { IsEnabled = reward is not TakeableReward takeable || takeable.CanTake,
-            Contents = RewardContents(reward) };
+        new(key, RewardValues(reward)) { IsEnabled = CanTake(reward), Contents = RewardContents(reward) };
+
+    private static bool CanTake(Reward reward) => reward is not TakeableReward takeable || takeable.CanTake;
 
     private static ImmutableArray<VisibleValue> RewardValues(Reward reward)
     {

@@ -108,6 +108,8 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("Reward")]
     [InlineData("RewardExtra")]
     [InlineData("RewardAlternative")]
+    [InlineData("RewardPotionFull")]
+    [InlineData("RewardPotionOpen")]
     [InlineData("ShopStock")]
     [InlineData("ShopRemoval")]
     [InlineData("Rest")]
@@ -315,7 +317,7 @@ public sealed class EventVisibleStateTests : IDisposable
 
 
     private static readonly string[] LegacyEvents = ["AbyssalBaths", "CrystalSphere", "DenseVegetation", "EndlessConveyor", "FakeMerchant", "JungleMazeAdventure", "LostWisp", "LuminousChoir", "RelicTrader", "SpiralingWhirlpool", "SunkenStatue", "SunkenTreasury", "ThisOrThat", "WhisperingHollow"];
-    private static bool IsScenario(string name) => name is "Inventory" or "Map" or "Reward" or "RewardExtra" or "RewardAlternative" or "ShopStock" or "ShopRemoval" or "Rest" or "CardManual" or "CardAutomatic" or "CardBundle" or "CustomSphere" or "CustomFake" or "Locked" or "Duplicate" or "Legacy" or "Counters";
+    private static bool IsScenario(string name) => name is "Inventory" or "Map" or "Reward" or "RewardExtra" or "RewardAlternative" or "RewardPotionFull" or "RewardPotionOpen" or "ShopStock" or "ShopRemoval" or "Rest" or "CardManual" or "CardAutomatic" or "CardBundle" or "CustomSphere" or "CustomFake" or "Locked" or "Duplicate" or "Legacy" or "Counters";
 
     private static async Task VerifyEvent(string name)
     {
@@ -525,6 +527,27 @@ public sealed class EventVisibleStateTests : IDisposable
                 if (scenario == "Reward") Assert.Contains(VisibleValue.Int("Amount", 42), projection.DescribeCandidate(choice).Values);
                 if (scenario == "RewardExtra") Assert.Equal(cards[0].Id.Entry, Assert.Single(projection.DescribeCandidate(choice).Contents).ContentId);
                 if (scenario == "RewardAlternative") Assert.Contains(VisibleValue.Id("AlternativeId", "fixture_alternative"), projection.DescribeCandidate(choice).Values);
+                break;
+            case "RewardPotionFull":
+            case "RewardPotionOpen":
+                // #687: a full belt blocks taking a merchant potion, but the native custom reward screen keeps Skip.
+                if (scenario == "RewardPotionFull")
+                    while (player.PotionSlots.Contains(null)) player.AddPotionInternal((FirePotion)ModelDb.Potion<FirePotion>().MutableClone());
+                var merchantPotion = new PotionReward((FirePotion)ModelDb.Potion<FirePotion>().MutableClone(), player) { IsOptionalMerchantChoice = true };
+                var potionRewards = RewardsSet.CreateCustom(player, extraRewards: [merchantPotion]);
+                await potionRewards.Gold.Take();
+                var potionChoice = Assert.IsType<RewardDecisionClassification.Choice>(RewardDecisionClassifier.Classify(potionRewards));
+                RewardDecision[] potionChoices = [.. potionChoice.Candidates];
+                projection = Pure(run, () => VisibleDecisionProjection.ForRewards(potionRewards, potionChoices));
+                bindings = potionChoices;
+                bool open = scenario == "RewardPotionOpen";
+                Assert.Equal(open, merchantPotion.CanTake);
+                Assert.Equal(open ? 2 : 1, potionChoices.Length);
+                Assert.All(potionChoices, candidate => Assert.True(projection.DescribeCandidate(candidate).IsEnabled, $"{scenario}: {projection.DescribeCandidate(candidate).OptionKey} must stay enabled."));
+                Assert.Single(potionChoices, candidate => candidate is RewardDecision.ResolveExtra { Skip: true });
+                Assert.Equal(open, Assert.Single(projection.Metadata.DisplayOptions, row => row.OptionKey == "reward:0").IsEnabled);
+                var untakeable = new RewardDecision.ResolveExtra(merchantPotion);
+                Assert.Equal(open, Pure(run, () => VisibleDecisionProjection.ForRewards(potionRewards, [untakeable])).DescribeCandidate(untakeable).IsEnabled);
                 break;
             case "ShopStock":
             case "ShopRemoval":
