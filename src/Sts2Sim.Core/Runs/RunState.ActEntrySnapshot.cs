@@ -92,14 +92,14 @@ public sealed partial class RunState
 
     private void RequireActEntryBoundary()
     {
-        if (IsGameOver || EntryPhase != RunEntryPhase.InitializedBeforeAncient || CurrentActIndex != 1 ||
+        if (IsGameOver || EntryPhase != RunEntryPhase.InitializedBeforeAncient || CurrentActIndex is not (1 or 2) ||
             _players.Count != 1 || _currentRooms.Count != 0 || _activeRewardOffers.Count != 0 ||
             ForcedCombatResumeOutcome is not null || _selectingMapEventBeforeHistoryAppend ||
             _visibleMapVisits.Count != 0 || _unknownMapPointEntriesThisAct != 0 ||
             _visitedMapCoords.Any(c => c != Map.StartingMapPoint.coord) || _visitedMapCoords.Count > 1 ||
             _eventsVisited != 0 || _normalEncountersVisited != 0 || _eliteEncountersVisited != 0 ||
             _bossEncountersVisited != 0 || _nextRoomId != 0)
-            throw new TransplantMappingException("ActEntry.Phase", "Only initialized act 2 before Ancient entry is supported.");
+            throw new TransplantMappingException("ActEntry.Phase", "Only initialized act 2 or 3 before Ancient entry is supported.");
     }
 
     private static MapCoordDto Coord(MapPoint p) => new(p.coord.col, p.coord.row);
@@ -107,7 +107,7 @@ public sealed partial class RunState
 
     internal static RunState ImportActEntryState(ActEntrySnapshot s)
     {
-        if (s.Phase != RunEntryPhase.InitializedBeforeAncient || s.ActIndex != 1 || s.Ascension is < 0 or > 10 ||
+        if (s.Phase != RunEntryPhase.InitializedBeforeAncient || s.ActIndex is not (1 or 2) || s.Ascension is < 0 or > 10 ||
             string.IsNullOrEmpty(s.Seed) || s.RunRng is null || s.RunRng.Seed != s.Seed || s.Acts is null ||
             s.Rooms is null || s.Rooms.Count != s.Acts.Count || s.Player is null || s.Map is null ||
             s.Visited is null || s.AncientHistory is null || !s.CompleteAncientHistory || s.VisitedEvents is null ||

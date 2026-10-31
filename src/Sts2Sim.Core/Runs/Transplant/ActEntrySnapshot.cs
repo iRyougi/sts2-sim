@@ -11,7 +11,7 @@ public sealed record ActEntryMapPoint(int Col, int Row, string Type, bool CanBeM
 public sealed record ActEntryMap(string Kind, int Columns, int Rows, MapCoordDto Starting,
     MapCoordDto Boss, MapCoordDto? SecondBoss, IReadOnlyList<MapCoordDto> Starts, IReadOnlyList<ActEntryMapPoint> Points);
 
-/// <summary>Offline private state, admissible only at act 2 before Ancient entry. Never a model observation.</summary>
+/// <summary>Offline private state, admissible only at act 2 or 3 before Ancient entry. Never a model observation.</summary>
 public sealed record ActEntrySnapshot(int SchemaVersion, string CoreHash, string Seed, string CharacterId,
     int Ascension, int ActIndex, IReadOnlyList<string> Acts, RunEntryPhase Phase,
     IReadOnlyList<MapCoordDto> Visited, int CompletedFloors, PlayerSnapshot Player, decimal Block,
