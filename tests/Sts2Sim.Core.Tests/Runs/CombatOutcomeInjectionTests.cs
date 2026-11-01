@@ -49,6 +49,7 @@ public sealed class CombatOutcomeInjectionTests
             return;
         }
         CombatRoom room = await driver.RunOneCombatFromTransplantAsync(target);
+        Assert.Equal(1, source.CompletedCalls); // #728: injected outcomes must reach completion validation.
         Assert.True(run.IsGameOver == (row == "died"), $"seed={seed}, row={row}");
         Assert.True(run.Players[0].Creature.IsDead == (row == "died"), $"seed={seed}, row={row}");
         if (row == "died") Assert.Empty(room.GeneratedRewards);
@@ -86,10 +87,16 @@ public sealed class CombatOutcomeInjectionTests
         }
     }
 
-    private sealed class InjectionSource(bool died, IReadOnlyList<int>? consumed = null) : IRunDecisionSource, ICombatOutcomeOverride
+    private sealed class InjectionSource(bool died, IReadOnlyList<int>? consumed = null) : IRunDecisionSource, ICombatOutcomeOverride, ICombatCompletionValidator
     {
         public int StartTurn { get; private set; }
         public int Calls { get; private set; }
+        public int CompletedCalls { get; private set; }
+        public void ValidateCompletedCombat(CombatState state)
+        {
+            Assert.False(state.Engine!.IsInProgress);
+            CompletedCalls++;
+        }
         public InjectedCombatOutcome? TryInject(RunState run, CombatRoom room)
         {
             Calls++;

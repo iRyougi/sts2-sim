@@ -643,6 +643,7 @@ public sealed class RunDriver
                     player.RemovePotionInternal(potion);
                 }
             }
+            (_decisionSource as ICombatCompletionValidator)?.ValidateCompletedCombat(engine.State);
             await combatRoom.ResolveOutcomeAsync(generateRewards);
             if (!injected.Died)
                 player.Creature.SetCurrentHpInternal(Math.Clamp(injected.RemainingHp, 1, player.Creature.MaxHp));

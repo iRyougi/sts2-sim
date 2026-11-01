@@ -142,6 +142,7 @@ public sealed class RunDriverRecorderTests : IDisposable
         Assert.Equal((capture.Result.Won, capture.Result.FloorsVisited, capture.Result.FinalPlayerHp), recorder.EndRunSummary);
         Assert.True(recorder.CombatCallCount > 0);
         Assert.Equal(1, recorder.CombatEndCount);
+        Assert.Equal(1, recorder.SettlementCount); // #728: capture after combat outcome and before reward choices.
     }
 
     [Fact]
@@ -402,6 +403,13 @@ public sealed class RunDriverRecorderTests : IDisposable
         public int CombatCallCount { get; private set; }
 
         public int CombatEndCount { get; private set; }
+        public int SettlementCount { get; private set; }
+        public void ObserveCombatSettlement(RunState run, CombatState state)
+        {
+            Assert.False(state.Engine!.IsInProgress);
+            Assert.True(IsFloorActive);
+            SettlementCount++;
+        }
 
         public IReadOnlyDictionary<string, CombatLog> CombatLogs => new Dictionary<string, CombatLog>();
 
