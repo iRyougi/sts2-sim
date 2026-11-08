@@ -356,6 +356,8 @@ public sealed class EventVisibleStateTests : IDisposable
             for (int page = 0; page < 10 && !observed.Event.IsFinished; page++)
             {
                 AssertSnapshot(observed.Run, observed.Event);
+                // #777: only the opening page counts as initial (deployment routes later pages to the fallback).
+                Assert.True(observed.Event.IsOnInitialPage == (page == 0), $"{name} branch {branch} page {page}: IsOnInitialPage");
                 Assert.Equal(control.Event.CurrentOptions.Select(o => (o.Key, o.IsLocked)), observed.Event.CurrentOptions.Select(o => (o.Key, o.IsLocked)));
                 if (observed.Event.IsAwaitingForcedCombat || observed.Event.HasPendingRewardOffers) break;
                 EventOption[] offered = observed.Event.CurrentOptions.ToArray();

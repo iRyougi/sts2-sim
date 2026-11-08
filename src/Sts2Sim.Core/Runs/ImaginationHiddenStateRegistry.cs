@@ -80,7 +80,7 @@ internal static class ImaginationHiddenStateRegistry
             "_stateLock _owner _runState _activeChoiceTask _activeChoiceOption _pendingForcedCombatFactory _pendingForcedCombatBatchFactory _pendingForcedCombatSlottedBatchFactory");
         Add(typeof(EventModel).FullName!, N, "Event-local future RNG is replaced with a fresh root-derived stream.", "_rng");
         Add(typeof(EventModel).FullName!, V, history,
-            "_activeChoicePageVersion _pageVersion _hasBegun _isAwaitingForcedCombat _pendingRewardOffers _suspendedRewardOffers <CurrentOptions>k__BackingField <IsFinished>k__BackingField");
+            "_activeChoicePageVersion _pageVersion _initialPageVersion _hasBegun _isAwaitingForcedCombat _pendingRewardOffers _suspendedRewardOffers <CurrentOptions>k__BackingField <IsFinished>k__BackingField");
 
         Event("AbyssalBaths", V, history, "_lingerCount _damage");
         Event("BattlewornDummy", V, history, "_selectedTier");

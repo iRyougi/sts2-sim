@@ -23,6 +23,7 @@ public abstract class EventModel : AbstractModel
     private EventOption? _activeChoiceOption;
     private int _activeChoicePageVersion;
     private int _pageVersion;
+    private int _initialPageVersion;
     private bool _hasBegun;
     private bool _isAwaitingForcedCombat;
     private Queue<RewardsSet> _pendingRewardOffers = new();
@@ -40,6 +41,10 @@ public abstract class EventModel : AbstractModel
     public IReadOnlyList<EventOption> CurrentOptions { get; private set; } = EmptyOptions();
 
     public bool IsFinished { get; private set; }
+
+    /// <summary>Whether the player is still on the page the event opened with (no option taken yet that changed the
+    /// page). Visible to the player; read by the strategic deployment, never by RNG or simulation logic (#777).</summary>
+    public bool IsOnInitialPage { get { lock (_stateLock) { return _hasBegun && !IsFinished && _pageVersion == _initialPageVersion; } } }
 
     /// <summary>Returns only values already displayed by the current event page.</summary>
     public VisibleDecisionSnapshot GetVisibleState()
@@ -178,6 +183,7 @@ public abstract class EventModel : AbstractModel
             {
                 CalculateVars();
                 SetOptions(GenerateInitialOptionsWrapper());
+                _initialPageVersion = _pageVersion;
             }
             if (LocksPotions && !IsFinished) Owner.CanUseOrRemovePotions = false;
         }
@@ -489,6 +495,7 @@ public abstract class EventModel : AbstractModel
         _activeChoiceOption = null;
         _activeChoicePageVersion = 0;
         _pageVersion = source._pageVersion;
+        _initialPageVersion = source._initialPageVersion;
         _hasBegun = source._hasBegun;
         _isAwaitingForcedCombat = source._isAwaitingForcedCombat;
         IsFinished = source.IsFinished;
@@ -517,6 +524,7 @@ public abstract class EventModel : AbstractModel
         _activeChoiceOption = null;
         _activeChoicePageVersion = 0;
         _pageVersion = 0;
+        _initialPageVersion = 0;
         _hasBegun = false;
         _isAwaitingForcedCombat = false;
         _pendingRewardOffers = new Queue<RewardsSet>();
