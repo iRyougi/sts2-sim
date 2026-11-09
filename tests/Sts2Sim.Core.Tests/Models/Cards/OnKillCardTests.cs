@@ -30,19 +30,43 @@ public sealed class OnKillCardTests : IDisposable
     public void Dispose() => ModelDb.ResetForTests();
 
     [Fact]
-    public async Task KnockoutBlow_Upgrade_KillsEnemy_AndGrantsFiveStars()
+    public async Task KnockoutBlow_Upgrade_GrantsFiveStarsOnlyBeforeCombatEnding()
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync("knockout-blow");
+        const string seed = "knockout-blow";
+        (Player player, CombatRoom room) = await CreateCombatAsync(seed);
         KnockoutBlow card = AddToHand<KnockoutBlow>(player);
         card.Upgrade();
         Creature enemy = room.Engine.State.HittableEnemies.Single();
+        Creature lastEnemy = room.Engine.State.AddMonster(
+            (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
+            Sts2Sim.Core.Combat.CombatSide.Enemy);
         enemy.LoseHpInternal(enemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
-        int starsBefore = player.PlayerCombatState!.Stars;
+        PlayerCombatState playerCombatState = player.PlayerCombatState!;
+        int starsBefore = playerCombatState.Stars;
+        decimal starsGainedBefore = playerCombatState.StarsGainedThisTurn;
 
         await card.PlayAsync(enemy);
 
-        Assert.True(enemy.IsDead);
-        Assert.Equal(starsBefore + 5, player.PlayerCombatState!.Stars);
+        Assert.True(enemy.IsDead, $"seed={seed}, kill=non-final: first enemy should die");
+        Assert.False(room.Engine.State.IsEnding(), $"seed={seed}, kill=non-final: combat should remain active");
+        Assert.True(playerCombatState.Stars == starsBefore + 5,
+            $"seed={seed}, kill=non-final: expected {starsBefore + 5} stars, actual {playerCombatState.Stars}");
+        Assert.True(playerCombatState.StarsGainedThisTurn == starsGainedBefore + 5m,
+            $"seed={seed}, kill=non-final: expected {starsGainedBefore + 5m} stars gained, actual {playerCombatState.StarsGainedThisTurn}");
+
+        lastEnemy.LoseHpInternal(lastEnemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
+        playerCombatState.ResetEnergy();
+        KnockoutBlow finalCard = AddToHand<KnockoutBlow>(player);
+        finalCard.Upgrade();
+
+        await finalCard.PlayAsync(lastEnemy);
+
+        Assert.True(lastEnemy.IsDead, $"seed={seed}, kill=final: last enemy should die");
+        Assert.True(room.Engine.State.IsEnding(), $"seed={seed}, kill=final: combat should be ending");
+        Assert.True(playerCombatState.Stars == starsBefore + 5,
+            $"seed={seed}, kill=final: expected stars to remain {starsBefore + 5}, actual {playerCombatState.Stars}");
+        Assert.True(playerCombatState.StarsGainedThisTurn == starsGainedBefore + 5m,
+            $"seed={seed}, kill=final: expected stars gained to remain {starsGainedBefore + 5m}, actual {playerCombatState.StarsGainedThisTurn}");
     }
 
     [Fact]

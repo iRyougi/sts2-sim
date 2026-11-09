@@ -128,6 +128,9 @@ public static class CreatureCmd
         CardModel? cardSource,
         CardPlay? cardPlay)
     {
+        if (dealer?.IsDead == true)
+            return targets.Select(target => new DamageResult(target, props)).ToArray();
+
         List<Creature> targetList = targets.ToList();
         var pending = new List<(DamageResult Result, bool Prevented)>();
 
@@ -519,6 +522,9 @@ public static class CreatureCmd
     public static async Task Heal(Creature creature, decimal amount)
     {
         ArgumentNullException.ThrowIfNull(creature);
+        if (!creature.IsPlayer && creature.CombatState?.IsEnding() == true)
+            return;
+
         int hpBefore = creature.CurrentHp;
         creature.HealInternal(amount);
         (creature.CombatState as CombatState)?.PredictionSink?.HealApplied(

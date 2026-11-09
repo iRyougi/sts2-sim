@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
@@ -16,7 +17,7 @@ public sealed class Void : CardModel
     {
         if (ReferenceEquals(card, this))
         {
-            Owner.PlayerCombatState!.LoseEnergy(1m);
+            return PlayerCmd.LoseEnergy(1m, Owner);
         }
 
         return Task.CompletedTask;

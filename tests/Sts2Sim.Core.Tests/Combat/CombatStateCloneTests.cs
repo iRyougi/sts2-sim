@@ -395,7 +395,7 @@ public sealed class CombatStateCloneTests
     public async Task Clone_ReviveMoveRebindsCallbackAndRuntimeToClonedIllusionPower()
     {
         (CombatState original, _) =
-            await NewStartedCombat("clone-transient-revive", typeof(CloneTransientMonster));
+            await NewStartedCombat("clone-transient-revive", typeof(CloneTransientMonster), addPrimaryEnemy: true);
         Creature originalEnemy = original.Enemies[0];
         IllusionPower originalPower = Assert.IsType<IllusionPower>(
             await PowerCmd.Apply<IllusionPower>(
@@ -434,6 +434,8 @@ public sealed class CombatStateCloneTests
         Assert.NotSame(originalPower, clonedPower);
         Assert.True(clonedPower.IsReviving);
         Assert.True(clonedEnemy.IsDead);
+        Assert.False(clone.IsEnding(),
+            "seed=clone-transient-revive: a live primary enemy must keep the revival inside an active combat");
 
         await clonedMonster.PerformMove();
 
@@ -1174,7 +1176,8 @@ public sealed class CombatStateCloneTests
 
     private static async Task<(CombatState State, CombatEngine Engine)> NewStartedCombat(
         string seed,
-        Type? monsterType = null)
+        Type? monsterType = null,
+        bool addPrimaryEnemy = false)
     {
         var runState = new CloneTestRunState(seed);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
@@ -1186,6 +1189,12 @@ public sealed class CombatStateCloneTests
         state.AddMonster(
             (MonsterModel)canonicalMonster.MutableClone(),
             CombatSide.Enemy);
+        if (addPrimaryEnemy)
+        {
+            state.AddMonster(
+                (MonsterModel)ModelDb.Monster<TrainingDummy>().MutableClone(),
+                CombatSide.Enemy);
+        }
         var engine = new CombatEngine(state);
         await engine.StartCombatAsync();
         return (state, engine);

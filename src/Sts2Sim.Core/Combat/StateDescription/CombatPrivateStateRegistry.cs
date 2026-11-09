@@ -46,6 +46,7 @@ internal static class CombatPrivateStateRegistry
         "Vambrace._triggeredThisCombat", "VenerableTeaSet._isArmed",
         "BoneTea._combatsLeft", "EmberTea._combatsLeft", "TeaOfDiscourtesy._combatsLeft",
         "HistoryCourse._lastAttack", "HistoryCourse._lastAttackTurn",
+        "HistoryCourse._previousAttack", "HistoryCourse._previousAttackTurn",
         "FakeHappyFlower._turnsSeen", "FakeOrichalcum._shouldTrigger",
         "FakeVenerableTeaSet._isArmed",
         "WongosMysteryTicket._combatsFinished", "WongosMysteryTicket._gaveRelics",

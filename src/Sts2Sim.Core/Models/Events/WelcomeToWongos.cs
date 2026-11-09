@@ -77,7 +77,9 @@ public sealed class WelcomeToWongos : EventModel
 
     private Task Leave()
     {
-        Rng.NextItem(Owner.Deck.Cards.Where(c => c.IsUpgraded))?.Downgrade();
+        CardModel? card = Rng.NextItem(Owner.Deck.Cards.Where(c => c.IsUpgraded));
+        if (card is not null)
+            CardCmd.Downgrade(card);
         Finish();
         return Task.CompletedTask;
     }

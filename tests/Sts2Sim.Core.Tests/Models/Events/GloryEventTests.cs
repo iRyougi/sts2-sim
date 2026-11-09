@@ -261,10 +261,12 @@ public sealed class GloryEventTests : IDisposable
             }
         }
         var ev = Begin<Reflections>(runState, player);
+        int rngBefore = ev.Rng.Counter;
 
         await Choose(ev, "TOUCH_A_MIRROR");
 
         Assert.Equal(4, player.Deck.Cards.Count(card => card.IsUpgraded));
+        Assert.Equal(6, ev.Rng.Counter - rngBefore);
         Assert.True(ev.IsFinished);
     }
 

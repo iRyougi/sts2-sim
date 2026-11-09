@@ -28,7 +28,7 @@ public sealed class Reflections : EventModel
         {
             CardModel card = Rng.NextItem(upgraded)!;
             upgraded.Remove(card);
-            card.Downgrade();
+            CardCmd.Downgrade(card);
         }
 
         List<CardModel> upgradable = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();

@@ -44,9 +44,29 @@ public static class PlayerCmd
         return Task.CompletedTask;
     }
 
+    public static Task LoseEnergy(decimal amount, Player player)
+    {
+        if (amount <= 0m)
+        {
+            return Task.CompletedTask;
+        }
+        if (player.Creature.CombatState?.IsEnding() == true)
+        {
+            return Task.CompletedTask;
+        }
+
+        player.PlayerCombatState!.LoseEnergy(amount);
+        return Task.CompletedTask;
+    }
+
     public static async Task GainStars(decimal amount, Player player)
     {
         if (player.PlayerCombatState is null)
+        {
+            return;
+        }
+
+        if (player.Creature.CombatState?.IsEnding() == true)
         {
             return;
         }

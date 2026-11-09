@@ -301,7 +301,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     /// <summary>A fixed energy-cost override until the turn ends or this card is first played.</summary>
     public int? TemporaryCostOverrideThisTurnOrUntilPlayed { get; private set; }
 
-    /// <summary>The independent star-cost part of SetToFreeThisTurn; unlike energy it survives playing.</summary>
+    /// <summary>The star-cost part of SetToFreeThisTurn, cleared after play or at turn end.</summary>
     public int? TemporaryStarCostOverrideThisTurn { get; private set; }
 
     public void SetToFreeThisTurn()
@@ -990,9 +990,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         {
             for (int playIndex = 0; playIndex < playCount; playIndex++)
             {
-                // 原版 OnPlayWrapper：每次打出前战斗已结束或正在结束就停止（#686：Burst 重放前，
-                // 上一次打出的 AfterCardPlayed 已打死最后一个敌人）。setup 窗口与 Hook 守卫一致不拦。
-                if (combatState.IsOverOrEnding() && !combatState.IsStarting())
+                // 原版 OnPlayWrapper：每次打出前战斗已结束或正在结束就停止，setup 窗口也不豁免。
+                // #686：Burst 重放前，上一次打出的 AfterCardPlayed 可能已打死最后一个敌人。
+                if (combatState.IsOverOrEnding())
                 {
                     break;
                 }
@@ -1075,6 +1075,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
         TemporaryCostOverrideThisTurnOrUntilPlayed = null;
         _localEnergyModifiers.RemoveAll(modifier => modifier.ClearsAfterPlay);
+        ClearTemporaryStarCostOverrideThisTurn();
 
         observer?.CardPlayFinished(this, target, firstPlay);
         return firstPlay;

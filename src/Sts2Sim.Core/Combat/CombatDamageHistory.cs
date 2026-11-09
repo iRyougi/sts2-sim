@@ -20,7 +20,7 @@ public sealed class CombatDamageHistory
         CardModel? cardSource,
         ICombatState combatState)
     {
-        if (combatState.IsLiveCombat())
+        if (combatState.IsLiveCombat() && !combatState.IsEnding())
         {
             _entries.Add(new CombatDamageHistoryEntry(
                 result,

@@ -10,7 +10,7 @@ using Sts2Sim.Core.Runs;
 namespace Sts2Sim.Core.Commands;
 
 /// <summary>
-/// 卡牌升级/转化命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CardCmd</c>）。
+/// 卡牌升级、降级与转化命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CardCmd</c>）。
 /// 偏离 #86：<c>Upgrade</c> 省略 <c>CardPreviewStyle</c> 预览高亮参数与存档 history 记录；本项目没有 UI 预览。
 /// </summary>
 public static class CardCmd
@@ -20,6 +20,12 @@ public static class CardCmd
     {
         ArgumentNullException.ThrowIfNull(card);
         var affliction = (T)Models.ModelDb.Affliction<T>().MutableClone();
+        if (card.Pile is { Type: not (PileType.None or PileType.Deck) } &&
+            (card.CombatState?.IsOverOrEnding() ?? true))
+        {
+            return Task.FromResult<T?>(null);
+        }
+
         if (!affliction.CanAfflict(card))
         {
             return Task.FromResult<T?>(null);
@@ -52,10 +58,26 @@ public static class CardCmd
     public static void Upgrade(Models.CardModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
+        if (card.CombatState?.IsEnding() == true)
+        {
+            return;
+        }
+
         if (card.IsUpgradable)
         {
             card.Upgrade();
         }
+    }
+
+    public static void Downgrade(Models.CardModel card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        if (card.CombatState?.IsEnding() == true)
+        {
+            return;
+        }
+
+        card.Downgrade();
     }
 
     /// <summary>Applies Retain only until this turn's hand flush has completed.</summary>

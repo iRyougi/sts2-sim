@@ -47,11 +47,31 @@ public sealed class TreasureRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(runState);
         _resolutions = Array.Empty<TreasureRoomResolution>();
-        var resolutions = new List<TreasureRoomResolution>();
+        var relics = new List<(Player Player, RelicModel? Relic)>();
         foreach (Player player in runState.Players)
         {
             // 偏离 #154：地图上的宝箱节点保持不变；被抑制时仅跳过该玩家的金币与遗物发放。
             if (!Hooks.Hook.ShouldGenerateTreasure(runState, player))
+            {
+                relics.Add((player, null));
+                continue;
+            }
+
+            RelicRarity rarity = RelicFactory.RollRarity(runState.Rng.ForSemanticKey(
+                RunRngType.TreasureRoomRelics,
+                $"{runState.SemanticLocationKey}/treasure/slot=relic"));
+            RelicGrabBag sharedBag = runState.SharedRelicGrabBag
+                ?? throw new InvalidOperationException("Shared relic bag must be initialized before entering treasure.");
+            RelicModel relic = sharedBag.PullFromFront(rarity, runState)
+                ?? ModelDb.Relic<Sts2Sim.Core.Models.Relics.Circlet>();
+            relics.Add((player, relic));
+        }
+
+        // All relics are picked before gold and quest rewards; obtain effects still run afterward.
+        var resolutions = new List<TreasureRoomResolution>();
+        foreach ((Player player, RelicModel? relic) in relics)
+        {
+            if (relic is null)
             {
                 resolutions.Add(new TreasureRoomResolution(player, 0, null));
                 continue;
@@ -69,13 +89,6 @@ public sealed class TreasureRoom : AbstractRoom
                     await quest.OnQuestComplete();
             }
             int goldGained = player.Gold - goldBefore;
-            RelicRarity rarity = RelicFactory.RollRarity(runState.Rng.ForSemanticKey(
-                RunRngType.TreasureRoomRelics,
-                $"{runState.SemanticLocationKey}/treasure/slot=relic"));
-            RelicGrabBag sharedBag = runState.SharedRelicGrabBag
-                ?? throw new InvalidOperationException("Shared relic bag must be initialized before entering treasure.");
-            RelicModel relic = sharedBag.PullFromFront(rarity, runState)
-                ?? ModelDb.Relic<Sts2Sim.Core.Models.Relics.Circlet>();
             await RelicCmd.Obtain(relic, player);
             resolutions.Add(new TreasureRoomResolution(
                 player,

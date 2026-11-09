@@ -1,4 +1,5 @@
 using Sts2Sim.Core.Combat;
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
@@ -30,7 +31,7 @@ public sealed class Bread : RelicModel
 
         if (Owner.PlayerCombatState.TurnNumber == 1)
         {
-            Owner.PlayerCombatState.LoseEnergy(2m);
+            return PlayerCmd.LoseEnergy(2m, Owner);
         }
         else if (Owner.PlayerCombatState.TurnNumber == 2)
         {
