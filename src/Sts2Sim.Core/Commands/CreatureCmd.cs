@@ -500,7 +500,7 @@ public static class CreatureCmd
     {
         ArgumentNullException.ThrowIfNull(combatState);
         ArgumentNullException.ThrowIfNull(target);
-        if (amount <= 0m || target.IsDead)
+        if (combatState.IsOverOrEnding() || amount <= 0m || target.IsDead)
         {
             return;
         }

@@ -35,12 +35,14 @@ public sealed class ZenWeaver : EventModel
     private async Task BreathingAsync()
     {
         await PlayerCmd.LoseGold(50, Owner, GoldLossType.Spent);
-        for (int i = 0; i < 2; i++)
+        var cards = new CardModel[2];
+        for (int i = 0; i < cards.Length; i++)
         {
             var card = (Enlightenment)ModelDb.Card<Enlightenment>().MutableClone();
             card.AssignOwner(Owner);
-            await CardPileCmd.AddToDeck(card);
+            cards[i] = card;
         }
+        await CardPileCmd.AddToDeck(cards);
         Finish();
     }
 

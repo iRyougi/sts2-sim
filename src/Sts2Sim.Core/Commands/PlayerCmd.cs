@@ -35,6 +35,11 @@ public static class PlayerCmd
 
     public static Task GainEnergy(decimal amount, Player player)
     {
+        if (amount <= 0m || player.Creature.CombatState?.IsEnding() == true)
+        {
+            return Task.CompletedTask;
+        }
+
         player.PlayerCombatState?.GainEnergy(amount);
         return Task.CompletedTask;
     }

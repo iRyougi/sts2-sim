@@ -51,6 +51,11 @@ public sealed class Shiv : CardModel, ICardDamageVariableProvider
         ICombatState combatState,
         Player? creator = null)
     {
+        if (count == 0 || combatState.IsOverOrEnding())
+        {
+            return Array.Empty<CardModel>();
+        }
+
         var shivs = new List<CardModel>();
         for (int index = 0; index < count; index++)
         {
