@@ -38,7 +38,7 @@ public static class CardEffectProbe
     private const int ProbeHp = 999, ProbeResource = 10;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
     private static readonly ConcurrentDictionary<(string Id, int Upgrade), CardEffectFacts> Cache = new();
-    private static readonly Lazy<Dictionary<string, float>> HeldBaseline = new(() => Task.Run(() => HeldAsync(null)).GetAwaiter().GetResult());
+    private static readonly Lazy<Dictionary<string, float>> HeldBaseline = new(() => ItemEffectProbe.StartDedicated(() => HeldAsync(null)).GetAwaiter().GetResult());
 
     public static readonly ImmutableArray<string> CountNames =
     [
@@ -56,7 +56,7 @@ public static class CardEffectProbe
 
     private static CardEffectFacts Observe(string cardId, int upgradeLevel)
     {
-        Task<CardEffectFacts> probe = Task.Run(() => ProbeAsync(cardId, upgradeLevel));
+        Task<CardEffectFacts> probe = ItemEffectProbe.StartDedicated(() => ProbeAsync(cardId, upgradeLevel));
         try
         {
             return probe.Wait(Timeout) ? probe.Result

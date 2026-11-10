@@ -49,9 +49,9 @@ public static class ItemEffectProbe
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
     private static readonly ConcurrentDictionary<string, ItemEffectFacts> RelicCache = new(), PotionCache = new();
     private static readonly Lazy<Dictionary<string, float>[]> RelicBaseline =
-        new(() => Task.Run(() => RunRelicScriptAsync(null)).GetAwaiter().GetResult());
+        new(() => StartDedicated(() => RunRelicScriptAsync(null)).GetAwaiter().GetResult());
     private static readonly Lazy<Dictionary<string, float>> PotionBaseline =
-        new(() => Task.Run(() => UsePotionAsync(null)).GetAwaiter().GetResult());
+        new(() => StartDedicated(() => UsePotionAsync(null)).GetAwaiter().GetResult());
 
     public static readonly ImmutableArray<string> Phases = ["Obtain", "CombatStart", "Attack", "TurnEnd", "Skill", "Poison", "Victory"];
     // Every-N triggers up to ten plays / three turns can show in the script.
@@ -113,9 +113,17 @@ public static class ItemEffectProbe
     public static ItemEffectFacts ProbePotion(string potionId) =>
         PotionCache.GetOrAdd(potionId, id => Observe(() => PotionAsync(id), "potion " + id));
 
+    /// <summary>
+    /// Starts a probe on its own thread instead of the shared pool queue, so the probe timeout measures the probe and
+    /// not the queue in front of it: a busy pool (e.g. the RL server's background replays under a small processor count)
+    /// once delayed a fresh probe past the timeout and turned an ordinary card face into an error (#907).
+    /// </summary>
+    internal static Task<T> StartDedicated<T>(Func<Task<T>> run) =>
+        Task.Factory.StartNew(run, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+
     private static ItemEffectFacts Observe(Func<Task<ItemEffectFacts>> run, string label)
     {
-        Task<ItemEffectFacts> probe = Task.Run(run);
+        Task<ItemEffectFacts> probe = StartDedicated(run);
         try
         {
             return probe.Wait(Timeout) ? probe.Result
