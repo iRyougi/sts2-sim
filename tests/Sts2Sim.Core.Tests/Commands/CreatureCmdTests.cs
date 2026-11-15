@@ -224,6 +224,107 @@ public class CreatureCmdTests
 
     private static Creature MakeCreature(int hp) => Creature.CreateStandaloneForTests(hp, hp);
 
+    private sealed class RedirectDamageProbe(Creature absorber, Creature? secondReceiver) : RelicModel
+    {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+        public decimal RawAmount { get; private set; }
+        public override decimal ModifyDamageAdditive(Creature? target, decimal amount, ValueProp props,
+            Creature? dealer, CardModel? source, CardPlay? play) => 2m;
+        public override Creature? ModifyPreBlockDamageTarget(Creature originalTarget, Creature? target,
+            decimal amount, ValueProp props, Creature? dealer)
+        {
+            RawAmount = amount;
+            return absorber;
+        }
+        public override Creature ModifyUnblockedDamageTarget(Creature target, decimal amount,
+            ValueProp props, Creature? dealer) => secondReceiver ?? target;
+    }
+
+    [Theory]
+    [InlineData(3, 0, false)]
+    [InlineData(3, 4, false)]
+    [InlineData(20, 4, false)]
+    [InlineData(3, 0, true)]
+    [InlineData(3, 4, true)]
+    [InlineData(20, 4, true)]
+    public async Task Damage_PreBlockAbsorptionPrecedesBlockAndOstyOverflow(int absorberHp, int block, bool redirectAgain)
+    {
+        Creature target = MakeCreature(30);
+        Creature absorber = MakeCreature(absorberHp);
+        Creature? second = redirectAgain ? MakeCreature(2) : null;
+        var probe = new RedirectDamageProbe(absorber, second);
+        var state = new FakeCombatState(new FakeRunState(probe));
+        target.CombatState = absorber.CombatState = state;
+        if (second is not null) second.CombatState = state;
+        target.GainBlockInternal(block);
+
+        var results = await CreatureCmd.Damage(state, [target], 10m, ValueProp.Move, null, null, null);
+
+        int remaining = Math.Max(12 - absorberHp, 0);
+        int blocked = Math.Min(block, remaining);
+        int unblocked = remaining - blocked;
+        Assert.Equal(10m, probe.RawAmount);
+        Assert.Equal(redirectAgain ? 3 : 2, results.Count);
+        Assert.Same(absorber, results[0].Receiver);
+        Assert.Same(target, results[0].OriginalTarget);
+        Assert.Equal(12, results[0].IntendedHpLoss);
+        Assert.Equal(Math.Max(absorberHp - 12, 0), absorber.CurrentHp);
+        Assert.Same(second ?? target, results[1].Receiver);
+        Assert.Same(target, results[1].OriginalTarget);
+        Assert.Equal(unblocked, results[1].IntendedHpLoss);
+        Assert.Equal(block - blocked, target.Block);
+        Assert.Equal(30 - (redirectAgain ? Math.Max(unblocked - 2, 0) : unblocked), target.CurrentHp);
+        Assert.Equal(blocked, results[^1].BlockedDamage);
+        if (second is not null)
+        {
+            Assert.Equal(Math.Max(2 - unblocked, 0), second.CurrentHp);
+            Assert.Same(target, results[2].Receiver);
+            Assert.Equal(Math.Max(unblocked - 2, 0), results[2].IntendedHpLoss);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public async Task LoseMaxHp_PropagatesBrightestFlameSourcePastBuffer(bool flame, bool lethal)
+    {
+        ModelDb.ResetForTests();
+        ModelDb.Init(Sts2Sim.Core.Content.ContentRegistry.AllTypes);
+        try
+        {
+            var run = new RunState("920-flame-buffer", new Sts2Sim.Core.Content.Acts.Overgrowth());
+            var player = Player.CreateForNewRun(ModelDb.Character<Sts2Sim.Core.Models.Characters.Silent>(), run);
+            run.AddPlayer(player);
+            var room = new Sts2Sim.Core.Rooms.CombatRoom(() =>
+                (Sts2Sim.Core.Models.Monsters.WanderingGrunt)ModelDb.Monster<Sts2Sim.Core.Models.Monsters.WanderingGrunt>().MutableClone());
+            await room.Enter(run);
+            var state = room.Engine.State;
+            player.Creature.SetMaxHpInternal(lethal ? 1 : 70);
+            player.Creature.SetCurrentHpInternal(player.Creature.MaxHp);
+            var buffer = (Sts2Sim.Core.Models.Powers.BufferPower)(await PowerCmd.Apply<Sts2Sim.Core.Models.Powers.BufferPower>(
+                state, player.Creature, 1, null, null))!;
+            CardModel source = flame
+                ? (CardModel)ModelDb.Card<Sts2Sim.Core.Models.Cards.BrightestFlame>().MutableClone()
+                : (CardModel)ModelDb.Card<Sts2Sim.Core.Models.Cards.StrikeSilent>().MutableClone();
+            source.AssignOwner(player);
+            if (flame)
+            {
+                CardPileCmd.Add(source, PileType.Hand);
+                await source.PlayAsync(player.Creature);
+            }
+            else
+                await CreatureCmd.LoseMaxHp(run, player.Creature, 2m, source);
+
+            Assert.Equal(lethal ? 1 : 68, player.Creature.MaxHp);
+            Assert.Equal(flame && lethal ? 0 : lethal ? 1 : 68, player.Creature.CurrentHp);
+            Assert.Equal(flame ? 1 : 0, buffer.Amount);
+            Assert.Equal(flame ? lethal ? 1 : 2 : 0, player.Creature.CumulativeHpLost);
+        }
+        finally { ModelDb.ResetForTests(); }
+    }
+
     [Fact]
     public async Task Damage_AbsorbsBlockFirst_ThenAppliesRemainderToHp()
     {

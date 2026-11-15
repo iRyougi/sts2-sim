@@ -126,7 +126,8 @@ public static class CreatureCmd
         ValueProp props,
         Creature? dealer,
         CardModel? cardSource,
-        CardPlay? cardPlay)
+        CardPlay? cardPlay,
+        ModifyDamageHookType modifyDamageHookType = ModifyDamageHookType.All)
     {
         if (dealer?.IsDead == true)
             return targets.Select(target => new DamageResult(target, props)).ToArray();
@@ -140,7 +141,7 @@ public static class CreatureCmd
             if (target.IsDead)
                 continue;
 
-            pending.AddRange(await DamageSingle(combatState, target, amount, props, dealer, cardSource, cardPlay));
+            pending.AddRange(await DamageSingle(combatState, target, amount, props, dealer, cardSource, cardPlay, modifyDamageHookType));
         }
 
         var killed = new List<DamageResult>();
@@ -163,7 +164,7 @@ public static class CreatureCmd
         }
 
         foreach (DamageResult result in killed)
-            await ResolvePotentialDeath(combatState.RunState, combatState, result.Receiver, result);
+            await ResolvePotentialDeath(combatState.RunState, combatState, result.Receiver, result, cardSource);
 
         var results = new List<DamageResult>(pending.Count);
         foreach (var (result, _) in pending)
@@ -185,7 +186,8 @@ public static class CreatureCmd
         ValueProp props,
         Creature? dealer,
         CardModel? cardSource,
-        CardPlay? cardPlay)
+        CardPlay? cardPlay,
+        ModifyDamageHookType modifyDamageHookType)
     {
         if (!Hook.ShouldAllowHitting(combatState, target))
         {
@@ -194,13 +196,28 @@ public static class CreatureCmd
         }
 
         IRunState runState = combatState.RunState;
-        decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay, out _);
+        decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay, out _, modifyDamageHookType);
         await Hook.BeforeDamageReceived(combatState, target, modifiedAmount, props, dealer, cardSource);
 
         Creature blockOwner = target.PetOwner?.Creature ?? target;
-        decimal blockedDamage = blockOwner.DamageBlockInternal(modifiedAmount, props);
+        var results = new List<(DamageResult Result, bool Prevented)>(3);
+        Creature? preBlockTarget = Hook.ModifyPreBlockDamageTarget(combatState, target, amount, props, dealer);
+        decimal damageRemaining = modifiedAmount;
+        if (preBlockTarget is not null)
+        {
+            decimal hpLoss = Hook.ModifyHpLost(runState, combatState, target, damageRemaining, props,
+                dealer, cardSource, HpLossHookPhase.BeforeWuppy, out _);
+            DamageResult absorbed = preBlockTarget.LoseHpInternal(hpLoss, props) with
+            {
+                IntendedHpLoss = (int)damageRemaining, OriginalTarget = target,
+            };
+            results.Add((absorbed, false));
+            damageRemaining = absorbed.OverkillDamage;
+        }
+        decimal blockedDamage = blockOwner.DamageBlockInternal(damageRemaining, props);
+        damageRemaining = Math.Max(damageRemaining - blockedDamage, 0m);
         decimal unblocked = Hook.ModifyHpLost(runState, combatState, target,
-            Math.Max(modifiedAmount - blockedDamage, 0m), props, dealer, cardSource,
+            damageRemaining, props, dealer, cardSource,
             HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
         await Hook.AfterModifyingHpLostBeforeOsty(runState, combatState, beforeOstyModifiers);
 
@@ -208,14 +225,17 @@ public static class CreatureCmd
         unblocked = Hook.ModifyHpLost(runState, combatState, receiver, unblocked, props, dealer, cardSource,
             HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
         await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, afterOstyModifiers);
-        DamageResult received = receiver.LoseHpInternal(unblocked, props);
+        DamageResult received = receiver.LoseHpInternal(unblocked, props) with
+        {
+            IntendedHpLoss = (int)damageRemaining, OriginalTarget = target,
+        };
+        damageRemaining = received.OverkillDamage;
         // 原版两项都看原始目标：宠物被命中时格挡由主人承担，宠物自身格挡恒为 0；
         // 完全格挡按承受者最终扣血（转给 Osty 时是 Osty 的扣血）判断。
         bool blockBroken = target.Block <= 0 && blockedDamage > 0m;
         bool fullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
                             (blockedDamage > 0m || target.Block > 0) && (int)unblocked == 0;
 
-        var results = new List<(DamageResult Result, bool Prevented)>(2);
         if (ReferenceEquals(receiver, target))
         {
             results.Add((received with
@@ -226,7 +246,7 @@ public static class CreatureCmd
         else
         {
             results.Add((received, false));
-            decimal overflow = Hook.ModifyHpLost(runState, combatState, target, received.OverkillDamage, props,
+            decimal overflow = Hook.ModifyHpLost(runState, combatState, target, damageRemaining, props,
                 dealer, cardSource, HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> overflowModifiers);
             await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, overflowModifiers);
             DamageResult original = overflow > 0m
@@ -234,6 +254,7 @@ public static class CreatureCmd
                 : new DamageResult(target, props);
             results.Add((original with
             {
+                IntendedHpLoss = (int)damageRemaining,
                 BlockedDamage = (int)blockedDamage, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
             }, false));
         }
@@ -244,7 +265,7 @@ public static class CreatureCmd
     }
 
     /// <summary>Kills a combat creature directly without running the ordinary damage hook pipeline.</summary>
-    public static async Task Kill(Creature creature)
+    public static async Task Kill(Creature creature, CardModel? cardSource = null)
     {
         ArgumentNullException.ThrowIfNull(creature);
         if (creature.IsDead)
@@ -260,7 +281,7 @@ public static class CreatureCmd
         if (result.UnblockedDamage > 0)
             await Hook.AfterCurrentHpChanged(combatState.RunState, combatState,
                 creature, -result.UnblockedDamage);
-        await ResolvePotentialDeath(combatState.RunState, combatState, creature, result);
+        await ResolvePotentialDeath(combatState.RunState, combatState, creature, result, cardSource);
     }
 
     /// <summary>Kills a run creature while bypassing death-prevention hooks, as an explicit run-abandon action does.</summary>
@@ -308,7 +329,8 @@ public static class CreatureCmd
         IRunState runState,
         Creature target,
         decimal amount,
-        ValueProp props)
+        ValueProp props,
+        CardModel? cardSource = null)
     {
         ArgumentNullException.ThrowIfNull(runState);
         ArgumentNullException.ThrowIfNull(target);
@@ -321,26 +343,28 @@ public static class CreatureCmd
             runState,
             null,
             target,
-            null,
+            cardSource?.Owner.Creature,
             amount,
             props,
-            null,
+            cardSource,
             null,
             out _);
-        await Hook.BeforeDamageReceived(runState, null, target, modifiedAmount, props, null, null);
+        Creature? dealer = cardSource?.Owner.Creature;
+        await Hook.BeforeDamageReceived(runState, null, target, modifiedAmount, props, dealer, cardSource);
 
         decimal blockedDamage = target.DamageBlockInternal(modifiedAmount, props);
         // 战斗外没有重定向：原版两个阶段依次跑在同一个目标上。
         decimal unblocked = Hook.ModifyHpLost(runState, null, target,
-            Math.Max(modifiedAmount - blockedDamage, 0m), props, null, null,
+            Math.Max(modifiedAmount - blockedDamage, 0m), props, dealer, cardSource,
             HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
         await Hook.AfterModifyingHpLostBeforeOsty(runState, null, beforeOstyModifiers);
-        unblocked = Hook.ModifyHpLost(runState, null, target, unblocked, props, null, null,
+        unblocked = Hook.ModifyHpLost(runState, null, target, unblocked, props, dealer, cardSource,
             HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
         await Hook.AfterModifyingHpLostAfterOsty(runState, null, afterOstyModifiers);
 
         DamageResult result = target.LoseHpInternal(unblocked, props) with
         {
+            IntendedHpLoss = (int)Math.Max(modifiedAmount - blockedDamage, 0m),
             BlockedDamage = (int)blockedDamage,
             WasBlockBroken = target.Block <= 0 && blockedDamage > 0m,
             WasFullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
@@ -349,8 +373,8 @@ public static class CreatureCmd
 
         if (result.UnblockedDamage > 0)
             await Hook.AfterCurrentHpChanged(runState, null, target, -result.UnblockedDamage);
-        await Hook.AfterDamageReceived(runState, null, target, result, props, null, null);
-        return await ResolvePotentialDeath(runState, null, target, result);
+        await Hook.AfterDamageReceived(runState, null, target, result, props, dealer, cardSource);
+        return await ResolvePotentialDeath(runState, null, target, result, cardSource);
     }
 
     public static async Task<DamageResult> LoseHp(
@@ -375,7 +399,8 @@ public static class CreatureCmd
         IRunState runState,
         ICombatState? combatState,
         Creature target,
-        DamageResult result)
+        DamageResult result,
+        CardModel? cardSource = null)
     {
         if (!result.WasTargetKilled)
         {
@@ -389,7 +414,7 @@ public static class CreatureCmd
                 break;
             if (recursion >= 10)
                 throw new InvalidOperationException("Death prevention repeatedly left the creature dead.");
-            await Hook.AfterDeath(runState, combatState, target, wasRemovalPrevented: true);
+            await Hook.AfterDeath(runState, combatState, target, wasRemovalPrevented: true, source: cardSource);
             int hpBefore = target.CurrentHp;
             await Hook.AfterPreventingDeath(preventer!, target);
             (combatState as CombatState)?.PredictionSink?.DeathPrevented(
@@ -397,19 +422,20 @@ public static class CreatureCmd
             if (!target.IsDead)
                 return result;
         }
-        return await ResolveConfirmedDeath(runState, combatState, target, result);
+        return await ResolveConfirmedDeath(runState, combatState, target, result, cardSource);
     }
 
     private static async Task<DamageResult> ResolveConfirmedDeath(
         IRunState runState,
         ICombatState? combatState,
         Creature target,
-        DamageResult result)
+        DamageResult result,
+        CardModel? cardSource = null)
     {
         target.InvokeDiedEvent();
         bool shouldRemove = combatState is not null &&
             Hook.ShouldCreatureBeRemovedFromCombatAfterDeath(combatState, target);
-        await Hook.AfterDeath(runState, combatState, target);
+        await Hook.AfterDeath(runState, combatState, target, source: cardSource);
         bool wasPrimaryEnemy = target.IsPrimaryEnemy;
         Creature[] livingTeammates = combatState?.GetCreaturesOnSide(target.Side)
             .Where(teammate => !ReferenceEquals(teammate, target) && teammate.IsAlive)
@@ -438,7 +464,7 @@ public static class CreatureCmd
                 if (teammateDeath.UnblockedDamage > 0)
                     await Hook.AfterCurrentHpChanged(runState, teammate.CombatState,
                         teammate, -teammateDeath.UnblockedDamage);
-                await ResolvePotentialDeath(runState, combatState, teammate, teammateDeath);
+                await ResolvePotentialDeath(runState, combatState, teammate, teammateDeath, cardSource);
             }
         }
         else if (combatState is not null && target.Player is { IsOstyAlive: true } player)
@@ -586,7 +612,7 @@ public static class CreatureCmd
         IRunState runState,
         Creature creature,
         decimal amount,
-        bool isFromCard)
+        CardModel? cardSource)
     {
         ArgumentNullException.ThrowIfNull(runState);
         ArgumentNullException.ThrowIfNull(creature);
@@ -600,17 +626,21 @@ public static class CreatureCmd
         if (newMaxHp < creature.CurrentHp)
         {
             ValueProp props = ValueProp.Unblockable | ValueProp.Unpowered;
-            if (isFromCard)
+            if (cardSource is not null)
             {
                 props |= ValueProp.Move;
             }
 
-            await Damage(runState, creature, creature.CurrentHp - newMaxHp, props);
+            if (creature.CombatState is { } combatState)
+                await Damage(combatState, [creature], creature.CurrentHp - newMaxHp, props,
+                    cardSource?.Owner.Creature, cardSource, null);
+            else
+                await Damage(runState, creature, creature.CurrentHp - newMaxHp, props, cardSource);
         }
 
         int maxHpBefore = creature.MaxHp;
         creature.SetMaxHpInternal(Math.Max(1m, newMaxHp));
         predictionSink?.MaxHpLost(
-            creature, amount, maxHpBefore, creature.MaxHp, isFromCard);
+            creature, amount, maxHpBefore, creature.MaxHp, cardSource is not null);
     }
 }

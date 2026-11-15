@@ -111,6 +111,8 @@ public sealed class CombatDamageHistoryEntry
 
         var result = new DamageResult(receiver, Result.Props)
         {
+            OriginalTarget = creatureMap[Result.OriginalTarget],
+            IntendedHpLoss = Result.IntendedHpLoss,
             BlockedDamage = Result.BlockedDamage,
             UnblockedDamage = Result.UnblockedDamage,
             OverkillDamage = Result.OverkillDamage,

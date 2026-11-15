@@ -81,7 +81,7 @@ public sealed class UnrestSiteTests : IDisposable
 
         Assert.False(site.IsAllowed(runState));
 
-        await CreatureCmd.LoseMaxHp(runState, player.Creature, 5m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(runState, player.Creature, 5m, cardSource: null);
         await CreatureCmd.LoseHp(runState, player.Creature, 21m, ValueProp.Unblockable);
 
         Assert.Equal(70, player.Creature.MaxHp);
@@ -100,7 +100,7 @@ public sealed class UnrestSiteTests : IDisposable
         var probe = Assert.IsType<LoseMaxHpProbeRelic>(player.Relics.Single(relic => relic is LoseMaxHpProbeRelic));
         int maxBefore = player.Creature.MaxHp;
 
-        await CreatureCmd.LoseMaxHp(runState, player.Creature, 8m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(runState, player.Creature, 8m, cardSource: null);
 
         Assert.Equal(maxBefore - 8, player.Creature.MaxHp);
         Assert.Equal(maxBefore - 8, player.Creature.CurrentHp);
@@ -118,7 +118,7 @@ public sealed class UnrestSiteTests : IDisposable
         int currentBefore = player.Creature.CurrentHp;
         int maxBefore = player.Creature.MaxHp;
 
-        await CreatureCmd.LoseMaxHp(runState, player.Creature, 8m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(runState, player.Creature, 8m, cardSource: null);
 
         Assert.Equal(maxBefore - 8, player.Creature.MaxHp);
         Assert.Equal(currentBefore, player.Creature.CurrentHp);
@@ -136,7 +136,7 @@ public sealed class UnrestSiteTests : IDisposable
             runState,
             player.Creature,
             player.Creature.MaxHp + 1m,
-            isFromCard: false);
+            cardSource: null);
 
         Assert.Equal(1, player.Creature.MaxHp);
         Assert.Equal(0, player.Creature.CurrentHp);
@@ -152,7 +152,7 @@ public sealed class UnrestSiteTests : IDisposable
         int maxBefore = player.Creature.MaxHp;
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => CreatureCmd.LoseMaxHp(runState, player.Creature, -1m, isFromCard: false));
+            () => CreatureCmd.LoseMaxHp(runState, player.Creature, -1m, cardSource: null));
 
         Assert.Equal(maxBefore, player.Creature.MaxHp);
         Assert.Equal(currentBefore, player.Creature.CurrentHp);

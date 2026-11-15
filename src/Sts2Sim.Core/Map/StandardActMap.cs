@@ -20,10 +20,10 @@ public sealed class StandardActMap : ActMap
     private readonly int _mapLength;
     private readonly Rng _rng;
 
-    private static readonly HashSet<MapPointType> LowerMapPointRestrictions = new()
+    private static readonly Dictionary<MapPointType, int> LowestRowByPointType = new()
     {
-        MapPointType.RestSite,
-        MapPointType.Elite,
+        [MapPointType.RestSite] = 5,
+        [MapPointType.Elite] = 6,
     };
 
     private static readonly HashSet<MapPointType> UpperMapPointRestrictions = new()
@@ -308,20 +308,22 @@ public sealed class StandardActMap : ActMap
     }
 
     /// <summary>从队列头部找起，找到第一个对该点合法（或被标记为"忽略规则"）的类型，取出返回；
-    /// 途中跳过的类型重新入队（保留在队列里，下一个点再试）。若整个队列都不合法，返回 Unassigned
+    /// 其余候选保留原有顺序。若整个队列都不合法，返回 Unassigned
     /// （该点这一轮保持未分配，留给下一轮或"补 Monster"兜底）。</summary>
     private MapPointType GetNextValidPointType(Queue<MapPointType> pointTypesQueue, MapPoint mapPoint)
     {
-        int count = pointTypesQueue.Count;
-        for (int i = 0; i < count; i++)
+        MapPointType[] candidates = pointTypesQueue.ToArray();
+        for (int i = 0; i < candidates.Length; i++)
         {
-            MapPointType candidate = pointTypesQueue.Dequeue();
-            if (_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(candidate) || IsValidPointType(candidate, mapPoint))
+            MapPointType candidate = candidates[i];
+            if (!_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(candidate) && !IsValidPointType(candidate, mapPoint))
             {
-                return candidate;
+                continue;
             }
-
-            pointTypesQueue.Enqueue(candidate);
+            pointTypesQueue.Clear();
+            for (int j = 0; j < candidates.Length; j++)
+                if (j != i) pointTypesQueue.Enqueue(candidates[j]);
+            return candidate;
         }
 
         return MapPointType.Unassigned;
@@ -339,7 +341,7 @@ public sealed class StandardActMap : ActMap
     /// <summary>这些类型不能出现在地图下半部分（越靠近开局的行）。</summary>
     private static bool IsValidForLower(MapPointType pointType, MapPoint mapPoint)
     {
-        return mapPoint.coord.row >= 6 || !LowerMapPointRestrictions.Contains(pointType);
+        return !LowestRowByPointType.TryGetValue(pointType, out int row) || mapPoint.coord.row >= row;
     }
 
     /// <summary>这些类型不能出现在地图上半部分（越靠近 Boss 的行）。</summary>

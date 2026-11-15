@@ -1634,12 +1634,13 @@ public static class Hook
         IRunState runState,
         ICombatState? combatState,
         Creature target,
-        bool wasRemovalPrevented = false)
+        bool wasRemovalPrevented = false,
+        CardModel? source = null)
     {
         foreach (AbstractModel model in runState.IterateHookListeners(combatState).ToArray())
         {
             if (!IsEligibleHookListener(model)) continue;
-            await model.AfterDeath(target, wasRemovalPrevented);
+            await model.AfterDeath(target, source, wasRemovalPrevented);
             model.InvokeExecutionFinished();
         }
     }
@@ -1689,7 +1690,8 @@ public static class Hook
         ValueProp props,
         CardModel? cardSource,
         CardPlay? cardPlay,
-        out IEnumerable<AbstractModel> modifiers) =>
+        out IEnumerable<AbstractModel> modifiers,
+        ModifyDamageHookType modifyDamageHookType = ModifyDamageHookType.All) =>
         ModifyDamage(
             combatState.RunState,
             combatState,
@@ -1699,7 +1701,8 @@ public static class Hook
             props,
             cardSource,
             cardPlay,
-            out modifiers);
+            out modifiers,
+            modifyDamageHookType);
 
     public static decimal ModifyDamage(
         IRunState runState,
@@ -1710,45 +1713,63 @@ public static class Hook
         ValueProp props,
         CardModel? cardSource,
         CardPlay? cardPlay,
-        out IEnumerable<AbstractModel> modifiers)
+        out IEnumerable<AbstractModel> modifiers,
+        ModifyDamageHookType modifyDamageHookType = ModifyDamageHookType.All)
     {
         decimal result = damage;
         List<AbstractModel> changed = new();
 
-        foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+        if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Additive))
         {
-            if (!IsEligibleHookListener(item)) continue;
-            decimal delta = item.ModifyDamageAdditive(target, result, props, dealer, cardSource, cardPlay);
-            result += delta;
-            if (delta != 0m)
+            foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
-                changed.Add(item);
-            }
-        }
-
-        foreach (AbstractModel item in runState.IterateHookListeners(combatState))
-        {
-            if (!IsEligibleHookListener(item)) continue;
-            decimal factor = item.ModifyDamageMultiplicative(target, result, props, dealer, cardSource, cardPlay);
-            result *= factor;
-            if (factor != 1m)
-            {
-                changed.Add(item);
-            }
-        }
-
-        decimal cap = decimal.MaxValue;
-        foreach (AbstractModel item in runState.IterateHookListeners(combatState))
-        {
-            if (!IsEligibleHookListener(item)) continue;
-            decimal itemCap = item.ModifyDamageCap(target, props, dealer, cardSource, cardPlay);
-            if (itemCap < cap)
-            {
-                cap = itemCap;
-                if (result > itemCap)
+                if (!IsEligibleHookListener(item)) continue;
+                decimal delta = item.ModifyDamageAdditive(target, result, props, dealer, cardSource, cardPlay);
+                result += delta;
+                if (delta != 0m)
                 {
-                    result = itemCap;
                     changed.Add(item);
+                }
+            }
+        }
+
+        if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Multiplicative))
+        {
+            foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+            {
+                if (!IsEligibleHookListener(item)) continue;
+                decimal factor = item.ModifyDamageMultiplicative(target, result, props, dealer, cardSource, cardPlay);
+                result *= factor;
+                if (factor != 1m)
+                {
+                    changed.Add(item);
+                }
+            }
+
+            foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+            {
+                if (!IsEligibleHookListener(item)) continue;
+                decimal factor = item.ModifyDamageMultiplicativeLate(target, result, props, dealer, cardSource, cardPlay);
+                result *= factor;
+                if (factor != 1m) changed.Add(item);
+            }
+        }
+
+        if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Cap))
+        {
+            decimal cap = decimal.MaxValue;
+            foreach (AbstractModel item in runState.IterateHookListeners(combatState))
+            {
+                if (!IsEligibleHookListener(item)) continue;
+                decimal itemCap = item.ModifyDamageCap(target, props, dealer, cardSource, cardPlay);
+                if (itemCap < cap)
+                {
+                    cap = itemCap;
+                    if (result > itemCap)
+                    {
+                        result = itemCap;
+                        changed.Add(item);
+                    }
                 }
             }
         }
@@ -1839,6 +1860,29 @@ public static class Hook
         }
 
         return target;
+    }
+
+    /// <summary>Direct damage-resolution dispatch, including the combat-ending window.</summary>
+    public static Creature? ModifyPreBlockDamageTarget(ICombatState? combatState, Creature originalTarget,
+        decimal amount, ValueProp props, Creature? dealer)
+    {
+        Creature? target = null;
+        foreach (AbstractModel model in combatState is null ? [] : IterateDirectCombatHookListeners(combatState))
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            target = model.ModifyPreBlockDamageTarget(originalTarget, target, amount, props, dealer);
+        }
+        return target;
+    }
+
+    public static bool ShouldGainStars(ICombatState combatState, decimal amount, Player player)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            if (!model.ShouldGainStars(amount, player)) return false;
+        }
+        return true;
     }
 
     public static decimal ModifySummonAmount(ICombatState combatState, Player summoner, decimal amount,

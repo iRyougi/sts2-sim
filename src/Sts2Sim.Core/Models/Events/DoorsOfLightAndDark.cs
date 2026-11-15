@@ -2,14 +2,13 @@ using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Events;
-using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Events;
 
 public sealed class DoorsOfLightAndDark : EventModel
 {
     protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
-        new("LIGHT", [VisibleValue.Int("Cards", 2), VisibleValue.Scope("Selection", "RandomUpgrade")]),
+        new("LIGHT", [VisibleValue.Int("UpgradeSelectCount", 1)]),
         new("DARK", [VisibleValue.Int("RemoveCount", 1)])
     ]);
 
@@ -19,15 +18,13 @@ public sealed class DoorsOfLightAndDark : EventModel
         new EventOption("DARK", DarkAsync),
     ];
 
-    private Task LightAsync()
+    private async Task LightAsync()
     {
-        List<CardModel> candidates = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();
-        candidates.StableShuffle(Rng);
-        foreach (CardModel card in candidates.Take(2))
+        CardModel? card = (await CardSelectCmd.FromDeckForUpgrade(Owner, 1, this)).FirstOrDefault();
+        if (card is not null)
             CardCmd.Upgrade(card);
 
         Finish();
-        return Task.CompletedTask;
     }
 
     private async Task DarkAsync()

@@ -16,7 +16,7 @@ public sealed class ZenWeaver : EventModel
 
     private VisibleOption DescribeBreathing() => CurrentOptions.First(option => option.Key == "BREATHING_TECHNIQUES").IsLocked
         ? new("BREATHING_TECHNIQUES", [])
-        : new("BREATHING_TECHNIQUES", [VisibleValue.Int("BreathingTechniquesCost", 50), VisibleValue.Int("CardCount", 2), VisibleValue.Id("Card", ModelDb.GetId<Enlightenment>().Entry)])
+        : new("BREATHING_TECHNIQUES", [VisibleValue.Int("BreathingTechniquesCost", 25), VisibleValue.Int("CardCount", 1), VisibleValue.Id("Card", ModelDb.GetId<Enlightenment>().Entry)])
         { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Enlightenment>())] };
 
     private VisibleOption DescribeRemoval(string key, string costName, int cost, int count) =>
@@ -27,15 +27,15 @@ public sealed class ZenWeaver : EventModel
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
-        new EventOption("BREATHING_TECHNIQUES", Owner.Gold >= 50 ? BreathingAsync : null),
+        new EventOption("BREATHING_TECHNIQUES", BreathingAsync),
         new EventOption("EMOTIONAL_AWARENESS", Owner.Gold >= 125 ? () => RemoveAsync(125, 1) : null),
         new EventOption("ARACHNID_ACUPUNCTURE", Owner.Gold >= 250 ? () => RemoveAsync(250, 2) : null),
     ];
 
     private async Task BreathingAsync()
     {
-        await PlayerCmd.LoseGold(50, Owner, GoldLossType.Spent);
-        var cards = new CardModel[2];
+        await PlayerCmd.LoseGold(25, Owner, GoldLossType.Spent);
+        var cards = new CardModel[1];
         for (int i = 0; i < cards.Length; i++)
         {
             var card = (Enlightenment)ModelDb.Card<Enlightenment>().MutableClone();

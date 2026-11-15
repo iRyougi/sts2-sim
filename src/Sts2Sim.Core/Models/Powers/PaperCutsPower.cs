@@ -17,6 +17,6 @@ public sealed class PaperCutsPower : PowerModel
         Creature target,
         CardModel? cardSource) =>
         dealer == Owner && target.IsPlayer && props.IsPoweredAttack() && result.UnblockedDamage > 0
-            ? CreatureCmd.LoseMaxHp(Owner.CombatState!.RunState, target, Amount, isFromCard: false)
+            ? CreatureCmd.LoseMaxHp(Owner.CombatState!.RunState, target, Amount, cardSource: null)
             : Task.CompletedTask;
 }

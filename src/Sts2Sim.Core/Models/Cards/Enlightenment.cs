@@ -8,7 +8,6 @@ public sealed class Enlightenment : CardModel
     public override CardRarity Rarity => CardRarity.Event;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 0;
-    protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
 
     protected override Task OnPlay(CardPlay cardPlay)
     {

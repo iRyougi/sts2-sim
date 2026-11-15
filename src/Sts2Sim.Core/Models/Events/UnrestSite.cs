@@ -34,7 +34,7 @@ public sealed class UnrestSite : EventModel
 
     private async Task KillAsync()
     {
-        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, 8m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, 8m, cardSource: null);
         RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner);
         await RelicCmd.Obtain(relic, Owner);
         Finish();

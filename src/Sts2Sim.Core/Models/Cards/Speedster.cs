@@ -11,6 +11,6 @@ public sealed class Speedster : CardModel
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 2;
     protected override Task OnPlay(CardPlay cardPlay) =>
-        PowerCmd.Apply<SpeedsterPower>(CombatState!, Owner.Creature, 2m, Owner.Creature, this);
+        PowerCmd.Apply<SpeedsterPower>(CombatState!, Owner.Creature, 3m, Owner.Creature, this);
     protected override void OnUpgrade() => AddKeyword(CardKeyword.Innate);
 }

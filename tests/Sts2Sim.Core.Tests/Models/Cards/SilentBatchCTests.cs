@@ -36,6 +36,7 @@ public sealed class SilentBatchCTests : IDisposable
         typeof(AccuracyPower), typeof(DoubleDamagePower), typeof(InfiniteBladesPower),
         typeof(PhantomBladesPower), typeof(ShadowStepPower), typeof(ToolsOfTheTradePower),
         typeof(Inky),
+        typeof(MoriNoHitPower),
     ];
 
     public SilentBatchCTests()
@@ -242,10 +243,10 @@ public sealed class SilentBatchCTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, 17)]
-    [InlineData(true, false, 21)]
-    [InlineData(false, true, 17)]
-    public async Task MementoMori_ScalesFromCardsDiscardedThisTurn(
+    [InlineData(false, false, 19)]
+    [InlineData(true, false, 23)]
+    [InlineData(false, true, 19)]
+    public async Task MementoMori_UsesFixedDamageDespiteCardsDiscardedThisTurn(
         bool upgraded, bool createAfterDiscard, int damage)
     {
         (Player player, CombatRoom room) = await CreateCombatAsync($"memento-{upgraded}-{createAfterDiscard}");
@@ -253,15 +254,62 @@ public sealed class SilentBatchCTests : IDisposable
         await CardCmd.Discard(new[] { AddToHand<StrikeSilent>(player), AddToHand<StrikeSilent>(player) });
         card ??= AddToHand<MementoMori>(player, upgraded);
         Assert.Equal(2, room.Engine.State.Clone().Players[0].PlayerCombatState!.CardsDiscardedThisTurn);
+        Assert.Equal(3, card.EnergyCost);
+        Assert.True(card.HasKeyword(CardKeyword.Sly));
+        Assert.Equal(TargetType.RandomEnemy, card.TargetType);
+        player.PlayerCombatState!.Energy = 2;
+        Assert.False(card.CanPlay(out UnplayableReason reason));
+        Assert.True(reason.HasFlag(UnplayableReason.EnergyCostTooHigh));
+        player.PlayerCombatState.Energy = 3;
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hp = enemy.CurrentHp;
-        await room.Engine.PlayCardAsync(player, card, enemy);
+        int counter = room.Engine.State.RunState.Rng.CombatTargets.Counter;
+        await room.Engine.PlayCardAsync(player, card, null);
         Assert.Equal(damage, hp - enemy.CurrentHp);
+        Assert.Equal(0, player.PlayerCombatState.Energy);
+        Assert.Equal(counter, room.Engine.State.RunState.Rng.CombatTargets.Counter);
     }
 
     [Theory]
-    [InlineData(false, false, 13)]
-    [InlineData(true, false, 16)]
+    [InlineData(false, "lowest", false)]
+    [InlineData(true, "tie", false)]
+    [InlineData(false, "none", false)]
+    [InlineData(false, "lowest", true)]
+    [InlineData(true, "tie", true)]
+    [InlineData(true, "none", true)]
+    public async Task MementoMori_TargetingAndSlyDoNotConsumeTargetRng(bool upgraded, string scenario, bool discard)
+    {
+        (Player player, CombatRoom room) = await CreateCombatAsync($"mori-{upgraded}-{scenario}-{discard}");
+        CombatState state = room.Engine.State;
+        Creature first = state.Enemies.Single();
+        Creature second = state.AddMonster((WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+        first.SetCurrentHpInternal(scenario == "lowest" ? 30 : 25);
+        second.SetCurrentHpInternal(25);
+        if (scenario == "none")
+        {
+            await PowerCmd.Apply<MoriNoHitPower>(state, first, 1m, player.Creature, null);
+            await PowerCmd.Apply<MoriNoHitPower>(state, second, 1m, player.Creature, null);
+            Assert.Empty(state.HittableEnemies);
+            Assert.False(state.IsOverOrEnding());
+        }
+        MementoMori card = AddToHand<MementoMori>(player, upgraded);
+        int firstHp = first.CurrentHp, secondHp = second.CurrentHp;
+        int counter = state.RunState.Rng.CombatTargets.Counter;
+        player.PlayerCombatState!.Energy = discard ? 0 : 3;
+        if (discard) await CardCmd.Discard(card);
+        else await room.Engine.PlayCardAsync(player, card, null);
+        int damage = upgraded ? 23 : 19;
+        Assert.Equal(scenario == "tie" ? damage : 0, firstHp - first.CurrentHp);
+        Assert.Equal(scenario == "lowest" ? damage : 0, secondHp - second.CurrentHp);
+        Assert.Equal(counter, state.RunState.Rng.CombatTargets.Counter);
+        Assert.Equal(0, player.PlayerCombatState.Energy);
+        Assert.Contains(card, player.PlayerCombatState.DiscardPile.Cards);
+        Assert.Equal(1, player.PlayerCombatState.AttackCardsPlayedThisTurn);
+    }
+
+    [Theory]
+    [InlineData(false, false, 12)]
+    [InlineData(true, false, 15)]
     [InlineData(false, true, 4)]
     [InlineData(true, true, 4)]
     public async Task PhantomBlades_RetainsShivsAndBuffsOnlyFirstShivEachTurn(bool upgraded, bool shivBeforePower, int firstDamage)
@@ -277,6 +325,7 @@ public sealed class SilentBatchCTests : IDisposable
         }
 
         await room.Engine.PlayCardAsync(player, AddToHand<PhantomBlades>(player, upgraded), null);
+        Assert.Equal(upgraded ? 11 : 8, Assert.Single(player.Creature.Powers.OfType<PhantomBladesPower>()).Amount);
         if (!shivBeforePower)
         {
             shivs = (await Shiv.CreateInHand(player, 2, room.Engine.State)).Cast<Shiv>().ToArray();
@@ -473,4 +522,11 @@ public sealed class SilentBatchCTests : IDisposable
             return Task.FromResult<IReadOnlyList<CardModel>>(selected);
         }
     }
+}
+
+file sealed class MoriNoHitPower : PowerModel
+{
+    public override Sts2Sim.Core.Entities.Powers.PowerType Type => Sts2Sim.Core.Entities.Powers.PowerType.Buff;
+    public override Sts2Sim.Core.Entities.Powers.PowerStackType StackType => Sts2Sim.Core.Entities.Powers.PowerStackType.Single;
+    public override bool ShouldAllowHitting(Creature creature) => creature != Owner;
 }

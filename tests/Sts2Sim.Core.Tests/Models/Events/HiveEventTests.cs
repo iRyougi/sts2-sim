@@ -409,7 +409,7 @@ public sealed class HiveEventTests : IDisposable
     }
 
     [Theory]
-    [InlineData("BREATHING_TECHNIQUES", 50, 2)]
+    [InlineData("BREATHING_TECHNIQUES", 25, 1)]
     [InlineData("EMOTIONAL_AWARENESS", 125, -1)]
     [InlineData("ARACHNID_ACUPUNCTURE", 250, -2)]
     public async Task ZenWeaver_GatesAt125Gold_AndImplementsEachPurchase(string key, int cost, int deckDelta)
@@ -427,13 +427,15 @@ public sealed class HiveEventTests : IDisposable
         Assert.Equal(count + deckDelta, player.Deck.Cards.Count);
         if (key == "BREATHING_TECHNIQUES")
         {
-            Assert.Equal(2, player.Deck.Cards.OfType<Enlightenment>().Count());
+            Assert.Single(player.Deck.Cards.OfType<Enlightenment>());
         }
         Assert.True(ev.IsFinished);
 
         (run, player) = CreateRun($"zen-gate-{key}");
         player.Gold = 124;
         Assert.False(ModelDb.Event<ZenWeaver>().IsAllowed(run));
+        player.Gold = 125;
+        Assert.True(ModelDb.Event<ZenWeaver>().IsAllowed(run));
     }
 
     [Theory]
@@ -608,6 +610,10 @@ public sealed class HiveEventTests : IDisposable
     }
 
     [Theory]
+    [InlineData(0, false)]
+    [InlineData(24, false)]
+    [InlineData(25, false)]
+    [InlineData(124, false)]
     [InlineData(125, false)]
     [InlineData(249, false)]
     [InlineData(250, true)]
@@ -616,6 +622,9 @@ public sealed class HiveEventTests : IDisposable
         (RunState run, Player player) = CreateRun($"zen-boundary-{gold}");
         player.Gold = gold;
         var ev = Begin<ZenWeaver>(run, player);
+        Assert.True(ev.CurrentOptions[0].IsEnabled);
+        Assert.Equal(gold >= 125, ev.CurrentOptions[1].IsEnabled);
+        Assert.Equal(gold >= 125, ev.IsAllowed(run));
         Assert.Equal(enabled, ev.CurrentOptions[2].IsEnabled);
     }
 

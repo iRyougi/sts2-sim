@@ -42,7 +42,7 @@ public sealed class DrowningBeacon : EventModel
 
     private async Task Climb()
     {
-        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, MaxHpLoss, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, MaxHpLoss, cardSource: null);
         await RelicCmd.Obtain(ModelDb.Relic<FresnelLens>(), Owner);
         Finish();
     }

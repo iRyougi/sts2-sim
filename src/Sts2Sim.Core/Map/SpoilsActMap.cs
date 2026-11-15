@@ -40,10 +40,10 @@ public sealed class SpoilsActMap : ActMap
 
     private readonly MapPointTypeCounts _pointTypeCounts;
 
-    private static readonly HashSet<MapPointType> _lowerMapPointRestrictions = new HashSet<MapPointType>
+    private static readonly Dictionary<MapPointType, int> _lowestRowByPointType = new()
     {
-        MapPointType.RestSite,
-        MapPointType.Elite
+        [MapPointType.RestSite] = 5,
+        [MapPointType.Elite] = 6
     };
 
     private static readonly HashSet<MapPointType> _upperMapPointRestrictions = new HashSet<MapPointType> { MapPointType.RestSite };
@@ -436,19 +436,18 @@ public sealed class SpoilsActMap : ActMap
 
     private MapPointType GetNextValidPointType(Queue<MapPointType> pointTypesQueue, MapPoint mapPoint)
     {
-        if (pointTypesQueue.Count == 0)
+        MapPointType[] candidates = pointTypesQueue.ToArray();
+        for (int i = 0; i < candidates.Length; i++)
         {
-            return MapPointType.Unassigned;
-        }
-        int count = pointTypesQueue.Count;
-        for (int i = 0; i < count; i++)
-        {
-            MapPointType mapPointType = pointTypesQueue.Dequeue();
-            if (_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(mapPointType) || IsValidPointType(mapPointType, mapPoint))
+            MapPointType mapPointType = candidates[i];
+            if (!_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(mapPointType) && !IsValidPointType(mapPointType, mapPoint))
             {
-                return mapPointType;
+                continue;
             }
-            pointTypesQueue.Enqueue(mapPointType);
+            pointTypesQueue.Clear();
+            for (int j = 0; j < candidates.Length; j++)
+                if (j != i) pointTypesQueue.Enqueue(candidates[j]);
+            return mapPointType;
         }
         return MapPointType.Unassigned;
     }
@@ -480,9 +479,9 @@ public sealed class SpoilsActMap : ActMap
 
     private static bool IsValidForLower(MapPointType pointType, MapPoint mapPoint)
     {
-        if (mapPoint.coord.row < 6)
+        if (_lowestRowByPointType.TryGetValue(pointType, out int row))
         {
-            return !_lowerMapPointRestrictions.Contains(pointType);
+            return mapPoint.coord.row >= row;
         }
         return true;
     }

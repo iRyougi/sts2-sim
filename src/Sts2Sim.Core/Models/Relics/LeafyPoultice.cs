@@ -10,7 +10,7 @@ public sealed class LeafyPoultice : RelicModel
 
     public override async Task AfterObtained()
     {
-        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 12m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 12m, cardSource: null);
         List<CardModel> basics = Owner.Deck.Cards
             .Where(card => card.Rarity == CardRarity.Basic)
             .ToList();

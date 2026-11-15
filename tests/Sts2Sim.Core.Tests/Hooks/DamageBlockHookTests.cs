@@ -80,6 +80,8 @@ public class DamageBlockHookTests
 
         public Func<decimal, decimal>? OnModifyDamageMultiplicative { get; init; }
 
+        public Func<decimal, decimal>? OnModifyDamageMultiplicativeLate { get; init; }
+
         public decimal? DamageCap { get; init; }
 
         public Func<decimal, decimal>? OnModifyHpLost { get; init; }
@@ -147,6 +149,10 @@ public class DamageBlockHookTests
         {
             return OnModifyDamageMultiplicative?.Invoke(amount) ?? 1m;
         }
+
+        public override decimal ModifyDamageMultiplicativeLate(Creature? target, decimal amount,
+            ValueProp props, Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) =>
+            OnModifyDamageMultiplicativeLate?.Invoke(amount) ?? 1m;
 
         public override decimal ModifyDamageCap(
             Creature? target,
@@ -228,8 +234,10 @@ public class DamageBlockHookTests
     {
         var strength = new ProbeModel { OnModifyDamageAdditive = v => 3m };
         var vulnerable = new ProbeModel { OnModifyDamageMultiplicative = v => 1.5m };
+        decimal lateInput = 0m;
+        var late = new ProbeModel { OnModifyDamageMultiplicativeLate = v => { lateInput = v; return 2m; } };
         var cap = new ProbeModel { DamageCap = 10m };
-        var combatState = new FakeCombatState(new FakeRunState(strength, vulnerable, cap));
+        var combatState = new FakeCombatState(new FakeRunState(strength, vulnerable, late, cap));
 
         decimal result = Hook.ModifyDamage(
             combatState,
@@ -242,9 +250,19 @@ public class DamageBlockHookTests
             out IEnumerable<AbstractModel> modifiers);
 
         Assert.Equal(10m, result);
+        Assert.Equal(13.5m, lateInput);
         Assert.Contains(modifiers, modifier => ReferenceEquals(strength, modifier));
         Assert.Contains(modifiers, modifier => ReferenceEquals(vulnerable, modifier));
         Assert.Contains(modifiers, modifier => ReferenceEquals(cap, modifier));
+        Assert.Contains(modifiers, modifier => ReferenceEquals(late, modifier));
+        lateInput = -1m;
+        Assert.Equal(10m, Hook.ModifyDamage(combatState, null, null, 20m, ValueProp.Move,
+            null, null, out modifiers, ModifyDamageHookType.Cap));
+        Assert.Equal(new AbstractModel[] { cap }, modifiers);
+        Assert.Equal(-1m, lateInput);
+        Assert.Equal(20m, Hook.ModifyDamage(combatState, null, null, 20m, ValueProp.Move,
+            null, null, out modifiers, ModifyDamageHookType.None));
+        Assert.Empty(modifiers);
     }
 
     [Fact]
@@ -279,6 +297,11 @@ public class DamageBlockHookTests
         Assert.Equal(5m, result);
         Assert.DoesNotContain(modifiers, modifier => ReferenceEquals(noop, modifier));
         Assert.Contains(modifiers, modifier => ReferenceEquals(halver, modifier));
+        Assert.Equal(1, (int)HpLossHookPhase.BeforeWuppy);
+        Assert.Equal(6, (int)HpLossHookPhase.All);
+        Assert.Equal(10m, Hook.ModifyHpLost(combatState.RunState, combatState, MakeCreature(),
+            10m, ValueProp.Move, null, null, HpLossHookPhase.BeforeWuppy, out modifiers));
+        Assert.Empty(modifiers);
     }
 
     [Fact]

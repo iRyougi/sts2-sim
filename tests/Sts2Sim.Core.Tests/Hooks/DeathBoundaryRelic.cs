@@ -8,6 +8,12 @@ public sealed class DeathBoundaryRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Common;
     public List<string> Trace { get; } = [];
+    public List<CardModel?> DeathSources { get; } = [];
+    public override Task AfterDeath(Creature creature, CardModel? source, bool wasRemovalPrevented)
+    {
+        DeathSources.Add(source);
+        return AfterDeath(creature, wasRemovalPrevented);
+    }
     public bool HealOnPrevention { get; set; } = true;
     public bool AlwaysPrevent { get; set; }
     private bool _prevented;

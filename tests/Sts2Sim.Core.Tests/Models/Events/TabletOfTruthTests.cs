@@ -160,7 +160,7 @@ public sealed class TabletOfTruthTests : IDisposable
         }
 
         Assert.Equal(30, player.Creature.MaxHp);
-        await CreatureCmd.LoseMaxHp(runState, player.Creature, 25m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(runState, player.Creature, 25m, cardSource: null);
         Assert.Equal(5, player.Creature.MaxHp);
     }
 

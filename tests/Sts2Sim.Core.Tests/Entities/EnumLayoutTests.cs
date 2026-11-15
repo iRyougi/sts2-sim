@@ -140,9 +140,12 @@ public class EnumLayoutTests
     public void HpLossHookPhase_HasGameValues()
     {
         Assert.Equal(0, (int)HpLossHookPhase.None);
-        Assert.Equal(1, (int)HpLossHookPhase.BeforeOsty);
-        Assert.Equal(2, (int)HpLossHookPhase.AfterOsty);
-        Assert.Equal(3, (int)HpLossHookPhase.All);
+        Assert.Equal(1, (int)HpLossHookPhase.BeforeWuppy);
+        Assert.Equal(2, (int)HpLossHookPhase.BeforeOsty);
+        Assert.Equal(4, (int)HpLossHookPhase.AfterOsty);
+        Assert.Equal(6, (int)HpLossHookPhase.All);
+        Assert.Equal(HpLossHookPhase.BeforeOsty | HpLossHookPhase.AfterOsty, HpLossHookPhase.All);
+        Assert.Equal(HpLossHookPhase.None, HpLossHookPhase.All & HpLossHookPhase.BeforeWuppy);
     }
 
     [Fact]

@@ -35,7 +35,7 @@ public static partial class VisibleContentProjection
             });
             deltas.Add(new("Damage", ((ICardChoiceBaseValueProvider)scythe).CardChoiceBaseValues!.Value.Damage - baseline));
         }
-        if (card is Dowsing) deltas.Add(new("RoomsRemaining", -Read<int>(card, "_unknownRoomsEntered")));
+        if (card is Dowsing dowsing) deltas.Add(new("RoomsRemaining", dowsing.RoomsRemaining - Dowsing.MaxRooms));
         if (card is Guilty) deltas.Add(new("CombatsRemaining", -Read<int>(card, "_combatsCompleted")));
         if (card is MadScience mad)
         {
@@ -153,8 +153,8 @@ public static partial class VisibleContentProjection
             case TheBall:
                 values.Add(VisibleValue.Int("Increase", card.IsUpgraded ? 15 : 10));
                 break;
-            case Dowsing:
-                values.Add(VisibleValue.Int("Rooms", 5 - Read<int>(card, "_unknownRoomsEntered")));
+            case Dowsing dowsing:
+                values.Add(VisibleValue.Int("Rooms", dowsing.RoomsRemaining));
                 break;
             case Guilty:
                 values.Add(VisibleValue.Int("Combats", 5 - Read<int>(card, "_combatsCompleted")));

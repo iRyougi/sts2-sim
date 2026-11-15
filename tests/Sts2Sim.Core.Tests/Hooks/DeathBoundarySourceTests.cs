@@ -30,22 +30,32 @@ public sealed class DeathBoundarySourceTests : IDisposable
         await RelicCmd.Obtain(ModelDb.Relic<DeathBoundaryRelic>(), player);
         var probe = player.Relics.OfType<DeathBoundaryRelic>().Single();
         probe.HealOnPrevention = heal;
+        var source = (CardModel)ModelDb.Card<Sts2Sim.Core.Models.Cards.StrikeSilent>().MutableClone();
+        source.AssignOwner(player);
 
-        await CreatureCmd.Kill(player.Creature);
+        await CreatureCmd.Kill(player.Creature, source);
 
         Assert.Equal(heal ? new[] { "before", "should", "death:True:0", "prevent" } :
             new[] { "before", "should", "death:True:0", "prevent", "before", "should", "death:False:0" }, probe.Trace);
         Assert.Equal(heal ? 10 : 0, player.Creature.CurrentHp);
+        Assert.Equal(heal ? 1 : 2, probe.DeathSources.Count);
+        Assert.All(probe.DeathSources, actual => Assert.Same(source, actual));
     }
 
     [Fact]
     public async Task OrdinaryEnemyDeath_RemovesCurrentMembershipAfterCallbacksButRetainsHistory()
     {
-        var (_, _, room) = await CreateCombat();
+        var (_, player, room) = await CreateCombat();
         var enemy = room.Engine.State.Enemies.Single();
+        await RelicCmd.Obtain(ModelDb.Relic<DeathBoundaryRelic>(), player);
+        var probe = player.Relics.OfType<DeathBoundaryRelic>().Single();
+        var source = (CardModel)ModelDb.Card<Sts2Sim.Core.Models.Cards.StrikeSilent>().MutableClone();
+        source.AssignOwner(player);
 
-        await CreatureCmd.Kill(enemy);
+        await CreatureCmd.Damage(room.Engine.State, [enemy], enemy.CurrentHp,
+            Sts2Sim.Core.ValueProps.ValueProp.Move, player.Creature, source, null);
 
+        Assert.Same(source, Assert.Single(probe.DeathSources));
         Assert.DoesNotContain(enemy, room.Engine.State.Enemies);
         Assert.Contains(enemy, room.Engine.State.SpawnedEnemies);
         Assert.Null(enemy.CombatState);

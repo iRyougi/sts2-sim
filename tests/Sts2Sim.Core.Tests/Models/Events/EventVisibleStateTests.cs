@@ -383,6 +383,7 @@ public sealed class EventVisibleStateTests : IDisposable
     {
         // Source values from approved plan #637 section 4, release 41cef1ea. These are displayed
         // constants, never recomputed by executing a candidate or querying its projection.
+        // #926 updates the three existing events below to v0.113.1 / d09d48e5.
         (string Key, string Name, string Value)? example = name switch
         {
             "Amalgamator" => ("COMBINE_STRIKES", "RemoveCount", "2"),
@@ -392,7 +393,7 @@ public sealed class EventVisibleStateTests : IDisposable
             "Bugslayer" => ("EXTERMINATION", "ObtainCount", "1"),
             "ByrdonisNest" => ("EAT", "MaxHp", "7"),
             "ColossalFlower" => ("EXTRACT_CURRENT_PRIZE", "Prize1", "35"),
-            "DoorsOfLightAndDark" => ("LIGHT", "Cards", "2"),
+            "DoorsOfLightAndDark" => ("LIGHT", "UpgradeSelectCount", "1"),
             "DrowningBeacon" => ("CLIMB", "HpLoss", "13"),
             "MorphicGrove" => ("LONER", "MaxHp", "5"),
             "Reflections" => ("TOUCH_A_MIRROR", "UpgradeCount", "4"),
@@ -424,11 +425,26 @@ public sealed class EventVisibleStateTests : IDisposable
             "WelcomeToWongos" => ("BARGAIN_BIN", "BargainBinCost", "100"),
             "Wellspring" => ("BOTTLE", "PotionCount", "1"),
             "WoodCarvings" => ("BIRD", "TransformCount", "1"),
-            "ZenWeaver" => ("BREATHING_TECHNIQUES", "BreathingTechniquesCost", "50"),
+            "ZenWeaver" => ("BREATHING_TECHNIQUES", "BreathingTechniquesCost", "25"),
             _ => null,
         };
         if (example is { } expected)
             AssertValue(state, expected.Key, expected.Name, expected.Value);
+        if (name == "DoorsOfLightAndDark")
+        {
+            VisibleOption light = Assert.Single(state.DisplayOptions, option => option.OptionKey == "LIGHT");
+            Assert.Equal(new[] { VisibleValue.Int("UpgradeSelectCount", 1) }, light.Values);
+        }
+        if (name == "ZenWeaver")
+        {
+            VisibleOption breathing = Assert.Single(state.DisplayOptions, option => option.OptionKey == "BREATHING_TECHNIQUES");
+            Assert.Contains(VisibleValue.Int("CardCount", 1), breathing.Values);
+            VisibleContent card = Assert.Single(breathing.Contents);
+            Assert.Equal("ENLIGHTENMENT", card.ContentId);
+            Assert.DoesNotContain(VisibleValue.Scope("Keyword", "Exhaust"), card.Values);
+        }
+        if (name == "WaterloggedScriptorium")
+            AssertValue(state, "PRICKLY_SPONGE", "Gold", "120");
         if (name == "ColorfulPhilosophers")
         {
             Assert.Contains(VisibleValue.Int("StatueCount", 3), state.ContextValues);

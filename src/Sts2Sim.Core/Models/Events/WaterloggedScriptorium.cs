@@ -12,7 +12,7 @@ public sealed class WaterloggedScriptorium : EventModel
     protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
         new("BLOODY_INK", [VisibleValue.Int("MaxHp", 6)]),
         DescribeEnchantment("TENTACLE_QUILL", 55, 1),
-        DescribeEnchantment("PRICKLY_SPONGE", 99, 2),
+        DescribeEnchantment("PRICKLY_SPONGE", 120, 2),
     ]);
 
     private VisibleOption DescribeEnchantment(string key, int cost, int count) =>
@@ -28,7 +28,7 @@ public sealed class WaterloggedScriptorium : EventModel
     [
         new EventOption("BLOODY_INK", BloodyInkAsync),
         new EventOption("TENTACLE_QUILL", Owner.Gold >= 55 ? TentacleQuillAsync : null),
-        new EventOption("PRICKLY_SPONGE", Owner.Gold >= 99 ? PricklySpongeAsync : null),
+        new EventOption("PRICKLY_SPONGE", Owner.Gold >= 120 ? PricklySpongeAsync : null),
     ];
 
     private async Task BloodyInkAsync()
@@ -46,7 +46,7 @@ public sealed class WaterloggedScriptorium : EventModel
 
     private async Task PricklySpongeAsync()
     {
-        await PlayerCmd.LoseGold(99m, Owner, GoldLossType.Spent);
+        await PlayerCmd.LoseGold(120m, Owner, GoldLossType.Spent);
         await EnchantCardsAsync(2);
         Finish();
     }

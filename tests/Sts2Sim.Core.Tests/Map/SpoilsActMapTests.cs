@@ -32,6 +32,48 @@ public sealed class SpoilsActMapTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void V01131_TypeAssignment_PreservesSourceRules(bool spoils)
+    {
+        var counts = new MapPointTypeCounts(12, 7);
+        ActMap map = spoils
+            ? new SpoilsActMap(CreateActTwoRun("v01131-map-rules"), counts)
+            : new StandardActMap(new Sts2Sim.Core.Random.Rng(919UL), 15, counts);
+        Type type = map.GetType();
+        var rng = (Sts2Sim.Core.Random.Rng)type.GetField("_rng",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(map)!;
+        int counter = rng.Counter;
+        Console.WriteLine($"v0.113.1 {type.Name} generated RNG Counter={counter}");
+        var valid = type.GetMethod("IsValidPointType", System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)!;
+        for (int row = 4; row <= 6; row++)
+        {
+            var point = new MapPoint(3, row);
+            Assert.Equal(row >= 5, (bool)valid.Invoke(map, [MapPointType.RestSite, point])!);
+            Assert.Equal(row >= 6, (bool)valid.Invoke(map, [MapPointType.Elite, point])!);
+        }
+        var next = type.GetMethod("GetNextValidPointType",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        MapPointType Take(Queue<MapPointType> queue, int row) =>
+            (MapPointType)next.Invoke(map, [queue, new MapPoint(3, row)])!;
+        var candidates = new Queue<MapPointType>(
+            [MapPointType.RestSite, MapPointType.Elite, MapPointType.Shop, MapPointType.Unknown]);
+        Assert.Equal(MapPointType.Shop, Take(candidates, 4));
+        Assert.Equal([MapPointType.RestSite, MapPointType.Elite, MapPointType.Unknown], candidates.ToArray());
+        Assert.Equal(MapPointType.RestSite, Take(candidates, 5));
+        Assert.Equal([MapPointType.Elite, MapPointType.Unknown], candidates.ToArray());
+        var rejected = new Queue<MapPointType>([MapPointType.RestSite, MapPointType.Elite]);
+        Assert.Equal(MapPointType.Unassigned, Take(rejected, 4));
+        Assert.Equal([MapPointType.RestSite, MapPointType.Elite], rejected.ToArray());
+        Assert.Equal(MapPointType.Unassigned, Take(new Queue<MapPointType>(), 4));
+        counts.PointTypesThatIgnoreRules.Add(MapPointType.RestSite);
+        Assert.Equal(MapPointType.RestSite, Take(rejected, 4));
+        Assert.Equal([MapPointType.Elite], rejected.ToArray());
+        Assert.Equal(counter, rng.Counter);
+    }
+
     [Fact]
     public void Generate_AcrossSeeds_HoldsEveryStructuralInvariant()
     {

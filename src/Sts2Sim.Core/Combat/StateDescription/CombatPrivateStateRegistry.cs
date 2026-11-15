@@ -289,7 +289,7 @@ internal static class CombatPrivateStateRegistry
         "Survivor._block",
         "Accuracy._amount", "Acrobatics._cards", "BladeOfInk._cards", "BladeDance._cards",
         "CloakAndDagger._cards", "DaggerThrow._damage", "FanOfKnives._cards",
-        "LeadingStrike._damage", "MementoMori._baseDamage", "MementoMori._extraDamage",
+        "LeadingStrike._damage", "MementoMori._damage",
         "PhantomBlades._amount", "Prepared._cards", "Reflex._cards", "Tactician._energy",
         "UpMySleeve._cards",
         "TheBomb._damage", "ThinkingAhead._draw", "ThrummingHatchet._damage",

@@ -243,28 +243,46 @@ public class PlayerCombatStateStarsTests : IDisposable
     }
 
     [Fact]
-    public async Task PlayerCmd_GainStars_DispatchesPositiveGainOnly()
+    public async Task PlayerCmd_GainStars_DispatchesPositiveAndZeroGain()
     {
         var spy = new StarsGainedSpy();
         Player player = MakeInCombatPlayer(spy);
         await PlayerCmd.GainStars(2m, player);
-        await PlayerCmd.GainStars(0m, player);
         Assert.Equal(2, player.PlayerCombatState!.Stars);
         Assert.Equal(1, spy.CallCount);
         Assert.Equal(2, spy.Amount);
         Assert.Same(player, spy.Gainer);
+
+        // v0.113.1 GainStars always notifies after an allowed gain, including zero.
+        await PlayerCmd.GainStars(0m, player);
+        Assert.Equal(2, player.PlayerCombatState.Stars);
+        Assert.Equal(2m, player.PlayerCombatState.StarsGainedThisTurn);
+        Assert.Equal(2, spy.CallCount);
+        Assert.Equal(0, spy.Amount);
+        Assert.Same(player, spy.Gainer);
     }
 
     [Fact]
-    public async Task PlayerCmd_GainStars_StillMutatesCombatStateWithoutCreatureCombatState()
+    public async Task PlayerCmd_Stars_SkipWithoutCombatOrSetup()
     {
-        var runState = new FakeRunState();
+        var spy = new StarsGainedSpy();
+        var runState = new FakeRunState(spy);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         player.ResetCombatState();
+        var state = player.PlayerCombatState!;
+        state.GainStars(5m);
 
+        // ResetCombatState alone creates no combat/setup. Native ShouldSkipCombatEffect
+        // is true without a turn state (not in progress and not starting).
         await PlayerCmd.GainStars(3m, player);
+        Assert.Equal(5, state.Stars);
+        Assert.Equal(5m, state.StarsGainedThisTurn);
+        Assert.Equal(0, spy.CallCount);
 
-        Assert.Equal(3, player.PlayerCombatState!.Stars);
+        await PlayerCmd.LoseStars(2m, player);
+        Assert.Equal(5, state.Stars);
+        Assert.Equal(5m, state.StarsGainedThisTurn);
+        Assert.Equal(0, spy.CallCount);
         Assert.Null(player.Creature.CombatState);
     }
 

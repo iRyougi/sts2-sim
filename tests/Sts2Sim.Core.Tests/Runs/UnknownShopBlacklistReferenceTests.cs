@@ -21,18 +21,23 @@ public sealed class UnknownShopBlacklistReferenceTests : IDisposable
     public async Task UnknownRooms_ExcludeShopsAfterShopEntryOrBeforeOnlyShopChildren()
     {
         // JGEN run_history F3 is DrowningBeacon; F5 is Shop; F6 Unknown is RoomFullOfCheese.
-        // Reproduce its two Unknown rolls through the production resolver without changing odds or RNG.
+        // Preserve the observed Unknown inputs explicitly: v0.113.1's generated map has changed.
+        // This tests the resolver/entry bookkeeping, not same-version archive map reconstruction.
         var archive = new RunState("JGENKZEW4VNW", ascensionLevel: 10);
         archive.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Silent>(), archive));
         archive.AddVisitedMapCoord(new MapCoord(3, 0));
         archive.AddVisitedMapCoord(new MapCoord(6, 1));
         archive.AddVisitedMapCoord(new MapCoord(6, 2));
-        Assert.Equal(RoomType.Event, RoomFactory.ResolveRoomType(archive, archive.CurrentMapPoint!));
+        var firstUnknown = new MapPoint(6, 2) { PointType = MapPointType.Unknown };
+        firstUnknown.AddChildPoint(new MapPoint(6, 3) { PointType = MapPointType.Monster });
+        Assert.Equal(RoomType.Event, RoomFactory.ResolveRoomType(archive, firstUnknown));
         archive.AddVisitedMapCoord(new MapCoord(6, 3));
         archive.AddVisitedMapCoord(new MapCoord(6, 4));
         await EnterAndLeave(archive, new MerchantRoom());
         archive.AddVisitedMapCoord(new MapCoord(5, 5));
-        var actual = new List<RoomType> { RoomFactory.ResolveRoomType(archive, archive.CurrentMapPoint!) };
+        var afterShop = new MapPoint(5, 5) { PointType = MapPointType.Unknown };
+        afterShop.AddChildPoint(new MapPoint(5, 6) { PointType = MapPointType.Monster });
+        var actual = new List<RoomType> { RoomFactory.ResolveRoomType(archive, afterShop) };
 
         // A Shop reached through Unknown, including a nested shop, still counts as a shop visit.
         var nested = new RunState("unknown-nested-shop");

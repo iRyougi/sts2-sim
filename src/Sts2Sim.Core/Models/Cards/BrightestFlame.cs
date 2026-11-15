@@ -17,6 +17,6 @@ public sealed class BrightestFlame : CardModel
         int amount = IsUpgraded ? 3 : 2;
         Owner.PlayerCombatState!.GainEnergy(amount);
         await CardPileCmd.Draw(CombatState!, amount, Owner, fromHandDraw: false);
-        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 2m, isFromCard: true);
+        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 2m, this);
     }
 }

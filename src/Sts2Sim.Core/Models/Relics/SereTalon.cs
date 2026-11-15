@@ -10,7 +10,7 @@ public sealed class SereTalon : RelicModel
     public override bool HasUponPickupEffect => true;
     public override async Task AfterObtained()
     {
-        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 9m, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(Owner.RunState, Owner.Creature, 9m, cardSource: null);
         for (int index = 0; index < 3; index++)
         {
             var wish = (Wish)ModelDb.Card<Wish>().MutableClone();

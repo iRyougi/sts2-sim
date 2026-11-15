@@ -33,8 +33,8 @@ public sealed class AscensionA0FingerprintTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
-    /// <summary>A0 三幕地图的点类型布局，按固定种子记录。</summary>
-    [Theory]
+    /// <summary>Historical v0.111.0 A0 layouts; v0.113.1 changes the source map algorithm.</summary>
+    [Theory(Skip = "v0.111.0 map goldens; v0.113.1 source map algorithm changed; same-version reference pending #930")]
     [InlineData(0, "a0-fingerprint-map")]
     [InlineData(1, "a0-fingerprint-map")]
     [InlineData(2, "a0-fingerprint-map")]

@@ -9,7 +9,11 @@ namespace Sts2Sim.Core.Models.Cards;
 /// </summary>
 public sealed class Dowsing : CardModel
 {
+    public const int MaxRooms = 4;
     private int _unknownRoomsEntered;
+
+    public int RoomsEntered => _unknownRoomsEntered;
+    public int RoomsRemaining => Math.Max(1, MaxRooms - RoomsEntered);
 
     public override CardType Type => CardType.Quest;
     public override CardRarity Rarity => CardRarity.Quest;
@@ -30,10 +34,21 @@ public sealed class Dowsing : CardModel
         }
 
         _unknownRoomsEntered++;
-        if (_unknownRoomsEntered >= 5)
+        if (_unknownRoomsEntered >= MaxRooms)
         {
             await Commands.CardCmd.CreateAndTransform<Abundance>(this);
         }
+    }
+
+    public override IReadOnlySet<RoomType> ModifyUnknownMapPointRoomTypes(IReadOnlySet<RoomType> roomTypes)
+    {
+        var result = new HashSet<RoomType>(roomTypes);
+        if (RoomsEntered >= MaxRooms - 1)
+        {
+            result.Remove(RoomType.Monster);
+            result.Remove(RoomType.Elite);
+        }
+        return result;
     }
 
     internal override void AppendCombatStateDescription(

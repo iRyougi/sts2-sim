@@ -6,7 +6,7 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class PhantomBlades : CardModel
 {
-    private decimal _amount = 9m;
+    private decimal _amount = 8m;
     public override CardType Type => CardType.Power;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.Self;

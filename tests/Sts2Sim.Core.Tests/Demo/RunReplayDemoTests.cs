@@ -76,9 +76,9 @@ public class RunReplayDemoTests : IDisposable
     {
         var log = new List<string>();
 
-        // Source-correct encounter slot order changes this automatic policy route.
-        // A bounded compiled-demo probe selected this seed; retain real Boss reach and resolution assertions.
-        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("shared-demo-boss-117", log.Add);
+        // v0.113.1 map rules change this automatic route; a bounded offline fixture probe
+        // selected this seed. Retain real Boss reach and resolution assertions.
+        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("v01131-demo-boss-18", log.Add);
 
         Assert.True(
             result.FloorsVisited >= 15,

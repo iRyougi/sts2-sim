@@ -21,6 +21,7 @@ public sealed class DeckSelectionMigrationTests : IDisposable
     [Theory]
     [InlineData("AromaOfChaos", "LET_GO", "transform", 1)]
     [InlineData("AromaOfChaos", "MAINTAIN_CONTROL", "upgrade", 1)]
+    [InlineData("DoorsOfLightAndDark", "LIGHT", "upgrade", 1)]
     [InlineData("FieldOfManSizedHoles", "RESIST", "remove", 2)]
     [InlineData("LuminousChoir", "REACH_INTO_THE_FLESH", "remove", 2)]
     [InlineData("MorphicGrove", "GROUP", "transform", 2)]
@@ -58,6 +59,11 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         Assert.Equal(count, request.MinCount); Assert.Equal(count, request.MaxCount);
         Assert.False(request.Cancelable);
         Assert.All(request.Candidates, c => Assert.Contains(c, player.Deck.Cards));
+        if (name == "DoorsOfLightAndDark")
+        {
+            Assert.Equal(player.Deck.Cards.Where(card => card.IsUpgradable), request.Candidates);
+            Assert.Equal(0, ((EventModel)model).Rng.Counter);
+        }
         if (name == "ZenWeaver") Assert.Equal(300, player.Gold);
         int nicheBefore = run.Rng.Niche.Counter;
         CardModel[] chosen = request.Candidates.TakeLast(count).Reverse().ToArray();
@@ -66,6 +72,11 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         Assert.Equal(nicheBefore, run.Rng.Niche.Counter);
         source.Complete(chosen);
         await effect;
+        if (name == "DoorsOfLightAndDark")
+        {
+            Assert.Equal(nicheBefore, run.Rng.Niche.Counter);
+            Assert.Equal(0, ((EventModel)model).Rng.Counter);
+        }
         Assert.Contains(untouched, player.Deck.Cards);
         if (operation == "upgrade")
         {

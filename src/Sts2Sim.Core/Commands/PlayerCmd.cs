@@ -66,21 +66,22 @@ public static class PlayerCmd
             return;
         }
 
-        if (player.Creature.CombatState?.IsEnding() == true)
-        {
-            return;
-        }
-
-        player.PlayerCombatState.GainStars(amount);
         ICombatState? combatState = player.Creature.CombatState;
-        if (combatState is not null && amount > 0m)
+        if (combatState is null || (combatState.IsOverOrEnding() && !combatState.IsStarting()))
+            return;
+
+        if (Hook.ShouldGainStars(combatState, amount, player))
         {
+            player.PlayerCombatState.GainStars(amount);
             await Hook.AfterStarsGained(combatState, (int)amount, player);
         }
     }
 
     public static Task LoseStars(decimal amount, Player player)
     {
+        ICombatState? combatState = player.Creature.CombatState;
+        if (combatState is null || (combatState.IsOverOrEnding() && !combatState.IsStarting()))
+            return Task.CompletedTask;
         player.PlayerCombatState?.LoseStars(amount);
         return Task.CompletedTask;
     }

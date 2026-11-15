@@ -30,7 +30,7 @@ public sealed class Sacrifice : CardModel, ICardChoiceBaseValueProvider
 
         // 原版 CalculatedBlockVar：CalculationBase 0 + CalculationExtra 1 × (Osty 存活 ? MaxHp×3 : 0)。
         decimal blockGain = Owner.IsOstyAlive ? Owner.Osty!.MaxHp * 3 : 0m;
-        await CreatureCmd.Kill(Owner.Osty!);
+        await CreatureCmd.Kill(Owner.Osty!, this);
         await CreatureCmd.GainBlock(CombatState!, Owner.Creature, blockGain, ValueProp.Move, this, cardPlay);
     }
 

@@ -1,9 +1,10 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Models.Powers;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>Authoritative Silent Expertise: retain only the cards actually drawn by this play.</summary>
+/// <summary>Draw cards, then retain the whole hand through this turn's end.</summary>
 public sealed class Expertise : CardModel
 {
     private int _cards = 2;
@@ -13,10 +14,8 @@ public sealed class Expertise : CardModel
     protected override int CanonicalEnergyCost => 1;
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        foreach (CardModel card in await CardPileCmd.Draw(CombatState!, _cards, Owner, fromHandDraw: false))
-        {
-            CardCmd.ApplySingleTurnRetain(card);
-        }
+        await CardPileCmd.Draw(CombatState!, _cards, Owner, fromHandDraw: false);
+        await PowerCmd.Apply<RetainHandPower>(CombatState!, Owner.Creature, 1m, Owner.Creature, this);
     }
     protected override void OnUpgrade() => _cards++;
 }

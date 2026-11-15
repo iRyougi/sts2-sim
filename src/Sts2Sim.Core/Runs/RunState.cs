@@ -442,12 +442,15 @@ public sealed partial class RunState : IRunState
         bool hasJuzu = false;
         bool goldenPath = false;
         bool lanternKey = false;
+        bool dowsingForbidsCombat = false;
         foreach (AbstractModel listener in IterateHookListeners(null))
         {
             if (listener is Models.Relics.JuzuBracelet) hasJuzu = true;
             if (listener is Models.Relics.GoldenCompass compass && compass.GoldenPathAct == CurrentActIndex)
                 goldenPath = true;
             if (listener is Models.Cards.LanternKey && CurrentActIndex == 2) lanternKey = true;
+            if (listener is Models.Cards.Dowsing { RoomsEntered: >= Models.Cards.Dowsing.MaxRooms - 1 })
+                dowsingForbidsCombat = true;
         }
         // Capturing public increases invokes ModifyOddsIncreaseForUnrolledRoomType once
         // before the actual roll. No current listener overrides it with stateful effects;
@@ -457,7 +460,7 @@ public sealed partial class RunState : IRunState
             Odds.UnknownMapPoint.CapturePublicUnrolledIncreases(),
             PreviousMapPointHasShop,
             point.Children.Count > 0 && point.Children.All(child => child.PointType == MapPointType.Shop),
-            hasJuzu, goldenPath, lanternKey);
+            hasJuzu, goldenPath, lanternKey, dowsingForbidsCombat);
     }
 
     internal void RecordVisibleUnknownMapPointEntry(RoomType actualType, UnknownMapPointPublicRules rules)

@@ -5,7 +5,7 @@ namespace Sts2Sim.Core.Tests.Map;
 
 public class MapPathPruningTests
 {
-    [Fact]
+    [Fact(Skip = "v0.111.0 archived map; v0.113.1 topology changed; same-version replacement pending #930")]
     public void ArchivedMVBCYMS8BUST_FirstActHasTheRecordedCompletePath()
     {
         // Exact map_point_type sequence from the archive's first act; no generated

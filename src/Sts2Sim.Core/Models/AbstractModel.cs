@@ -558,6 +558,10 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     /// Animation and multiplayer choice context are omitted in the headless simulator.</summary>
     public virtual Task AfterDeath(Creature target, bool wasRemovalPrevented) =>
         wasRemovalPrevented ? Task.CompletedTask : AfterDeath(target);
+
+    /// <summary>Source-aware death notification; source-free listeners retain their existing prevention semantics.</summary>
+    public virtual Task AfterDeath(Creature target, CardModel? source, bool wasRemovalPrevented) =>
+        AfterDeath(target, wasRemovalPrevented);
     public virtual bool ShouldOwnerDeathTriggerFatal() => true;
 
     public virtual bool ShouldPowerBeRemovedOnDeath(PowerModel power) => true;
@@ -583,6 +587,9 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     {
         return 1m;
     }
+
+    public virtual decimal ModifyDamageMultiplicativeLate(Creature? target, decimal amount, ValueProp props,
+        Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) => 1m;
 
     public virtual decimal ModifyDamageCap(
         Creature? target,
@@ -610,6 +617,9 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     /// <summary>决定未格挡伤害由谁承受；原版只有 Osty 的 DieForYouPower 会把主人换成 Osty。</summary>
     public virtual Creature ModifyUnblockedDamageTarget(Creature target, decimal amount, ValueProp props,
         Creature? dealer) => target;
+
+    public virtual Creature? ModifyPreBlockDamageTarget(Creature originalTarget, Creature? target,
+        decimal amount, ValueProp props, Creature? dealer) => target;
 
     public virtual decimal ModifySummonAmount(Player summoner, decimal amount, AbstractModel? source) => amount;
 
@@ -789,6 +799,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     public virtual bool TryEnableCardRewardReroll(Player player, Rewards.CardReward reward) => false;
 
     public virtual Task AfterStarsGained(int amount, Player gainer) => Task.CompletedTask;
+
+    public virtual bool ShouldGainStars(decimal amount, Player player) => true;
 
     public virtual Task AfterStarsSpent(int amount, Player spender) => Task.CompletedTask;
 

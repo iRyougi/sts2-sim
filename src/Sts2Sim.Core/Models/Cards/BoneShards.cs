@@ -42,6 +42,6 @@ public sealed class BoneShards : CardModel, ICardChoiceBaseValueProvider, ICardD
             .TargetingAllOpponents(CombatState!).Execute();
         await CreatureCmd.GainBlock(CombatState!, Owner.Creature, Block, ValueProp.Move, this, cardPlay);
         if (Owner.IsOstyAlive)
-            await CreatureCmd.Kill(Owner.Osty!);
+            await CreatureCmd.Kill(Owner.Osty!, this);
     }
 }

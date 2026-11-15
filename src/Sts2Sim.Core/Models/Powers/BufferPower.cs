@@ -19,7 +19,7 @@ public sealed class BufferPower : PowerModel
         Creature? dealer,
         CardModel? cardSource)
     {
-        return target == Owner ? 0m : amount;
+        return target == Owner && cardSource is not Cards.BrightestFlame ? 0m : amount;
     }
 
     public override Task AfterModifyingHpLostAfterOsty() =>

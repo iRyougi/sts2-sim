@@ -73,7 +73,7 @@ public sealed class TabletOfTruth : EventModel
                 RunState,
                 Owner.Creature,
                 Owner.Creature.MaxHp - 1m,
-                isFromCard: false);
+                cardSource: null);
             await CreatureCmd.LoseHp(
                 RunState,
                 Owner.Creature,
@@ -82,7 +82,7 @@ public sealed class TabletOfTruth : EventModel
             return;
         }
 
-        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, hpLoss, isFromCard: false);
+        await CreatureCmd.LoseMaxHp(RunState, Owner.Creature, hpLoss, cardSource: null);
         List<CardModel> upgradable = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();
         if (_decipherCount == 4)
         {

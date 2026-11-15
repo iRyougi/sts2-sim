@@ -54,7 +54,9 @@ public sealed class HiveContentBehaviorTests : IDisposable
         Enlightenment enlightenment = AddToHand<Enlightenment>(player, upgraded);
         Sneaky expensive = AddToHand<Sneaky>(player);
         Slice cheap = AddToHand<Slice>(player);
+        Assert.DoesNotContain(CardKeyword.Exhaust, enlightenment.Keywords);
         await room.Engine.PlayCardAsync(player, enlightenment, null);
+        Assert.Equal(PileType.Discard, enlightenment.Pile!.Type);
         Assert.Equal(1, expensive.EnergyCost);
         Assert.Null(expensive.TemporaryCostOverrideThisTurn);
         Assert.Equal(thisTurn ? 1 : null, expensive.TemporaryCostOverrideThisTurnOrUntilPlayed);

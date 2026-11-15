@@ -198,7 +198,7 @@ public static class CardFaceBaseValues
         [typeof(MasterPlanner)] = Entry<MasterPlanner>([0d, 0d, 0d, 0d, 0d], [0d, 0d, 0d, 0d, 0d], [null, null, null, null, null], 0),
         [typeof(Maul)] = Entry<Maul>([5d, 0d, 0d, 0d, 0d], [1d, 0d, 0d, 0d, 0d], ["_damage", null, null, null, null], 1),
         [typeof(Mayhem)] = Entry<Mayhem>([0d, 0d, 0d, 0d, 0d], [0d, 0d, 0d, 0d, 0d], [null, null, null, null, null], 0),
-        [typeof(MementoMori)] = Entry<MementoMori>([0d, 0d, 0d, 0d, 0d], [0d, 0d, 0d, 0d, 0d], [null, null, null, null, null], 0),
+        [typeof(MementoMori)] = Entry<MementoMori>([19d, 0d, 0d, 0d, 0d], [4d, 0d, 0d, 0d, 0d], ["_damage", null, null, null, null], 1),
         [typeof(Metamorphosis)] = Entry<Metamorphosis>([0d, 0d, 3d, 0d, 0d], [0d, 0d, 2d, 0d, 0d], [null, null, null, null, null], 4),
         [typeof(MeteorShower)] = Entry<MeteorShower>([14d, 0d, 0d, 0d, 0d], [7d, 0d, 0d, 0d, 0d], [null, null, null, null, null], 1),
         [typeof(Mimic)] = Entry<Mimic>([0d, 0d, 0d, 0d, 0d], [0d, 0d, 0d, 0d, 0d], [null, null, null, null, null], 0),
