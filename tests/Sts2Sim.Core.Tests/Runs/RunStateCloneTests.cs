@@ -327,8 +327,12 @@ public sealed partial class RunStateCloneTests
             RunState variant = source.CloneExact();
 
             var variantGame = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(variant.CurrentRoom).Event).Game!;
-            // Layout is the #563 exception; only old RNG/hidden future may vary here.
+            // #979: old RNG, hidden future and the concealed layout may all vary here.
             ((Rng)typeof(CrystalSphereMinigame).GetField("_rng", PrivateFields)!.GetValue(variantGame)!).NextInt(97);
+            var concealed = variantGame.Items.Where(i => i.Position is { } p && !Shown(variantGame, i)).ToArray();
+            if (concealed.Length >= 2) // Swap two concealed items of different shape when both fit.
+                foreach (var other in concealed.Where(o => o.Width == concealed[0].Width && o.Height == concealed[0].Height && o.Kind != concealed[0].Kind).Take(1))
+                    (other.Position, concealed[0].Position) = (concealed[0].Position, other.Position);
             HiddenFutureCounterfactual.Change(variant);
             var before = RunCloneGraphSnapshot.Capture(source);
             var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -343,16 +347,42 @@ public sealed partial class RunStateCloneTests
             var b = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(second.CurrentRoom).Event);
             var c = Assert.IsType<CrystalSphere>(Assert.IsType<EventRoom>(different.CurrentRoom).Event);
             Assert.Equal(original.UncoverFutureCost, a.UncoverFutureCost);
+            string[] VisibleState(CrystalSphereMinigame g) => g.Items.Where(i => i.Position.HasValue && Shown(g, i))
+                .Select(i => $"{i.Kind}|{i.Position}|{i.Width}|{i.Height}|{i.CardRarity}|{i.PotionRarity}|{i.IsBigGold}|{i.IsRevealed}")
+                .Order(StringComparer.Ordinal).ToArray();
+            string Layout(CrystalSphereMinigame g) => string.Join(";", g.Items.Select(SphereItemState));
             foreach (var clone in new[] { a, b, c })
             {
-                Assert.Equal(game.DivinationCount, clone.Game!.DivinationCount);
-                Assert.Equal(game.PlacedAllItems, clone.Game.PlacedAllItems);
-                Assert.Equal(game.Items.Select(SphereItemState), clone.Game.Items.Select(SphereItemState));
-                Assert.Equal(game.RevealedItems.Select(SphereItemState), clone.Game.RevealedItems.Select(SphereItemState));
+                var cg = clone.Game!;
+                Assert.Equal(game.DivinationCount, cg.DivinationCount);
+                Assert.Equal(VisibleState(game), VisibleState(cg));
+                Assert.Equal(game.RevealedItems.Distinct().Select(i => (i.Kind, i.Position)),
+                    cg.RevealedItems.Distinct().Select(i => (i.Kind, i.Position)));
                 for (int x = 0; x < 11; x++) for (int y = 0; y < 11; y++)
-                    Assert.Equal(game.IsHidden(x, y), clone.Game.IsHidden(x, y));
-                for (int i = 0; i < game.Items.Count; i++) Assert.NotSame(game.Items[i], clone.Game.Items[i]);
-                Assert.Empty(clone.Game.Rewards);
+                {
+                    Assert.Equal(game.IsHidden(x, y), cg.IsHidden(x, y));
+                    // Consistency: every item is wholly hidden unless it is one of the shown items, and no overlap.
+                    var at = cg.Items.Where(i => i.Position is { } p && x >= p.X && x < p.X + i.Width && y >= p.Y && y < p.Y + i.Height).ToArray();
+                    Assert.True(at.Length <= 1, $"{scenario}: overlap at {x},{y}");
+                    if (!cg.IsHidden(x, y)) Assert.Equal(game.Items.Any(i => i.Position is { } p && x >= p.X && x < p.X + i.Width && y >= p.Y && y < p.Y + i.Height), at.Length == 1);
+                }
+                Assert.All(cg.Items, i => Assert.DoesNotContain(i, game.Items));
+                Assert.Empty(cg.Rewards);
+            }
+            Assert.Equal(Layout(a.Game!), Layout(b.Game!)); // Same new seed: independent of source RNG and concealed layout.
+            Assert.NotEqual(Layout(a.Game!), Layout(c.Game!)); // Different seeds regenerate the concealed part.
+            Assert.NotEqual(Layout(game), Layout(a.Game!)); // The concealed source layout is not copied.
+            if (scenario == "hidden-preroll")
+            {
+                // Nothing uncovered: one draw of the sampler equals the native constructor on the same RNG.
+                for (ulong seed = 0; seed < 200; seed++)
+                {
+                    var native = new CrystalSphereMinigame(first.Players[0], new Rng(seed, "sphere-port"), 3);
+                    var drawn = CrystalSphereLayoutSampler.Sample(CrystalSphereLayoutSampler.BuildTimeHidden(), [], null,
+                        new Rng(seed, "sphere-port"), out _);
+                    Assert.Equal(native.Items.Select(i => i.Position), drawn.Positions.Take(native.Items.Count));
+                    Assert.True(native.PlacedAllItems == drawn.PlacedAll, $"seed {seed}");
+                }
             }
             // Fully uncover the same potion/card and finish at the same cell in every world.
             var outcomes = new List<string>();
@@ -375,7 +405,8 @@ public sealed partial class RunStateCloneTests
                 var expectedPotions = current.RevealedItems.Where(i => i.Kind == CrystalSphereItemKind.Potion)
                     .Select(i => probe.NextItem(Sts2Sim.Core.Factories.PotionFactory.GetOutOfCombatPool(ev.Owner)
                         .Where(p => p.Rarity == i.PotionRarity))!.Id).ToArray();
-                Assert.NotEmpty(expectedPotions);
+                // Only the source is known to hold the potion at that place; clones predict from their own RNG.
+                if (ReferenceEquals(ev, original)) Assert.NotEmpty(expectedPotions);
                 Assert.Equal(expectedPotions, current.Rewards.OfType<PotionReward>().Select(r => r.Potion!.Id));
                 outcomes.Add(string.Join(";", current.Rewards.Select(r => r switch
                 {
@@ -432,6 +463,9 @@ public sealed partial class RunStateCloneTests
         await room.Enter(run);
         return room;
     }
+    private static bool Shown(CrystalSphereMinigame game, CrystalSphereItem item) =>
+        item.Position is { } p && Enumerable.Range(0, item.Width).Any(dx =>
+            Enumerable.Range(0, item.Height).Any(dy => !game.IsHidden(p.X + dx, p.Y + dy)));
     private static string SphereItemState(CrystalSphereItem item) =>
         $"{item.Kind}|{item.Position}|{item.Width}|{item.Height}|{item.CardRarity}|{item.PotionRarity}|{item.IsBigGold}|{item.IsRevealed}|{item.RevealSubscriptions}";
     private static CombatState PreparedState(EventRoom room)

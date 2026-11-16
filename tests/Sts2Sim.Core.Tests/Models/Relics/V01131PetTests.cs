@@ -213,6 +213,25 @@ public sealed class V01131PetTests : IDisposable
                 Assert.Equal(51, clonedRelic.CurrentHp);
                 Assert.Equal(60, player.Relics.OfType<WuppyRelic>().Single().CurrentHp);
                 Assert.Equal(60, sourcePet.CurrentHp);
+                // #974：战后遗物仍持有已离场的 Wuppy 生物；战斗外跑局克隆必须成功，
+                // 且克隆世界的下一场战斗与源世界一致。
+                await CreatureCmd.Kill(room.Engine.State.Enemies[0]);
+                await room.ResolveOutcomeAsync(generateRewards: false);
+                await room.Exit(run);
+                run.PopCurrentRoom();
+                Assert.Null(player.Creature.CombatState);
+                foreach ((string label, RunState world) in new[]
+                    { ("source", run), ("exact", run.CloneExact()), ("reseeded", run.CloneReseeded(974)) })
+                {
+                    Player worldPlayer = Assert.Single(world.Players);
+                    WuppyRelic worldRelic = worldPlayer.Relics.OfType<WuppyRelic>().Single();
+                    CombatRoom next = await EnterCombat(world);
+                    Creature nextPet = Assert.Single(worldPlayer.PlayerCombatState!.Pets);
+                    Assert.True(ReferenceEquals(nextPet, worldRelic.CombatWuppy), $"{ctx} world={label}");
+                    Assert.True((60, 60) == (nextPet.CurrentHp, nextPet.MaxHp), $"{ctx} world={label}");
+                    await DamageCmd.Attack(9m).FromMonster(next.Engine.State.Enemies[0].Monster!).Execute();
+                    Assert.True(worldRelic.CurrentHp == 51, $"{ctx} world={label} hp={worldRelic.CurrentHp}");
+                }
                 return;
             }
         }

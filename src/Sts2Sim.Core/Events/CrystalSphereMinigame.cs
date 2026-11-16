@@ -128,12 +128,79 @@ public sealed class CrystalSphereMinigame
             return CloneResolvedVisibleForRun(owner, rng, mapVisibleItem, mapReward, registerGame);
         }
 
-        // #563: this event's layout (including fixed gold/Doubt) is an approved
-        // information-boundary exception. Copy it through the existing identity map;
-        // future potion/card/relic content still uses this clone's RNG at settlement.
-        // The copy constructor creates a fresh reveal gate and invokes no reveal,
-        // reward, curse or RNG side effects. Never rejection-sample a late board.
-        return new CrystalSphereMinigame(this, owner, rng, mapVisibleItem, mapReward, registerGame);
+        // #979: the layout is hidden information (the #563 exception was withdrawn by #977).
+        // Items with an uncovered cell are visible and keep their place; the rest of the board
+        // is regenerated with this clone's RNG by a bounded conditional sampler. No reveal,
+        // reward or curse side effect runs, and the source's RNG and hidden items are not read.
+        var known = new List<CrystalSphereItem>();
+        foreach (CrystalSphereItem item in _items)
+            if (item.Position is { } position && HasUncoveredCell(item, position)) known.Add(item);
+        CrystalSphereLayoutSampler.Layout layout = CrystalSphereLayoutSampler.Sample(_hidden,
+            known.Select(item => new CrystalSphereLayoutSampler.Known(CrystalSphereLayoutSampler.Shape.Of(item),
+                item.Position!.Value.X, item.Position.Value.Y)).ToArray(),
+            FirstUnplacedIndex(), rng, out _);
+        return BuildConditionalClone(layout, known, owner, rng, mapReward, registerGame, registerVisibleItem);
+    }
+
+    /// <summary>Unplaced items are drawn on the cleared top-left corner, so a failed build is visible.</summary>
+    internal int? FirstUnplacedIndex()
+    {
+        int index = _items.FindIndex(item => item.Position is null);
+        return index < 0 ? null : index;
+    }
+
+    private bool HasUncoveredCell(CrystalSphereItem item, (int X, int Y) position)
+    {
+        for (int dx = 0; dx < item.Width; dx++)
+            for (int dy = 0; dy < item.Height; dy++)
+                if (!_hidden[position.X + dx, position.Y + dy]) return true;
+        return false;
+    }
+
+    private CrystalSphereMinigame BuildConditionalClone(CrystalSphereLayoutSampler.Layout layout,
+        IReadOnlyList<CrystalSphereItem> known, Player owner, Rng rng,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame,
+        Action<CrystalSphereItem, CrystalSphereItem> registerVisibleItem)
+    {
+        var target = new CrystalSphereMinigame(owner, rng);
+        registerGame(this, target);
+        Array.Copy(_hidden, target._hidden, _hidden.Length);
+        target.DivinationCount = DivinationCount;
+        target.PlacedAllItems = layout.PlacedAll;
+        int batchSize = CrystalSphereLayoutSampler.Batch.Length;
+        for (int index = 0; index < layout.Positions.Length; index++)
+        {
+            CrystalSphereItem created = CrystalSphereLayoutSampler.Batch[index % batchSize].Create();
+            // Each PopulateItems call subscribes every item created so far once.
+            created.RevealSubscriptions = layout.Batches - index / batchSize;
+            if (layout.Positions[index] is { } position)
+            {
+                created.Position = position;
+                for (int dx = 0; dx < created.Width; dx++)
+                    for (int dy = 0; dy < created.Height; dy++)
+                        target._occupants[position.X + dx, position.Y + dy] = created;
+            }
+            target._items.Add(created);
+        }
+        var mapped = new Dictionary<CrystalSphereItem, CrystalSphereItem>(ReferenceEqualityComparer.Instance);
+        for (int k = 0; k < known.Count; k++)
+        {
+            CrystalSphereItem copy = target._items[layout.KnownSlots[k]];
+            copy.IsRevealed = known[k].IsRevealed;
+            mapped.Add(known[k], copy);
+            registerVisibleItem(known[k], copy);
+        }
+        // Rebuild the revealed list in the source's reveal order with the clone's own multiplicity.
+        var seen = new HashSet<CrystalSphereItem>(ReferenceEqualityComparer.Instance);
+        foreach (CrystalSphereItem revealed in _revealed)
+        {
+            if (!seen.Add(revealed)) continue;
+            CrystalSphereItem copy = mapped[revealed];
+            for (int i = 0; i < copy.RevealSubscriptions; i++) target._revealed.Add(copy);
+        }
+        target.Rewards = Array.AsReadOnly(Rewards.Select(mapReward).ToArray());
+        return target;
     }
 
     private CrystalSphereMinigame(Player owner, Rng rng)

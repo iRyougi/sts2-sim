@@ -415,6 +415,14 @@ public sealed partial class RunState
                     // Typed Event/room owners restore these runtime controls after validating the boundary.
                     if (RunCloneOwnedRootDiscovery.IsRuntimeBoundary(field)) continue;
                     if (field.DeclaringType == typeof(EventModel)) continue;
+                    if (RunCloneOwnedRootDiscovery.IsCombatScopedCreatureReference(field))
+                    {
+                        // #974：战斗内映射到已发布的克隆生物；战斗外残留的已离场生物不属于任何世界根，
+                        // 映射为 null（与战斗克隆 RestoreCombatCloneReferencesFrom 对称，偏离 #160 条目）。
+                        object? creature = field.GetValue(pair.Source);
+                        field.SetValue(pair.Target, creature is null ? null : _mapTypedRoot(creature));
+                        continue;
+                    }
                     field.SetValue(pair.Target, MapValue(field.GetValue(pair.Source)));
                 }
             }
@@ -582,6 +590,8 @@ public sealed partial class RunState
                     // Locks, selectors, observers and ambient scopes are validated/rebuilt by
                     // the owning typed clone component, not descended into as logical roots.
                     if (IsRuntimeBoundary(field)) continue;
+                    // 战斗外可能指向已离场的生物；不把旧战斗当作逻辑根下钻（#974）。
+                    if (IsCombatScopedCreatureReference(field)) continue;
                     if (field.GetValue(current) is { } value) pending.Enqueue(value);
                 }
             }
@@ -599,6 +609,11 @@ public sealed partial class RunState
             || field.DeclaringType == typeof(CombatState) && field.Name == "_hookListenerSnapshotCache"
             || field.DeclaringType == typeof(EventModel)
                 && field.Name is "_activeChoiceTask" or "_activeChoiceOption" or "_activeChoicePageVersion";
+
+        /// <summary>模型上指向"本场战斗生物"的字段（原版战后不清空）。跑局克隆不下钻、只映射已发布的生物，
+        /// 未发布（战后残留）映射为 null（#974）。</summary>
+        internal static bool IsCombatScopedCreatureReference(FieldInfo field) =>
+            field.DeclaringType == typeof(Sts2Sim.Core.Models.Relics.Wuppy) && field.Name == "_combatWuppy";
 
         internal static FieldInfo[] InstanceFields(Type type) => Fields.GetOrAdd(type, static rootType =>
         {

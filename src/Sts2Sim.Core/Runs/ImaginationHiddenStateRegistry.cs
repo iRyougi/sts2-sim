@@ -86,7 +86,7 @@ internal static class ImaginationHiddenStateRegistry
         Event("BattlewornDummy", V, history, "_selectedTier");
         Event("ColossalFlower", V, history, "_dig");
         Event("CrystalSphere", V, visible, "<UncoverFutureCost>k__BackingField");
-        Event("CrystalSphere", V, "#563 layout exception includes fixed 10/30 gold and Doubt; future random rewards use the clone RNG at native settlement time.", "<Game>k__BackingField");
+        Event("CrystalSphere", V, "#979: uncovered cells and items showing on them are kept; the concealed rest of the layout (including fixed gold and Doubt) is regenerated with the clone RNG by a bounded conditional sampler; random rewards use the clone RNG at native settlement time.", "<Game>k__BackingField");
         Event("DenseVegetation", V, "Displayed event gold and initialization-time heal preview; output-only cache never executes healing.", "_gold _visibleHeal");
         Event("EndlessConveyor", V, history, "_lastDishId _currentDishId _numOfGrabs _visibleLastDishId");
         Event("FakeMerchant", N, runtime, "_interactionGate");

@@ -27,15 +27,21 @@ public sealed class CrystalSphere : EventModel
         context.Add(VisibleValue.Int("DivinationCount", game.DivinationCount));
         context.Add(VisibleValue.Int("Width", game.Width));
         context.Add(VisibleValue.Int("Height", game.Height));
-        // Approved Crystal Sphere-only layout boundary: no future randomized reward IDs.
-        context.Add(VisibleValue.Scope("InformationBoundary", "CrystalSphereLayoutException"));
+        // #979: player-visible board only. The marker name is kept for consumers that key on it.
+        context.Add(VisibleValue.Scope("InformationBoundary", "CrystalSpherePlayerVisible"));
         for (int x = 0; x < game.Width; x++)
             for (int y = 0; y < game.Height; y++)
                 context.Add(VisibleValue.Condition($"Cell[{x},{y}].Hidden", game.IsHidden(x, y) ? "true" : "false"));
+        // Only items with an uncovered cell are on screen; list them by position, not by the
+        // hidden native placement order.
+        var shown = game.Items
+            .Where(item => item.Position is { } p && Enumerable.Range(0, item.Width).Any(dx =>
+                Enumerable.Range(0, item.Height).Any(dy => !game.IsHidden(p.X + dx, p.Y + dy))))
+            .OrderBy(item => item.Position!.Value.X).ThenBy(item => item.Position!.Value.Y);
         int itemIndex = 0;
-        foreach (CrystalSphereItem item in game.Items)
+        foreach (CrystalSphereItem item in shown)
         {
-            if (item.Position is not { } position) continue;
+            var position = item.Position!.Value;
             string prefix = $"Item[{itemIndex++}]";
             context.Add(VisibleValue.Int($"{prefix}.X", position.X));
             context.Add(VisibleValue.Int($"{prefix}.Y", position.Y));
@@ -52,6 +58,8 @@ public sealed class CrystalSphere : EventModel
             if (item.Kind == CrystalSphereItemKind.Curse)
                 context.Add(VisibleValue.Id($"{prefix}.Curse", ModelDb.GetId<Doubt>().Entry));
         }
+        // A failed build stacks the unplaced items on the cleared top-left corner (#979).
+        if (game.FirstUnplacedIndex() is { } unplaced) context.Add(VisibleValue.Int("FirstUnplacedItem", unplaced));
         return new(context.ToImmutable(), candidates.Select(candidate => candidate switch
         {
             CustomEventDecision.RevealSphere reveal => new VisibleOption("REVEAL_SPHERE",

@@ -19,6 +19,7 @@
     <InternalsVisibleTo Include="SimFuzz" />
     <InternalsVisibleTo Include="Sts2Sim.Solver.Tests" />
     <InternalsVisibleTo Include="SolverDiff" />
+    <InternalsVisibleTo Include="RunCloneBench" />
   </ItemGroup>
 
 </Project>

@@ -686,8 +686,19 @@ public sealed class EventVisibleStateTests : IDisposable
                 projection = Pure(sphere.Run, () => VisibleDecisionProjection.ForCustomEvent(sphere.Event, reveal)); bindings = reveal;
                 Assert.Contains(VisibleValue.Int("DivinationCount", 3), projection.Metadata.ContextValues);
                 Assert.Contains(VisibleValue.Int("Width", 11), projection.Metadata.ContextValues);
-                Assert.Contains(VisibleValue.Scope("InformationBoundary", "CrystalSphereLayoutException"), projection.Metadata.ContextValues);
+                Assert.Contains(VisibleValue.Scope("InformationBoundary", "CrystalSpherePlayerVisible"), projection.Metadata.ContextValues);
                 Assert.DoesNotContain(projection.Metadata.ContextValues, value => value.Kind == VisibleValueKind.ContentId && value.Value != "DOUBT");
+                // #979: nothing uncovered yet shows no item; after a reveal only items on uncovered cells appear.
+                Assert.DoesNotContain(projection.Metadata.ContextValues, value => value.Name.StartsWith("Item[", StringComparison.Ordinal));
+                var sphereGame = ((CrystalSphere)sphere.Event).Game!;
+                var target = sphereGame.Items.First(i => i.Position.HasValue);
+                await ((CrystalSphere)sphere.Event).RevealAsync(target.Position!.Value.X, target.Position.Value.Y, big: false);
+                var revealedContext = Pure(sphere.Run, () => VisibleDecisionProjection.ForCustomEvent(sphere.Event, reveal)).Metadata.ContextValues;
+                int shownCount = sphereGame.Items.Count(i => i.Position is { } p && Enumerable.Range(0, i.Width).Any(dx =>
+                    Enumerable.Range(0, i.Height).Any(dy => !sphereGame.IsHidden(p.X + dx, p.Y + dy))));
+                Assert.Equal(1, shownCount);
+                Assert.Equal(shownCount, revealedContext.Count(value => value.Name.StartsWith("Item[", StringComparison.Ordinal) && value.Name.EndsWith(".X", StringComparison.Ordinal)));
+                Assert.Contains(VisibleValue.Int("Item[0].X", target.Position.Value.X), revealedContext);
                 break;
             case "CustomFake":
                 var fake = await Setup("FakeMerchant");
