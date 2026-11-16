@@ -26,9 +26,9 @@ public sealed class ContentRegistryTests : IDisposable
         CardModel[] cards = ModelDb.All<CardModel>().ToArray();
         // Defect adds 91 pool cards and Fuel, a generated token; Necrobinder adds 91 pool cards plus the
         // Soul and SweepingGaze tokens.
-        Assert.Equal(599, cards.Length);
-        Assert.Equal(573, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
-        Assert.Equal(507, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        Assert.Equal(600, cards.Length);
+        Assert.Equal(574, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        Assert.Equal(508, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(66, cards.Count(card => card.IsColorless));
         Assert.Equal(10, cards.Count(card => card.Rarity == CardRarity.Token));
         Assert.Equal(16, cards.Count(card => card.Rarity == CardRarity.Status));
@@ -69,9 +69,9 @@ public sealed class ContentRegistryTests : IDisposable
         RelicModel[] relics = ModelDb.All<RelicModel>().ToArray();
         // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, Task 3a
         // relics, the eight Necrobinder relics, and five Orobas upgraded starters.
-        Assert.Equal(304, relics.Length);
+        Assert.Equal(306, relics.Length);
         Assert.Equal(
-            143,
+            145,
             relics.Count(relic =>
                 relic.Rarity is RelicRarity.Ancient or RelicRarity.Event));
 
@@ -181,6 +181,7 @@ public sealed class ContentRegistryTests : IDisposable
                 typeof(Wellspring),
                 typeof(WhisperingHollow),
                 typeof(WoodCarvings),
+                typeof(WuppyInTrouble),
                 typeof(ZenWeaver),
             },
             events.Select(model => model.GetType()));

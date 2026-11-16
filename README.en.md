@@ -7,7 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/iRyougi/sts2-sim/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/iRyougi/sts2-sim/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/iRyougi/sts2-sim?label=release&color=blue)](https://github.com/iRyougi/sts2-sim/releases/latest)
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/9.0)
-[![STS2 v0.111.0](https://img.shields.io/badge/game-STS2%20v0.111.0-8B0000)](#)
+[![STS2 v0.113.1](https://img.shields.io/badge/game-STS2%20v0.113.1-8B0000)](#)
 [![License: MIT](https://img.shields.io/github/license/iRyougi/sts2-sim?color=green)](LICENSE)
 [![保真差异](https://img.shields.io/github/issues/iRyougi/sts2-sim/%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82?label=open%20fidelity%20issues&color=orange)](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+is%3Aopen+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82)
 [![Stars](https://img.shields.io/github/stars/iRyougi/sts2-sim?style=flat&logo=github)](https://github.com/iRyougi/sts2-sim/stargazers)
@@ -26,11 +26,11 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 - **A port of the game logic, not a re-design.** Game rules are ported from the game's own code as literally as practical, so behaviour can be checked method by method. Doc comments cite the original type they come from (for example `MegaCrit.Sts2.Core.Commands.CardCmd`).
 - **Seed-exact RNG.** The random number generator and seed derivation follow the game, with the goal that the same seed and the same choices reproduce the same run as the game client, draw for draw.
 - **Cloneable.** Combat state can be cloned (`CombatState.Clone()`) for search; RNG streams (`Rng`, `RunRngSet`, `PlayerRngSet`) can be copied exactly (`CloneExact`) or with fresh randomness (`CloneReseeded`) for sampling. Deep cloning of a whole run (`RunState`) is not supported yet.
-- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of game v0.111.0 and all encounters and events of the four acts are ported; a few items are not implemented yet (see below).
+- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of the four existing characters in game v0.113.1 (public beta) and all encounters and events of the four acts are ported; the new character Fool and a few other items are not implemented yet (see below).
 
 | | |
 |---|---|
-| Game baseline | STS2 v0.111.0 (release commit `41cef1ea`, `main_assembly_hash 222455745`) |
+| Game baseline | STS2 v0.113.1 public beta (release commit `d09d48e5`, `main_assembly_hash 358281912`) |
 | Characters | Defect, Ironclad, Necrobinder, Regent, Silent |
 | Acts | Overgrowth, Underdocks, Hive, Glory |
 | Multiplayer | Not supported |
@@ -49,6 +49,8 @@ There are two RNG modes, and they are deliberately separate APIs:
 The following can be met in a single-player run but are missing or incomplete:
 
 - The victory event after the final boss (TheArchitect) is not modelled; the simulator declares the win when the final boss dies.
+- **The new character Fool is not ported yet** (cards, relics, potions, the arrow and melody mechanics). Other characters can still obtain Fool cards through cross-colour sources such as Kaleidoscope, PrismaticGem, Splash, Orobas and ColorfulPhilosophers; when one of these triggers, the simulator draws only from the existing characters' pools, so the rest of the run will differ from the game.
+- The two-phase extra-turn source selection of v0.113.1 (PaelsEye first, the Ambergris power renamed to ExtraTurnPower, only one of them consumed) is not ported yet and still follows v0.111.0; it only differs from the game when both conditions hold in the same turn.
 
 Multiplayer-only content, and content that exists in the game but cannot be obtained, is out of scope.
 

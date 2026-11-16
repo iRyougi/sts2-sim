@@ -3,6 +3,7 @@ using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.ValueProps;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Events;
 
@@ -33,8 +34,7 @@ public sealed class DollRoom : EventModel
     {
         await CreatureCmd.Damage(RunState, Owner.Creature, damage, ValueProp.Unblockable | ValueProp.Unpowered);
         var dolls = Dolls();
-        dolls.Sort((a, b) => a.CompareTo(b));
-        Rng.Shuffle(dolls);
+        dolls.StableShuffle(Rng);
         SetOptions(dolls.Take(choices).Select(relic => new EventOption(relic.Id.Entry, () => Take(relic))).ToArray());
     }
 

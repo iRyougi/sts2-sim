@@ -118,18 +118,20 @@ public sealed class GloryEventTests : IDisposable
             return;
         }
 
+        // v0.113.1（#946）：遗物稀有度改由事件自身 Rng 掷出，不再消耗 PlayerRng.Rewards。
         (_, Player relicProbeOwner) = CreateRun(seed);
-        RelicModel expectedRelic = RelicFactory.PullNextRelicFromFront(relicProbeOwner);
-        var relicRngProbe = player.PlayerRng.Rewards.CloneExact();
-        _ = RelicFactory.RollRarity(relicRngProbe);
-        int relicCounterBefore = player.PlayerRng.Rewards.Counter;
+        var relicRngProbe = ev.Rng.CloneExact();
+        RelicModel expectedRelic = RelicFactory.PullNextRelicFromFront(relicProbeOwner, relicRngProbe);
+        int relicCounterBefore = ev.Rng.Counter;
+        int rewardsCounterBefore = player.PlayerRng.Rewards.Counter;
 
         ev.ResumeAfterForcedCombat(new ForcedCombatOutcome(Victory: true, TimedOut: false));
 
         Assert.True(ev.IsFinished);
         RelicModel relic = Assert.IsType<RelicReward>(Assert.Single(DrainRewardOffers(ev)).Relic).Relic!;
         Assert.Equal(expectedRelic.Id, relic.Id);
-        Assert.Equal(relicRngProbe.Counter - relicCounterBefore, player.PlayerRng.Rewards.Counter - relicCounterBefore);
+        Assert.Equal(relicRngProbe.Counter - relicCounterBefore, ev.Rng.Counter - relicCounterBefore);
+        Assert.Equal(rewardsCounterBefore, player.PlayerRng.Rewards.Counter);
     }
 
     [Fact]

@@ -64,8 +64,9 @@ public sealed class KaleidoscopeTests : IDisposable
 
         await RelicCmd.Obtain(ModelDb.Relic<Kaleidoscope>(), player);
 
-        Assert.True(player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore == 6,
-            $"seed={seed}, obtain: Niche delta={player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore}, expected=6");
+        // v0.113.1 (#946): each of the two four-pool shuffles consumes one parent draw (child-RNG seed).
+        Assert.True(player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore == 2,
+            $"seed={seed}, obtain: NonCombatGeneration delta={player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore}, expected=2");
         Assert.True(player.PlayerRng.Rewards.Counter - rewardsCounterBefore == 18,
             $"seed={seed}, obtain: Rewards delta={player.PlayerRng.Rewards.Counter - rewardsCounterBefore}, expected=18");
 

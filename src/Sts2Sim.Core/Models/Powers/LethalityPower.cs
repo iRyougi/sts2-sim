@@ -30,7 +30,8 @@ public sealed class LethalityPower : PowerModel
             return 1m;
 
         int attacksStarted = Owner.Player?.PlayerCombatState?.AttackCardsStartedThisTurn ?? 0;
-        if (attacksStarted > (inPlayPile ? 1 : 0))
+        // v0.113.1：牌在 Play 堆但没有 CardPlay 时不再视为“本张已计入”。
+        if (attacksStarted > (inPlayPile && cardPlay is not null ? 1 : 0))
             return 1m;
 
         return 1m + Amount / 100m;

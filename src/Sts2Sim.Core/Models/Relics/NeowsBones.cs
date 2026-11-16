@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Relics;
 
@@ -21,7 +22,7 @@ public sealed class NeowsBones : RelicModel
         List<RelicModel> candidates = ancient.AllPossibleOptions
             .Where(relic => relic is not NeowsBones && relic.IsAllowedAtNeow(Owner.RunState))
             .ToList();
-        Owner.PlayerRng.NonCombatGeneration.Shuffle(candidates);
+        candidates.UnstableShuffle(Owner.PlayerRng.NonCombatGeneration);
 
         // Native offers both mandatory relics together. Nested offers from taking one
         // relic must finish before the next relic or the subsequent curse is resolved.

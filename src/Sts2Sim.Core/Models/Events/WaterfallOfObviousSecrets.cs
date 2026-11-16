@@ -49,7 +49,7 @@ public sealed class WaterfallOfObviousSecrets : EventModel
 
     private async Task BeatUp()
     {
-        RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner, RelicFactory.RollRarity(Rng));
+        RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner, Rng);
         await RelicCmd.Obtain(relic, Owner);
         await CardPileCmd.AddCursesToDeck(Enumerable.Repeat<CardModel>(ModelDb.Card<Guilty>(), BeatUpCurseCount), Owner);
         Finish();

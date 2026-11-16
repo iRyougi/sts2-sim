@@ -72,7 +72,9 @@ public class CombatReplayDemoTests
         await CombatReplayDemo.RunAsync("task22-demo-1", log.Add);
 
         int venerateIndex = log.FindIndex(line => line.Contains("Venerate -> Energy 3->2, Stars 0->2, damage 0, block 0->0, Weak 0->0, Vulnerable 0->0"));
-        int fallingStarIndex = log.FindIndex(line => line.Contains("FallingStar -> Energy 1->1, Stars 2->0, damage 8, block 5->5, Weak 0->1, Vulnerable 0->1"));
+        // v0.113.1（#946）：开局抽牌堆改用子 Rng 洗牌，第 2 回合先打两张 Defend 再打 FallingStar，
+        // FallingStar 的 8 点伤害击杀剩 8 HP 的木桩，因此 Weak/Vulnerable 不再出现增量（金值按新版重算）。
+        int fallingStarIndex = log.FindIndex(line => line.Contains("FallingStar -> Energy 0->0, Stars 2->0, damage 8, block 10->10, Weak 0->0, Vulnerable 0->0"));
         Assert.True(venerateIndex >= 0);
         Assert.True(fallingStarIndex > venerateIndex);
     }

@@ -343,12 +343,13 @@ public sealed class V01131NewSharedEventsTests : IDisposable
     public void EventPools_MatchV01131Order()
     {
         // Shared and Glory orders are pinned by SharedEventIntegrationTests / GloryEventTests.
-        // v0.113.1 Underdocks.AllEvents minus the trailing WuppyInTrouble owned by #928 (deviation #927).
+        // v0.113.1 Underdocks.AllEvents (12 entries; WuppyInTrouble appended by #928).
         Assert.Equal(new[]
         {
             typeof(AbyssalBaths), typeof(DrowningBeacon), typeof(EndlessConveyor), typeof(PunchOff),
             typeof(SpiralingWhirlpool), typeof(SunkenStatue), typeof(SunkenTreasury), typeof(DoorsOfLightAndDark),
             typeof(TrashHeap), typeof(WaterfallOfObviousSecrets), typeof(WaterloggedScriptorium),
+            typeof(WuppyInTrouble),
         }, UnderdocksEventPool.All);
 
         List<Type> colorless = ColorlessCardPool.Instance.AllCards.Select(card => card.GetType()).ToList();

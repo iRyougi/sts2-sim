@@ -112,7 +112,8 @@ public sealed class Aeonglass : MonsterModel
             {
                 var wither = (Wither)ModelDb.Card<Wither>().MutableClone();
                 wither.AssignOwner(target.Player!);
-                await CardPileCmd.Generate(Creature.CombatState, wither, PileType.Discard, creator: null);
+                await CardPileCmd.Generate(
+                    Creature.CombatState, wither, PileType.Discard, creator: null, position: CardPilePosition.Random);
             }
         }
 

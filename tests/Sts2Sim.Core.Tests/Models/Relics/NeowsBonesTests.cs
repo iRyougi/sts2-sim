@@ -16,6 +16,7 @@ using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Tests.Models.Relics;
 
@@ -233,7 +234,7 @@ public sealed class NeowsBonesTests : IDisposable
             .Select(relic => relic.GetType())
             .ToList();
         var rewardsOracle = player.PlayerRng.NonCombatGeneration.CloneExact();
-        rewardsOracle.Shuffle(expectedTypes);
+        expectedTypes.UnstableShuffle(rewardsOracle);
         Type[] expectedRelics = expectedTypes.Take(2).ToArray();
         List<CardModel> curseCandidates = CardPoolFilters.ForSinglePlayer(ModelDb.All<CardModel>())
             .Where(card => card.Rarity == CardRarity.Curse && card.CanBeGeneratedByModifiers)

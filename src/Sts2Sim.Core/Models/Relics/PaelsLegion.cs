@@ -33,7 +33,8 @@ public sealed class PaelsLegion : RelicModel
         if (!props.HasFlag(ValueProp.Move) || cardSource?.Owner != Owner || _cooldown > 0)
             return 1m;
 
-        return 2m;
+        // v0.113.1：只对尚无受影响出牌或正是该出牌的格挡翻倍，防嵌套自动出牌双倍。
+        return _affectedCardPlay is null || ReferenceEquals(_affectedCardPlay, cardPlay) ? 2m : 1m;
     }
 
     public override Task AfterModifyingBlockAmount(

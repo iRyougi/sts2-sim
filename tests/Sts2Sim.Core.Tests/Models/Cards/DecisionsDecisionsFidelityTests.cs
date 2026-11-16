@@ -72,10 +72,12 @@ public sealed class DecisionsDecisionsFidelityTests : IDisposable
         Assert.Equal(5, cardsBefore);
         var request = Assert.Single(selection.Requests);
         LegSweep selected = Assert.IsType<LegSweep>(request.Candidates[0]);
-        Assert.Equal(cardsBefore + 2, player.PlayerCombatState.CardsPlayedThisTurn);
+        // v0.113.1：VelvetChoker 数本回合已开始的出牌（含进行中的 DecisionsDecisions），第 6 张开始后
+        // 所有嵌套自动打出都被拒绝，只有 DecisionsDecisions 本身完成。
+        Assert.Equal(cardsBefore + 1, player.PlayerCombatState.CardsPlayedThisTurn);
         Assert.Equal(PileType.Discard, selected.Pile!.Type);
-        Assert.Equal(1, room.Engine.State.HittableEnemies.Count(enemy => enemy.Powers.OfType<WeakPower>().Any()));
-        Assert.Equal(targetsBefore + 1, runState.Rng.CombatTargets.Counter);
+        Assert.Equal(0, room.Engine.State.HittableEnemies.Count(enemy => enemy.Powers.OfType<WeakPower>().Any()));
+        Assert.Equal(targetsBefore, runState.Rng.CombatTargets.Counter);
     }
 
     private static TCard AddCard<TCard>(Player player, PileType pile)

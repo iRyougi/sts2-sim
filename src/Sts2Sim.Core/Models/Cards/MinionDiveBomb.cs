@@ -4,10 +4,10 @@ using Sts2Sim.Core.Entities.Cards;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>Charge 转化生成的随从卡。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.MinionDiveBomb</c>）：
-/// 0费,造成13点伤害,Exhaust。</summary>
+/// 0费,造成11(13)点伤害,Exhaust。</summary>
 public sealed class MinionDiveBomb : CardModel, ICardDamageVariableProvider
 {
-    private decimal _damage = 13m;
+    private decimal _damage = 11m;
 
     public bool TryGetThrashDamageVariable(out decimal amount)
     {
@@ -31,5 +31,5 @@ public sealed class MinionDiveBomb : CardModel, ICardDamageVariableProvider
         await DamageCmd.Attack(_damage).FromCard(this, cardPlay).Targeting(cardPlay.Target).Execute();
     }
 
-    protected override void OnUpgrade() => _damage += 3m;
+    protected override void OnUpgrade() => _damage += 2m;
 }

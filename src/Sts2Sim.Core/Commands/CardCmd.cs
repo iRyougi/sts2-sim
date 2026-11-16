@@ -155,8 +155,9 @@ public static class CardCmd
 
         (Combat.ICombatState combatState, Player owner, bool departedHand) =
             ValidateDiscardBatch(discardCards);
+        // 原版 v0.113.1 DiscardAndDraw：狡诈只在弃牌时该牌位于手牌才触发（#922）。
         Models.CardModel[] slyCards = discardCards
-            .Where(card => card.HasKeyword(CardKeyword.Sly))
+            .Where(card => card.Pile?.Type == PileType.Hand && card.HasKeyword(CardKeyword.Sly))
             .ToArray();
         await MoveAndBroadcastDiscardCards(combatState, discardCards);
         await CardPileCmd.NotifyHandDeparture(combatState, owner, departedHand);
@@ -181,8 +182,9 @@ public static class CardCmd
         Models.CardModel[] discardCards = cardsToDiscard.ToArray();
         (Combat.ICombatState combatState, Player owner, bool departedHand) =
             ValidateDiscardBatch(discardCards);
+        // 原版 v0.113.1 DiscardAndDraw：狡诈只在弃牌时该牌位于手牌才触发（#922）。
         Models.CardModel[] slyCards = discardCards
-            .Where(card => card.HasKeyword(CardKeyword.Sly))
+            .Where(card => card.Pile?.Type == PileType.Hand && card.HasKeyword(CardKeyword.Sly))
             .ToArray();
         MoveDiscardCards(discardCards);
 
@@ -263,26 +265,28 @@ public static class CardCmd
     /// <summary>把 <paramref name="original"/> 所在牌堆位置换成 <paramref name="replacement"/>（移除原卡、
     /// 在同一牌堆里加入新卡）。逐字移植核心行为（<c>MegaCrit.Sts2.Core.Commands.CardCmd.Transform</c>），
     /// 偏离 #93：省略转化动画/预览与"卡不在任何牌堆时"的多人路径——本项目单机，且所有调用点在转化前都已确认卡在牌堆里。</summary>
-    public static async Task Transform(Models.CardModel original, Models.CardModel replacement)
+    /// <returns>落地的替换卡；战斗正在结束或原卡不在牌堆时未变形，返回 null（原版 v0.113.1 返回 null 结果）。</returns>
+    public static async Task<Models.CardModel?> Transform(Models.CardModel original, Models.CardModel replacement)
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(replacement);
         if (IsCombatEnding(original))
         {
-            return;
+            return null;
         }
         CardPile? pile = original.Pile;
         if (pile is null)
         {
-            return;
+            return null;
         }
         if (!original.IsTransformable)
         {
             throw new InvalidOperationException("Eternal cards cannot be transformed in the persistent deck.");
         }
+        // 原版只拒绝不同归属；MourningBlow 等经 CombatState.CreateCard 生成的替换卡已归属同一玩家（#922）。
         if (ReferenceEquals(original, replacement) ||
             replacement.Pile is not null ||
-            replacement.CombatState is not null)
+            (replacement.CombatState is not null && !ReferenceEquals(replacement.Owner, original.Owner)))
         {
             throw new InvalidOperationException("The replacement card must not already belong to a pile or combat.");
         }
@@ -330,10 +334,14 @@ public static class CardCmd
             pile.AddInternal(original, originalIndex);
             throw;
         }
+        // 原版 v0.113.1：新卡入堆后先回调 AfterThisWasTransformedInto/From（替代旧 AfterTransformedFrom/To）。
+        original.AfterThisWasTransformedInto(replacement);
+        replacement.AfterThisWasTransformedFrom(original);
         if (replacement.Pile?.Type is PileType.Draw or PileType.Hand or PileType.Discard or PileType.Exhaust or PileType.Play)
         {
             await Hook.AfterCardGeneratedForCombat(replacement.CombatState!, replacement, replacement.Owner);
         }
+        return replacement;
     }
 
     /// <summary>便捷封装：从 <see cref="Models.ModelDb"/> 生成一张 <typeparamref name="TCard"/> 再转化。</summary>
@@ -498,6 +506,8 @@ public static class CardCmd
                     throw;
                 }
             }
+            entry.Original.AfterThisWasTransformedInto(replacement);
+            replacement.AfterThisWasTransformedFrom(entry.Original);
             results.Add(replacement);
         }
         foreach (Models.CardModel replacement in results)

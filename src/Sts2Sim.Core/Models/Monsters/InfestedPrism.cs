@@ -6,17 +6,14 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves;
 using Sts2Sim.Core.MonsterMoves.Intents;
-using Sts2Sim.Core.ValueProps;
 
 public sealed class InfestedPrism : MonsterModel
 {
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 171, 161);
     public override int MaxInitialHp => MinInitialHp;
     private int JabDamage => Ascension(AscensionLevel.DeadlyEnemies, 17, 15);
-    private int RadiateDamage => Ascension(AscensionLevel.DeadlyEnemies, 13, 11);
     private int WhirlwindDamage => Ascension(AscensionLevel.DeadlyEnemies, 6, 5);
     private int PulsateDamage => Ascension(AscensionLevel.DeadlyEnemies, 10, 8);
-    private int PulsateBlock => Ascension(AscensionLevel.ToughEnemies, 22, 20);
     private int SparkAmount => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
 
     public override async Task AfterAddedToRoom()
@@ -28,24 +25,18 @@ public sealed class InfestedPrism : MonsterModel
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
         var jab = new MoveState("JAB_MOVE", Jab, new SingleAttackIntent(JabDamage));
-        var radiate = new MoveState("RADIATE_MOVE", Radiate, new SingleAttackIntent(RadiateDamage), new DefendIntent());
+        var jab2 = new MoveState("JAB_MOVE_2", Jab, new SingleAttackIntent(JabDamage));
         var whirlwind = new MoveState("WHIRLWIND_MOVE", Whirlwind, new MultiAttackIntent(WhirlwindDamage, 3));
-        var pulsate = new MoveState("PULSATE_MOVE", Pulsate, new SingleAttackIntent(PulsateDamage), new BuffIntent(), new DefendIntent());
-        jab.FollowUpState = radiate;
-        radiate.FollowUpState = whirlwind;
+        var pulsate = new MoveState("PULSATE_MOVE", Pulsate, new SingleAttackIntent(PulsateDamage), new DebuffIntent(), new BuffIntent());
+        jab.FollowUpState = jab2;
+        jab2.FollowUpState = whirlwind;
         whirlwind.FollowUpState = pulsate;
         pulsate.FollowUpState = jab;
-        return new MonsterMoveStateMachine(new MonsterState[] { jab, radiate, whirlwind, pulsate }, jab);
+        return new MonsterMoveStateMachine(new MonsterState[] { jab, jab2, whirlwind, pulsate }, jab);
     }
 
     private Task Jab(IReadOnlyList<Creature> targets) =>
         DamageCmd.Attack(JabDamage).FromMonster(this).Execute();
-
-    private async Task Radiate(IReadOnlyList<Creature> targets)
-    {
-        await DamageCmd.Attack(RadiateDamage).FromMonster(this).Execute();
-        await CreatureCmd.GainBlock(Creature.CombatState!, Creature, RadiateDamage, ValueProp.Move, null, null);
-    }
 
     private Task Whirlwind(IReadOnlyList<Creature> targets) =>
         DamageCmd.Attack(WhirlwindDamage).WithHitCount(3).FromMonster(this).Execute();
@@ -53,7 +44,8 @@ public sealed class InfestedPrism : MonsterModel
     private async Task Pulsate(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(PulsateDamage).FromMonster(this).Execute();
-        await CreatureCmd.GainBlock(Creature.CombatState!, Creature, PulsateBlock, ValueProp.Move, null, null);
+        foreach (Creature target in targets)
+            await PowerCmd.Apply<VulnerablePower>(Creature.CombatState!, target, 1m, Creature, null);
         await PowerCmd.Apply<VitalSparkPower>(Creature.CombatState!, Creature, SparkAmount, Creature, null);
     }
 

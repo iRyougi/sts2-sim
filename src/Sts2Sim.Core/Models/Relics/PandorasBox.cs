@@ -15,7 +15,7 @@ public sealed class PandorasBox : RelicModel
         CardModel[] originals = Owner.Deck.Cards.Where(card => card.Rarity == CardRarity.Basic &&
             (card.Tags.Contains(CardTag.Strike) || card.Tags.Contains(CardTag.Defend)) && card.IsRemovable).ToArray();
         IEnumerable<CardTransformation> transformations = originals.Select(original =>
-            new CardTransformation(original, CardFactory.CreateRandomCardForTransform(original, false, Owner.RunState.Rng.Niche)));
+            new CardTransformation(original, CardFactory.CreateRandomCardForTransform(original, false, Owner.PlayerRng.Transformations)));
         await CardCmd.Transform(transformations, null);
     }
 }

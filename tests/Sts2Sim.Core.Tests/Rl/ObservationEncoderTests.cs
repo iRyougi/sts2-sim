@@ -209,7 +209,8 @@ public class ObservationEncoderTests : IDisposable
 
         int strikeHandIndex = player.PlayerCombatState.Hand.Cards
             .ToList()
-            .FindIndex(card => card.TargetType == TargetType.AnyEnemy);
+            // Star-cost FallingStar is AnyEnemy but unplayable at 0 stars; the row needs a playable one.
+            .FindIndex(card => card.TargetType == TargetType.AnyEnemy && card.CanPlay(out _));
         Assert.True(strikeHandIndex >= 0);
         int expectedSlot = ActionSpaceLayout.PlayCardIndex(strikeHandIndex, enemyIndex: 0);
         Assert.True(snapshot.LegalActionMask[expectedSlot]);

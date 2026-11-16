@@ -17,7 +17,12 @@ public sealed class OneForAllPower : PowerModel
             return 0m;
         CardModel playCard = cardPlay?.Card ?? cardSource;
         if (playCard.CostsXEnergy) return 0m;
-        if (cardPlay is not null && cardPlay.Resources.EnergySpent != 0) return 0m;
+        // v0.113.1：自动打出看 EnergyValue，非自动打出看 EnergySpent。
+        if (cardPlay is not null)
+        {
+            if (!cardPlay.IsAutoPlay && cardPlay.Resources.EnergySpent != 0) return 0m;
+            if (cardPlay.IsAutoPlay && cardPlay.Resources.EnergyValue != 0) return 0m;
+        }
         if (cardPlay is null && cardSource.EnergyCost != 0) return 0m;
         return Amount;
     }

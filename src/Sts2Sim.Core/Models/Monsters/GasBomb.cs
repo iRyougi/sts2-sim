@@ -40,7 +40,8 @@ public sealed class GasBomb : MonsterModel
     {
         HasExploded = true;
         await DamageCmd.Attack(ExplosionDamage).FromMonster(this).Execute();
-        await CreatureCmd.Kill(Creature);
+        if (!Creature.IsDead)
+            await CreatureCmd.Kill(Creature);
     }
 
     internal override void AppendCombatStateDescription(

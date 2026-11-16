@@ -190,7 +190,8 @@ public sealed class UnrestSiteTests : IDisposable
     {
         (_, Player player, UnrestSite ev) = SetupEvent("unrest-kill");
         int maxBefore = player.Creature.MaxHp;
-        RelicRarity expectedRarity = RelicFactory.RollRarity(player.PlayerRng.Rewards.CloneExact());
+        // v0.113.1 (#946): the event rolls relic rarity with its own Rng, not PlayerRng.Rewards.
+        RelicRarity expectedRarity = RelicFactory.RollRarity(ev.Rng.CloneExact());
 
         await Choose(ev, "KILL");
 

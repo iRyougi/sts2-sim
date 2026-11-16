@@ -137,19 +137,6 @@ public class RngTests
     }
 
     [Fact]
-    public void Shuffle_IsDeterministic()
-    {
-        var a = new Rng(2024uL);
-        var b = new Rng(2024uL);
-        var listA = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        var listB = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        a.Shuffle(listA);
-        b.Shuffle(listB);
-        Assert.Equal(listA, listB);
-        Assert.Equal(9, a.Counter); // Fisher-Yates: n-1 次交换
-    }
-
-    [Fact]
     public void NextInt_InvalidRange_Throws()
     {
         var rng = new Rng(1uL);

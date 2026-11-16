@@ -220,6 +220,18 @@ public static class VisibleDecisionProjection
                 case DigRestSiteOption:
                     values.Add(VisibleValue.Scope("RewardKind", "Relic"));
                     break;
+                case RestoreRestSiteOption:
+                    Wuppy restoredWuppy = player.Relics.OfType<Wuppy>().First();
+                    values.Add(VisibleValue.Id("Relic", restoredWuppy.Id.Entry));
+                    values.Add(VisibleValue.Int("CurrentHp", restoredWuppy.CurrentHp));
+                    values.Add(VisibleValue.Int("MaxHp", restoredWuppy.MaxHp));
+                    break;
+                case EvolveRestSiteOption:
+                    values.Add(VisibleValue.Id("Relic", ModelDb.GetId<Byrdpip>().Entry));
+                    values.Add(VisibleValue.Id("EvolvedRelic", ModelDb.GetId<Byrdine>().Entry));
+                    values.Add(VisibleValue.Id("Card", ModelDb.GetId<Models.Cards.ByrdSwoop>().Entry));
+                    values.Add(VisibleValue.Id("TransformedCard", ModelDb.GetId<Models.Cards.GodByrd>().Entry));
+                    break;
                 default:
                     throw new NotSupportedException($"Unsupported rest-site decision {candidate.GetType().Name}.");
             }

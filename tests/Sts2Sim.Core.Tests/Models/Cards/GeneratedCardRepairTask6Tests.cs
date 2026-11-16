@@ -254,7 +254,8 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
         Assert.DoesNotContain(target.PlayerCombatState.Hand.Cards, candidate => candidate is Task6OwnerColorless);
         Assert.Equal(1, owner.PlayerCombatState.CardsGeneratedThisCombat);
         Assert.Equal(0, target.PlayerCombatState.CardsGeneratedThisCombat);
-        Assert.Equal(2, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // v0.113.1（#946）：3 张候选的整池洗牌只让父流前进 1 次（旧版 n-1=2 次）。
+        Assert.Equal(1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
         Assert.Equal(1, Assert.Single(owner.Creature.Powers.OfType<StrengthPower>()).Amount);
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hpBefore = enemy.CurrentHp;
@@ -319,7 +320,8 @@ public sealed class GeneratedCardRepairTask6Tests : IDisposable
 
         Assert.Equal(firstType, secondType);
         Assert.Equal(firstCounter, secondCounter);
-        Assert.Equal(2, firstCounter);
+        // v0.113.1（#946）：整池洗牌父流只前进 1 次（旧版 n-1=2 次）。
+        Assert.Equal(1, firstCounter);
     }
 
     [Theory]

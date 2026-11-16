@@ -106,6 +106,7 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("Wellspring")]
     [InlineData("WhisperingHollow")]
     [InlineData("WoodCarvings")]
+    [InlineData("WuppyInTrouble")]
     [InlineData("ZenWeaver")]
     [InlineData("Inventory")]
     [InlineData("Map")]
@@ -407,6 +408,7 @@ public sealed class EventVisibleStateTests : IDisposable
             "UnrestSite" => ("KILL", "MaxHpLoss", "8"),
             "WarHistorianRepy" => ("UNLOCK_CHEST", "PotionCount", "2"),
             "WaterloggedScriptorium" => ("BLOODY_INK", "MaxHp", "6"),
+            "WuppyInTrouble" => ("HELP_IMMEDIATELY", "WuppyMaxHp", "60"),
             "DollRoom" => ("TAKE_SOME_TIME", "TakeTimeHpLoss", "5"),
             "FieldOfManSizedHoles" => ("RESIST", "RemoveCount", "2"),
             "GraveOfTheForgotten" => ("ACCEPT", "RelicCount", "1"),
@@ -513,8 +515,8 @@ public sealed class EventVisibleStateTests : IDisposable
         if (scenario == "Inventory")
         {
             Type[] events = ContentRegistry.AllTypes.Where(t => typeof(EventModel).IsAssignableFrom(t) && !t.IsAbstract).ToArray();
-            Assert.Equal(69, events.Length);
-            Assert.Equal(61, events.Count(t => !typeof(AncientEventModel).IsAssignableFrom(t)));
+            Assert.Equal(70, events.Length);
+            Assert.Equal(62, events.Count(t => !typeof(AncientEventModel).IsAssignableFrom(t)));
             Assert.Equal(8, events.Count(t => typeof(AncientEventModel).IsAssignableFrom(t)));
             Assert.False(typeof(EventModel).IsAssignableFrom(typeof(ForcedCombatOutcome)));
             Assert.Equal(new ForcedCombatOutcome(true, false), new ForcedCombatOutcome(Victory: true, TimedOut: false));
@@ -638,11 +640,14 @@ public sealed class EventVisibleStateTests : IDisposable
                 }
                 break;
             case "Rest":
-                foreach (Type type in new[] { typeof(RegalPillow), typeof(StoneHumidifier), typeof(TinyMailbox), typeof(DreamCatcher), typeof(Girya), typeof(PumpkinCandle) })
+                foreach (Type type in new[] { typeof(RegalPillow), typeof(StoneHumidifier), typeof(TinyMailbox), typeof(DreamCatcher), typeof(Girya), typeof(PumpkinCandle), typeof(Sts2Sim.Core.Models.Relics.Wuppy) })
                     await RelicCmd.Obtain((RelicModel)ModelDb.Get(type).MutableClone(), player);
-                RestSiteDecision[] rest = [new RestSiteDecision.Heal(), new RestSiteDecision.Smith(cards[0]), new RestSiteDecision.Cook(), new RestSiteDecision.Hatch(), new LiftRestSiteOption(), new KindleRestSiteOption(), new CloneRestSiteOption(), new DigRestSiteOption()];
+                RestSiteDecision[] rest = [new RestSiteDecision.Heal(), new RestSiteDecision.Smith(cards[0]), new RestSiteDecision.Cook(), new RestSiteDecision.Hatch(), new LiftRestSiteOption(), new KindleRestSiteOption(), new CloneRestSiteOption(), new DigRestSiteOption(), new RestoreRestSiteOption(false), new EvolveRestSiteOption()];
                 projection = Pure(run, () => VisibleDecisionProjection.ForRestSite(player, rest)); bindings = rest;
-                Assert.Equal(8, projection.Metadata.DisplayOptions.Length);
+                Assert.Equal(10, projection.Metadata.DisplayOptions.Length);
+                Assert.False(projection.DescribeCandidate(rest[8]).IsEnabled);
+                Assert.Contains(VisibleValue.Int("MaxHp", 60), projection.DescribeCandidate(rest[8]).Values);
+                Assert.Contains(VisibleValue.Id("TransformedCard", "GOD_BYRD"), projection.DescribeCandidate(rest[9]).Values);
                 Assert.DoesNotContain(projection.Metadata.CoverageGapIds, gap => gap.StartsWith("Unsupported", StringComparison.Ordinal));
                 Assert.Contains("G3.Modifier.NightTerrors", projection.Metadata.CoverageGapIds);
                 Assert.Contains("G4.Multiplayer.Mend", projection.Metadata.CoverageGapIds);

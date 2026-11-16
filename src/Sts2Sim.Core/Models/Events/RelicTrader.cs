@@ -2,6 +2,7 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Events;
 
@@ -33,11 +34,10 @@ public sealed class RelicTrader : EventModel
     protected override void CalculateVars()
     {
         var owned = Owner.Relics.Where(r => r.IsTradable).ToList();
-        owned.Sort((a, b) => a.CompareTo(b));
-        Rng.Shuffle(owned);
+        owned.StableShuffle(Rng);
         OwnedRelics = owned.Take(3).ToArray();
         if (OwnedRelics.Count > 0)
-            NewRelics = Enumerable.Range(0, 3).Select(_ => RelicFactory.PullNextRelicFromFront(Owner)).ToArray();
+            NewRelics = Enumerable.Range(0, 3).Select(_ => RelicFactory.PullNextRelicFromFront(Owner, Rng)).ToArray();
     }
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()

@@ -19,7 +19,8 @@ public sealed class ByrdonisEgg : CardModel
         Player player,
         List<RestSiteDecision> decisions)
     {
-        if (ReferenceEquals(player, Owner))
+        // v0.113.1：已有 Hatch 时不再追加，持有多颗蛋也只出现一个孵化选项。
+        if (ReferenceEquals(player, Owner) && !decisions.Any(decision => decision is RestSiteDecision.Hatch))
         {
             decisions.Add(new RestSiteDecision.Hatch());
         }

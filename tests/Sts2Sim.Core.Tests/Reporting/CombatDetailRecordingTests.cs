@@ -327,7 +327,8 @@ public sealed class CombatDetailRecordingTests : IDisposable
     {
         RunCapture capture = await RunOnceAsync(
             useDriver,
-            recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch));
+            recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
+            seed: await VictorySeedAsync());
 
         CombatLog log = Assert.Single(capture.CombatLogs).Value;
         Assert.Equal("Monster", log.EncounterType);
@@ -387,7 +388,8 @@ public sealed class CombatDetailRecordingTests : IDisposable
             useDriver,
             recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
             addAmethystAubergine: true,
-            addPrayerWheel: true);
+            addPrayerWheel: true,
+            seed: await VictorySeedAsync());
 
         CombatRewards rewards = Assert.Single(capture.CombatLogs).Value.Rewards;
         Assert.Equal(capture.PlayerGold - 99, rewards.Gold);
@@ -433,7 +435,8 @@ public sealed class CombatDetailRecordingTests : IDisposable
         RunCapture recorderOnly = await RunOnceAsync(
             useDriver,
             recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
-            addStrengthPotion: true);
+            addStrengthPotion: true,
+            seed: await VictorySeedAsync());
         Assert.Contains(recorderOnly.Potions, potion => potion == ModelDb.GetId<StrengthPotion>().ToString());
         Assert.Empty(Assert.Single(recorderOnly.CombatLogs).Value.Turns
             .SelectMany(turn => turn.Actions)
@@ -444,7 +447,8 @@ public sealed class CombatDetailRecordingTests : IDisposable
             useDriver,
             recorder: null,
             addStrengthPotion: true,
-            useAvailablePotions: true);
+            useAvailablePotions: true,
+            seed: await VictorySeedAsync());
         Assert.DoesNotContain(policyWithoutRecorder.Potions, potion => potion == ModelDb.GetId<StrengthPotion>().ToString());
         Assert.Equal((1, 1, 1, 1, 1), policyWithoutRecorder.HookCounts);
 
@@ -452,7 +456,8 @@ public sealed class CombatDetailRecordingTests : IDisposable
             useDriver,
             recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
             addStrengthPotion: true,
-            useAvailablePotions: true);
+            useAvailablePotions: true,
+            seed: await VictorySeedAsync());
         UsePotionAction action = Assert.Single(Assert.Single(policyWithRecorder.CombatLogs).Value.Turns
             .SelectMany(turn => turn.Actions)
             .OfType<UsePotionAction>());
@@ -820,6 +825,30 @@ public sealed class CombatDetailRecordingTests : IDisposable
         Assert.Equal(0, turn.PlayerPost.Hp);
     }
 
+    private const string DefaultSeed = "task-7-combat-reporting";
+
+    private static string? _victorySeed;
+
+    // Victory-dependent rows need any seed on which the default first-legal policy beats the
+    // reporting monster on both paths. Deterministic rule (#946, shuffle changed draw order):
+    // DefaultSeed, then DefaultSeed-1, -2, ... first seed whose combat ends in victory without a recorder.
+    private static async Task<string> VictorySeedAsync()
+    {
+        if (_victorySeed is not null) return _victorySeed;
+        const int maxSeeds = 64;
+        for (int k = 0; k < maxSeeds; k++)
+        {
+            string candidate = k == 0 ? DefaultSeed : $"{DefaultSeed}-{k}";
+            if ((await RunOnceAsync(false, recorder: null, seed: candidate)).HookCounts.Victory == 1 &&
+                (await RunOnceAsync(true, recorder: null, seed: candidate)).HookCounts.Victory == 1)
+            {
+                return _victorySeed = candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"No {DefaultSeed}[-1..{maxSeeds - 1}] seed wins the reporting combat.");
+    }
+
     private static async Task<RunCapture> RunOnceAsync(
         bool useDriver,
         RunRecorder? recorder,
@@ -835,11 +864,12 @@ public sealed class CombatDetailRecordingTests : IDisposable
         Func<Player, Task>? afterPlayerTurnStart = null,
         Func<MonsterModel>? monsterFactory = null,
         bool addAmethystAubergine = false,
-        bool addPrayerWheel = false)
+        bool addPrayerWheel = false,
+        string seed = DefaultSeed)
     {
         var act = new CombatReportingAct(monsterFactory ?? (() =>
             (MonsterModel)ModelDb.Monster<CombatReportingMonster>().MutableClone()));
-        var runState = new RunState("task-7-combat-reporting", act);
+        var runState = new RunState(seed, act);
         runState.Map.StartingMapPoint.PointType = MapPointType.Monster;
         MapPoint firstPoint = runState.Map.StartingMapPoint.Children.OrderBy(point => point.coord.col).First();
         firstPoint.PointType = MapPointType.Monster;

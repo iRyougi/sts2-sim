@@ -15,7 +15,7 @@ public sealed class Astrolabe : RelicModel
             await CardSelectCmd.FromDeckForTransformation(Owner, 3, this);
         foreach (CardModel original in selected)
         {
-            CardModel replacement = CardFactory.CreateRandomCardForTransform(original, false, Owner.RunState.Rng.Niche);
+            CardModel replacement = CardFactory.CreateRandomCardForTransform(original, false, Owner.PlayerRng.Transformations);
             CardCmd.Upgrade(replacement);
             await CardCmd.Transform(original, replacement);
         }

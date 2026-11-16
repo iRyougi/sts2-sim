@@ -22,6 +22,7 @@ public static class TransplantFieldRegistry
         "FurCoat._actIndex", "FurCoat._markedCoordinates", "GalacticDust._starsSpent",
         "Girya._timesLifted", "HappyFlower._turnCounter", "IronClub._cardsPlayed",
         "BathRobes._wasUsed",
+        "Byrdpip._swoopsPlayed", "Wuppy._currentHp", "Wuppy._maxHp",
         "JossPaper._cardsExhausted", "LastingCandy._combatRewardsSeen", "LizardTail._wasUsed",
         "MawBank._hasItemBeenBought", "Nunchaku._attacksPlayed", "PaelsTooth._removedCards",
         "PaelsWing._rewardsSacrificed", "Pendulum._turnCounter", "PenNib._attacksPlayed",
@@ -38,7 +39,7 @@ public static class TransplantFieldRegistry
     ];
     private static readonly HashSet<string> NativeBoundaryResetFields =
     [
-        "VelvetChoker._cardsPlayedThisTurn", "MusicBox._wasUsedThisTurn",
+        "MusicBox._wasUsedThisTurn",
         "MusicBox._cardBeingPlayed", "ThrowingAxe._used", "PaelsEye._usedThisCombat",
         "PaelsLegion._cooldown", "PaelsLegion._affectedCardPlay", "PaelsTears._gainNextTurn",
         "ArtOfWar._attackPlayedThisTurn", "ArtOfWar._previousTurnHadNoAttack",
@@ -66,6 +67,7 @@ public static class TransplantFieldRegistry
         "Bolas._playedOnTurnNumber", "ThrummingHatchet._playedOnTurnNumber",
         "TheBall._damage", "Wither._fakeUpgradeLevel",
         "Disintegration.<PowerAmount>k__BackingField",
+        "Wuppy._combatWuppy",
     ];
 
     public static IReadOnlyDictionary<string, (TransplantFieldClass Class, string Reason)> Fields => _fields;
@@ -114,6 +116,10 @@ public static class TransplantFieldRegistry
                     (type.Name == "Claw" && field.Name == "_increase"))
                     (fieldClass, reason) = (TransplantFieldClass.Derived,
                         "Persistent deck values derive from canonical card vars and upgrade level.");
+                // Native Wuppy has no saved flag: loading [SavedProperty] CurrentHp runs the setter, which sets it.
+                if (type.Name == "Wuppy" && field.Name == "_currentHpSet")
+                    (fieldClass, reason) = (TransplantFieldClass.Derived,
+                        "Set by the native CurrentHp saved-property setter on load.");
                 // Native Monologue's Power var is always 1; upgrading only adds Retain.
                 if (type.Name == "Monologue" && field.Name == "_power")
                     (fieldClass, reason) = (TransplantFieldClass.Derived,

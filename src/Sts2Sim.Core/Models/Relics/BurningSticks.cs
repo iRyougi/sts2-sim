@@ -28,9 +28,10 @@ public sealed class BurningSticks : RelicModel
             return;
         }
 
+        // v0.113.1：先置位再生成复制，防止生成过程重入二次触发。
+        _wasUsedThisCombat = true;
         CardModel copy = (CardModel)card.MutableClone();
         await CardPileCmd.Generate(card.CombatState!, copy, PileType.Hand);
-        _wasUsedThisCombat = true;
     }
 
     public override Task AfterCombatEnd()

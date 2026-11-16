@@ -11,5 +11,5 @@ public sealed record DigRestSiteOption : RestSiteDecision
     public override int Priority => 4;
 
     public override Task ExecuteAsync(Player player) =>
-        RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(player), player);
+        RelicCmd.Obtain(RelicFactory.PullNextRelicForRewardFromFront(player), player);
 }

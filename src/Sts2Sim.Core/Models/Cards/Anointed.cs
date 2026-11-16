@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Cards;
 
@@ -22,9 +23,9 @@ public sealed class Anointed : CardModel
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         int count = CardPile.MaxCardsInHand - Owner.PlayerCombatState!.Hand.Cards.Count;
-        List<CardModel> rareCards = Owner.PlayerCombatState!.DrawPile.Cards.Where(c => c.Rarity == CardRarity.Rare).ToList();
-        CombatState!.RunState.Rng.CombatCardSelection.Shuffle(rareCards);
-        foreach (CardModel card in rareCards.Take(count))
+        List<CardModel> rareCards = Owner.PlayerCombatState!.DrawPile.Cards.Where(c => c.Rarity == CardRarity.Rare)
+            .TakeRandom(count, CombatState!.RunState.Rng.CombatCardSelection).ToList();
+        foreach (CardModel card in rareCards)
         {
             CardPileCmd.Add(card, PileType.Hand);
         }

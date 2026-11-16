@@ -30,7 +30,7 @@ public sealed class PaelsWing : RelicModel
         _rewardsSacrificed++;
         Flash();
         if (_rewardsSacrificed % 2 == 0)
-            await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
+            await RelicCmd.Obtain(RelicFactory.PullNextRelicForRewardFromFront(Owner), Owner);
     }
 
     internal override void AppendCombatStateDescription(

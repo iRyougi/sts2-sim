@@ -69,6 +69,24 @@ public class MapPathPruningTests
     }
 
     [Fact]
+    public void RepairPrunedPointTypes_CountsOnlyModifiablePointsAndFallsBackToUnknownCandidates()
+    {
+        // v0.113.1 RepairPointType (#941): a fixed (CanBeModified=false) Shop does not count toward
+        // NumOfShops, and with no Monster candidates the missing Shops come from Unknown rooms.
+        var counts = new MapPointTypeCounts(12, 7);
+        var map = new StandardActMap(new Rng(13UL), numberOfRooms: 15, counts);
+        foreach (MapPoint point in map.GetAllMapPoints().Where(p => p.CanBeModified
+            && p.PointType is MapPointType.Monster or MapPointType.Shop))
+            point.PointType = MapPointType.Unknown;
+        MapPoint fixedShop = map.GetAllMapPoints().First(p => p.CanBeModified && p.PointType == MapPointType.Unknown);
+        fixedShop.PointType = MapPointType.Shop;
+        fixedShop.CanBeModified = false;
+
+        Assert.True(MapPathPruning.RepairPrunedPointTypes(map, counts, new Rng(1UL), (_, _) => true));
+        Assert.Equal(counts.NumOfShops + 1, map.GetAllMapPoints().Count(p => p.PointType == MapPointType.Shop));
+    }
+
+    [Fact]
     public void PruneAndRepair_IsDeterministicForSameSeed()
     {
         var mapA = new StandardActMap(new Rng(13UL), numberOfRooms: 15, new MapPointTypeCounts(12, 7));

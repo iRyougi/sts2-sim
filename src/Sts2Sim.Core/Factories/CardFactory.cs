@@ -5,6 +5,7 @@ using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.CardPools;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Factories;
 
@@ -102,14 +103,15 @@ public static class CardFactory
         return options;
     }
 
-    /// <summary>Selects exactly one eligible reward option using the niche RNG, cloning before enchantment.</summary>
+    /// <summary>Selects exactly one eligible reward option using <c>PlayerRng.Rewards</c> (v0.113.1 WingCharm),
+    /// cloning before enchantment.</summary>
     public static bool EnchantOneRewardOption<TEnchantment>(Player player, List<CardModel> options, decimal magnitude)
         where TEnchantment : EnchantmentModel
     {
         var canonical = (EnchantmentModel)ModelDb.Get(typeof(TEnchantment));
         var eligible = options.Select((card, index) => (card, index)).Where(item => canonical.CanEnchant(item.card)).ToList();
         if (eligible.Count == 0) return false;
-        var selected = player.RunState.Rng.Niche.NextItem(eligible);
+        var selected = player.PlayerRng.Rewards.NextItem(eligible);
         var clone = (CardModel)selected.card.MutableClone();
         clone.AssignOwner(player);
         Commands.CardCmd.Enchant<TEnchantment>(clone, magnitude).GetAwaiter().GetResult();
@@ -308,8 +310,8 @@ public static class CardFactory
     }
 
     /// <summary>
-    /// Creates distinct combat cards after shuffling the complete eligible pool once. A one-card
-    /// request therefore consumes exactly eligible-count minus one RNG draws, matching TakeRandom.
+    /// Creates distinct combat cards via native <c>TakeRandom</c>: the complete eligible pool is
+    /// shuffled once (one parent-stream draw that seeds the v0.113.1 child shuffle RNG).
     /// </summary>
     public static IReadOnlyList<CardModel> GetDistinctForCombat(
         Player player,
@@ -321,9 +323,7 @@ public static class CardFactory
         ArgumentNullException.ThrowIfNull(cards);
         ArgumentNullException.ThrowIfNull(rng);
         ArgumentOutOfRangeException.ThrowIfNegative(count);
-        List<CardModel> candidates = CardPoolProjection.OrderedCombatCandidates(player, cards).ToList();
-        rng.Shuffle(candidates);
-        return candidates.Take(count)
+        return CardPoolProjection.OrderedCombatCandidates(player, cards).TakeRandom(count, rng)
             .Select(canonical =>
             {
                 var card = (CardModel)canonical.MutableClone();

@@ -17,7 +17,7 @@ public sealed class TreasureReferenceTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
     }
 
-    [Fact]
+    [Fact(Skip = "v0.111 native capture; v0.113.1 child-RNG shuffle (#946) requires #930 recertification")]
     public async Task FirstTreasure_UsesArchivedSharedRelicAndPovertyGoldRange()
     {
         const string seed = "8F9CPYQ6QYEN";

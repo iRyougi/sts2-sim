@@ -116,7 +116,8 @@ public sealed class HiveContentBehaviorTests : IDisposable
             .StableShuffle(player.PlayerRng.NonCombatGeneration.CloneExact()).Take(6).ToArray();
         await RelicCmd.Obtain(ModelDb.Relic<SandCastle>(), player);
         Assert.Equal(6, player.Deck.Cards.Count(card => card.IsUpgraded));
-        Assert.Equal(eligible - 1, player.PlayerRng.NonCombatGeneration.Counter - rng);
+        // v0.113.1 StableShuffle seeds a child RNG: exactly one parent draw (#946).
+        Assert.Equal(1, player.PlayerRng.NonCombatGeneration.Counter - rng);
         Assert.True(expected.ToHashSet().SetEquals(player.Deck.Cards.Where(card => card.IsUpgraded)),
             "seed=sand-castle: upgrades differ from native stable-shuffle selection");
         Assert.True(ModelDb.Relic<SandCastle>().HasUponPickupEffect);

@@ -41,8 +41,8 @@ public sealed class ManifestAuthorityTests : IDisposable
         Assert.Same(player.PlayerCombatState.Hand, generated.Pile);
         Assert.False(generated.IsUpgraded);
         Assert.Equal(2, generated.EnergyCost);
-        // Native full-pool shuffle needs no draw when only one candidate is eligible.
-        Assert.Equal(0, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // v0.113.1（#946）：单张候选的整池洗牌也先从父流取 1 次 NextUnsignedLong 派生子 Rng（旧版 0 次）。
+        Assert.Equal(1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
         Assert.Equal(0, room.Engine.State.RunState.Rng.CombatCardSelection.Counter);
         Assert.Equal(
             new[] { typeof(ManifestEligibleCard) },
@@ -99,8 +99,9 @@ public sealed class ManifestAuthorityTests : IDisposable
         (string second, int secondGenerationCounter, int secondSelectionCounter) = await PlayAndCaptureAsync("manifest-rng");
 
         Assert.Equal(first, second);
-        Assert.Equal(0, firstGenerationCounter);
-        Assert.Equal(0, secondGenerationCounter);
+        // v0.113.1（#946）：单张候选的整池洗牌父流固定前进 1 次（旧版 0 次）。
+        Assert.Equal(1, firstGenerationCounter);
+        Assert.Equal(1, secondGenerationCounter);
         Assert.Equal(0, firstSelectionCounter);
         Assert.Equal(0, secondSelectionCounter);
     }
@@ -181,7 +182,8 @@ public sealed class ManifestAuthorityEmptyPoolTests : IDisposable
         Assert.Empty(player.PlayerCombatState.Hand.Cards.OfType<ManifestTestCard>());
         Assert.Empty(player.PlayerCombatState.DiscardPile.Cards.OfType<ManifestTestCard>());
         Assert.Contains(manifest, player.PlayerCombatState.DiscardPile.Cards);
-        Assert.Equal(0, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // v0.113.1（#946）：空池 TakeRandom 原版无守卫，仍从父流取 1 次 NextUnsignedLong（旧版 0 次）。
+        Assert.Equal(1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 }
 

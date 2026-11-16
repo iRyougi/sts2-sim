@@ -19,12 +19,11 @@ public sealed class Vakuu : AncientEventModel
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {
-        List<Type> first = Pool1.ToList();
-        List<Type> second = Pool2.ToList();
-        List<Type> third = Pool3.ToList();
-        first.UnstableShuffle(Rng);
-        second.UnstableShuffle(Rng);
-        third.UnstableShuffle(Rng);
-        return [RelicOption(first[0], first[0].Name), RelicOption(second[0], second[0].Name), RelicOption(third[0], third[0].Name)];
+        // v0.113.1 GetOptionsFromThreePools：每池先按 relic.IsAllowed 过滤再各 Rng.NextItem 一次。
+        // 这三池在标准单人下无不可用遗物（账本"模拟器现状已一致"·AncientEventModel 组），过滤恒等、回退补抽不触发。
+        Type first = Rng.NextItem(Pool1)!;
+        Type second = Rng.NextItem(Pool2)!;
+        Type third = Rng.NextItem(Pool3)!;
+        return [RelicOption(first, first.Name), RelicOption(second, second.Name), RelicOption(third, third.Name)];
     }
 }

@@ -25,7 +25,7 @@ public sealed class JeweledMask : RelicModel
         CardModel? selected = Owner.RunState.Rng.CombatCardSelection.NextItem(powers);
         if (selected is not null)
         {
-            selected.SetToFreeThisTurn();
+            selected.MakeFreeThisCombat(); // v0.113.1：SetToFreeThisCombat
             CardPileCmd.Add(selected, PileType.Hand);
         }
 

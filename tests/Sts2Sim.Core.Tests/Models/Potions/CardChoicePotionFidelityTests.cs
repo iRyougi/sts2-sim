@@ -44,19 +44,20 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
     [Theory(Skip = "v0.111.0 native colorless vectors; v0.113.1 adds MyShinies to ColorlessCardPool (#927); same-version vectors pending #930")]
     [InlineData("Colorless", "HSP7P798XTVC", "UltimateStrike Impatience UltimateDefend", 49, 714604651)]
     [InlineData("Colorless", "XEB2TX5C4XL6", "Production Omnislice UltimateStrike", 49, 16112059)]
+    // The recorded v0.111 values stay in InlineData as history; when re-enabled after #930 the row
+    // is checked against the v0.113.1 child-RNG oracle below, not against these old vectors (#946).
     public Task GenerateChoices_V0111ColorlessVectors(
         string kind, string seed, string expectedChoices, int expectedDraws, int expectedNext) =>
-        GenerateChoices_MatchesNativePoolOrderAndRng(kind, seed, expectedChoices, expectedDraws, expectedNext);
+        GenerateChoices_MatchesNativePoolOrderAndRng(kind, seed);
 
     [Theory]
-    [InlineData("Attack", "HSP7P798XTVC", "Dash DaggerThrow FlickFlack", 22, 2124664562)]
-    [InlineData("Attack", "XEB2TX5C4XL6", "EchoingSlash Ricochet Skewer", 22, 2071359471)]
-    [InlineData("Skill", "HSP7P798XTVC", "BladeDance BubbleBubble Untouchable", 38, 401551762)]
-    [InlineData("Skill", "XEB2TX5C4XL6", "Malaise Expertise Prepared", 38, 1519507862)]
-    [InlineData("Power", "HSP7P798XTVC", "WellLaidPlans InfiniteBlades ToolsOfTheTrade", 15, 1438873863)]
-    [InlineData("Power", "XEB2TX5C4XL6", "Footwork ToolsOfTheTrade MasterPlanner", 15, 1855981314)]
-    public async Task GenerateChoices_MatchesNativePoolOrderAndRng(
-        string kind, string seed, string expectedChoices, int expectedDraws, int expectedNext)
+    [InlineData("Attack", "HSP7P798XTVC")]
+    [InlineData("Attack", "XEB2TX5C4XL6")]
+    [InlineData("Skill", "HSP7P798XTVC")]
+    [InlineData("Skill", "XEB2TX5C4XL6")]
+    [InlineData("Power", "HSP7P798XTVC")]
+    [InlineData("Power", "XEB2TX5C4XL6")]
+    public async Task GenerateChoices_MatchesNativePoolOrderAndRng(string kind, string seed)
     {
         var run = new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Silent>(), run);
@@ -71,14 +72,24 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         if (kind != "Colorless") eligible = eligible.Where(card => card.Type.ToString() == kind);
         Assert.Equal(NativePool(kind).Split(' '), CardPoolFilters.ForCombatGeneration(eligible).Select(card => card.GetType().Name));
         var counters = Enum.GetValues<RunRngType>().ToDictionary(type => type, type => run.Rng.GetRng(type).Counter);
+        // v0.113.1（#946）：TakeRandom 的 UnstableShuffle 先从父流取一次 NextUnsignedLong 派生子 Rng，
+        // 再在子 Rng 上做降序 Fisher–Yates。期望值由原版池顺序独立计算，不调用生产洗牌。
+        string[] expected = NativePool(kind).Split(' ');
+        var oracle = run.Rng.CombatCardGeneration.CloneExact();
+        var child = new Sts2Sim.Core.Random.Rng(oracle.NextUnsignedLong());
+        for (int i = expected.Length - 1; i > 0; i--)
+        {
+            int j = child.NextInt(i + 1);
+            (expected[i], expected[j]) = (expected[j], expected[i]);
+        }
         PotionModel potion = (PotionModel)ModelDb.Get(typeof(PotionModel).Assembly.GetType($"Sts2Sim.Core.Models.Potions.{kind}Potion")!).MutableClone();
         potion.AssignOwner(player);
 
         await potion.UseInternal(player.Creature);
 
-        Assert.Equal(expectedChoices.Split(' '), source.Candidates.Select(card => card.GetType().Name));
-        Assert.Equal(expectedDraws, run.Rng.CombatCardGeneration.Counter);
-        Assert.Equal(expectedNext, run.Rng.CombatCardGeneration.NextInt());
+        Assert.Equal(expected.Take(3), source.Candidates.Select(card => card.GetType().Name));
+        Assert.Equal(1, run.Rng.CombatCardGeneration.Counter);
+        Assert.Equal(oracle.NextInt(), run.Rng.CombatCardGeneration.NextInt());
         foreach (var (type, counter) in counters)
             if (type != RunRngType.CombatCardGeneration) Assert.Equal(counter, run.Rng.GetRng(type).Counter);
         CardModel selected = Assert.Single(player.PlayerCombatState!.Hand.Cards);
@@ -120,10 +131,12 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         // Source UnstableShuffle: descend from N-1 to 1, draw [0, i], then Take(3).
         // Work from the fixture's explicit eligible list, without calling pool filters or Shuffle.
         var expected = pool.Eligible.Take(size).ToArray();
+        // v0.113.1（#946）：one parent NextUnsignedLong seeds a child Rng; even an empty pool consumes it.
         var oracleRng = run.Rng.CombatCardGeneration.CloneExact();
+        var child = new Sts2Sim.Core.Random.Rng(oracleRng.NextUnsignedLong());
         for (int i = expected.Length - 1; i > 0; i--)
         {
-            int j = oracleRng.NextInt(i + 1);
+            int j = child.NextInt(i + 1);
             (expected[i], expected[j]) = (expected[j], expected[i]);
         }
         PotionModel potion = (PotionModel)ModelDb.Potion<SkillPotion>().MutableClone();
@@ -132,7 +145,7 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         await potion.UseInternal(recipient.Creature);
 
         Assert.Equal(expected.Take(3).Select(card => card.GetType()), source.Candidates.Select(card => card.GetType()));
-        Assert.Equal(Math.Max(0, size - 1), run.Rng.CombatCardGeneration.Counter);
+        Assert.Equal(1, run.Rng.CombatCardGeneration.Counter);
         Assert.Equal(oracleRng.NextInt(), run.Rng.CombatCardGeneration.NextInt());
         Assert.Empty(creator.PlayerCombatState!.Hand.Cards);
         Assert.All(source.Candidates, card => Assert.Same(recipient, card.Owner));

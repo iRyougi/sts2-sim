@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Random;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Entities.Cards;
 
@@ -59,8 +60,9 @@ public sealed class CardPile(PileType type)
     /// <summary>开局使用不稳定洗牌；普通重洗由 CardPileCmd.Shuffle 的 StableShuffle 处理。</summary>
     public void RandomizeOrderInternal(Rng rng)
     {
+        // 原版 v0.113.1：_cards.UnstableShuffle(rng)。
         List<CardModel> list = _cards.ToList();
-        rng.Shuffle(list);
+        list.UnstableShuffle(rng);
         _cards.Clear();
         _cards.AddRange(list);
     }

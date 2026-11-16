@@ -182,7 +182,7 @@ public sealed class LuminousChoirTests : IDisposable
     }
 
     [Fact]
-    public void PullNextRelicFromFront_RollsPlayerRewardsRarity_AndPullsThatExactBucketFront()
+    public void PullNextRelicForRewardFromFront_RollsPlayerRewardsRarity_AndPullsThatExactBucketFront()
     {
         var observed = new HashSet<RelicRarity>();
         for (int i = 0; i < 100; i++)
@@ -193,7 +193,7 @@ public sealed class LuminousChoirTests : IDisposable
             runState.ConfigureCardSelectionSource(new LegacySelectionDecisionSource());
             RelicRarity expected = RelicFactory.RollRarity(player.PlayerRng.Rewards.CloneExact());
 
-            RelicModel pulled = RelicFactory.PullNextRelicFromFront(player);
+            RelicModel pulled = RelicFactory.PullNextRelicForRewardFromFront(player);
 
             observed.Add(expected);
             Assert.Equal(expected, pulled.Rarity);
@@ -205,7 +205,7 @@ public sealed class LuminousChoirTests : IDisposable
     }
 
     [Fact]
-    public void PullNextRelicFromFront_WhenRolledBucketIsEmpty_ReturnsCircletWithoutCrossRarityFallback()
+    public void PullNextRelicForRewardFromFront_WhenRolledBucketIsEmpty_ReturnsCircletWithoutCrossRarityFallback()
     {
         var runState = new RunState("luminous-relic-empty", new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
@@ -214,7 +214,7 @@ public sealed class LuminousChoirTests : IDisposable
         RelicRarity expected = RelicFactory.RollRarity(player.PlayerRng.Rewards.CloneExact());
         Assert.NotNull(player.RelicGrabBag.PullFromFront(expected));
 
-        RelicModel pulled = RelicFactory.PullNextRelicFromFront(player);
+        RelicModel pulled = RelicFactory.PullNextRelicForRewardFromFront(player);
 
         Assert.IsType<Sts2Sim.Core.Models.Relics.Circlet>(pulled);
     }

@@ -401,6 +401,12 @@ public sealed class CombatEngine
         {
             Task move = AddTurnEndCardToPlayPileWithDelay(card, delay);
             Task wait = previousResult is null ? move : Task.WhenAll(move, previousResult);
+            // 原版 v0.113.1 DoTurnEndCards：已移出战斗状态的卡不结算、不计入延迟序号（#922）。模拟器没有卡牌
+            // HasBeenRemovedFromState 标记，与 CardPileCmd.AddAsync 同用"不在任何牌堆"作移除代理（偏离登记）。
+            if (card.Pile is null)
+            {
+                continue;
+            }
             Task<CardPileAddResult?> result = ResolveTurnEndCardEffects(card, wait);
             // Native TweenTurnEndCardToResultPile only awaits this result and a visual tween.
             // No gameplay work follows the success check; headless retains the result dependency.

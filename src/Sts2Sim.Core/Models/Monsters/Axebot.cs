@@ -20,8 +20,10 @@ public sealed class Axebot : MonsterModel
             _stockAmount = value;
         }
     }
-    public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 76, 70) + (2 - StockAmount) * 10;
-    public override int MaxInitialHp => Ascension(AscensionLevel.ToughEnemies, 86, 78) + (2 - StockAmount) * 10;
+    public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 80, 70) + RespawnMaxHpBonus;
+    public override int MaxInitialHp => MinInitialHp;
+    private int RespawnMaxHpBonus => RespawnCount * 10;
+    private int RespawnCount => 2 - StockAmount;
     private int OneTwoDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
     private int UppercutDamage => Ascension(AscensionLevel.DeadlyEnemies, 18, 14);
     private int BootBlock => Ascension(AscensionLevel.DeadlyEnemies, 15, 10);

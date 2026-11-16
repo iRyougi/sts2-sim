@@ -19,8 +19,8 @@ public sealed class HelixDrill : CardModel, ICardChoiceBaseValueProvider, ICardD
         ArgumentNullException.ThrowIfNull(play.Target);
         var state = (CombatState)CombatState!;
         int hits = state.SemanticHistory.SumEnergySpentThisTurn(state, Owner);
-        if (Pile?.Type == PileType.Play)
-            hits -= EnergyCost;
+        // v0.113.1：扣除当前未完成 CardPlay 实际花费的能量（OnPlay 内即本次出牌），不再用当前显示费用。
+        hits -= play.Resources.EnergySpent;
         await DamageCmd.Attack(_damage).WithHitCount(hits).FromCard(this, play)
             .Targeting(play.Target).Execute();
     }

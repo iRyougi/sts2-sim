@@ -58,7 +58,7 @@ public sealed class RetainAndForgeCardTests : IDisposable
         int hpBefore = enemy.CurrentHp;
 
         await card.PlayAsync(enemy);
-        Assert.Equal(hpBefore - 12, enemy.CurrentHp);
+        Assert.Equal(hpBefore - 10, enemy.CurrentHp); // v0.113.1：12→10
 
         await room.Engine.EndPlayerTurnAsync();
 

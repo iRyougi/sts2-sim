@@ -224,8 +224,8 @@ public sealed class CommonPotionBatch1Tests : IDisposable
             }
         });
         Assert.Equal(result.GeneratedTypes[0], result.SelectedType);
-        // Three eligible cards: native full-pool Fisher–Yates consumes N-1 draws.
-        Assert.Equal(2, result.GenerationCounter);
+        // Native v0.113.1 full-pool shuffle seeds a child RNG: exactly one parent draw (#946).
+        Assert.Equal(1, result.GenerationCounter);
         Assert.Equal(0, result.SelectionCounter);
         Assert.Equal(PileType.Hand, result.SelectedPile);
         Assert.True(result.SelectedTemporaryFreeThisTurn);

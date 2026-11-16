@@ -178,11 +178,14 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             CardModel[] originals = [ModelDb.Card<StrikeRegent>(), ModelDb.Card<DefendRegent>(), ModelDb.Card<Dazed>()];
             var reward = new CardReward(player, originals);
             int nicheBefore = run.Rng.Niche.Counter;
+            int rewardsBefore = player.PlayerRng.Rewards.Counter;
             reward.Populate(run);
             Assert.Equal(3, reward.Options.Count);
             CardModel changed = Assert.Single(reward.Options, card => card.Enchantments.Count > 0);
             Assert.Equal(1m, Assert.IsType<Swift>(Assert.Single(changed.Enchantments)).Magnitude);
-            Assert.Equal(1, run.Rng.Niche.Counter - nicheBefore);
+            // v0.113.1 WingCharm picks the enchanted option with PlayerRng.Rewards (#946), not Niche.
+            Assert.Equal(1, player.PlayerRng.Rewards.Counter - rewardsBefore);
+            Assert.Equal(0, run.Rng.Niche.Counter - nicheBefore);
             Assert.All(originals, card => Assert.Empty(card.Enchantments));
             Assert.Equal(2, reward.Options.Count(card => originals.Any(original => ReferenceEquals(card, original))));
             Assert.Same(originals[2], reward.Options[2]);

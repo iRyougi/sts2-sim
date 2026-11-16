@@ -60,13 +60,15 @@ public sealed class DistinctCombatPoolCallSiteTests : IDisposable
         if (name == "Abundance") nativePool = nativePool.Where(c => c.Type == CardType.Power);
         if (name == "Crossbow") nativePool = nativePool.Where(c => c.Type == CardType.Attack);
         if (name == "JackOfAllTrades") nativePool = nativePool.Where(c => c is not JackOfAllTrades);
-        // Native factory filters canonical candidates, then TakeRandom performs descending Fisher–Yates.
+        // Native factory filters canonical candidates, then TakeRandom performs descending Fisher–Yates
+        // on a child Rng seeded by one parent NextUnsignedLong (v0.113.1, #946).
         var expected = nativePool.Where(c => c.CanBeGeneratedInCombat &&
             c.Rarity is CardRarity.Common or CardRarity.Uncommon or CardRarity.Rare).Distinct().ToArray();
         var oracle = run.Rng.CombatCardGeneration.CloneExact();
+        var child = new Sts2Sim.Core.Random.Rng(oracle.NextUnsignedLong());
         for (int i = expected.Length - 1; i > 0; i--)
         {
-            int j = oracle.NextInt(i + 1);
+            int j = child.NextInt(i + 1);
             (expected[i], expected[j]) = (expected[j], expected[i]);
         }
         var counters = Enum.GetValues<RunRngType>().ToDictionary(t => t, t => run.Rng.GetRng(t).Counter);
@@ -97,8 +99,8 @@ public sealed class DistinctCombatPoolCallSiteTests : IDisposable
             : source.Candidates.Count > 0 ? source.Candidates : player.PlayerCombatState.Hand.Cards;
         Assert.Equal(expected.Take(count).Select(c => c.Id), actual.Select(c => c.Id));
         Assert.All(actual, c => Assert.Same(player, c.Owner));
-        Assert.True(run.Rng.CombatCardGeneration.Counter == expected.Length - 1,
-            $"{name}, seed={seed}: expected {expected.Length - 1} full-pool draws, got {run.Rng.CombatCardGeneration.Counter}");
+        Assert.True(run.Rng.CombatCardGeneration.Counter == 1,
+            $"{name}, seed={seed}: expected one parent draw per full-pool shuffle, got {run.Rng.CombatCardGeneration.Counter}");
         Assert.Equal(oracle.NextInt(), run.Rng.CombatCardGeneration.NextInt());
         foreach (var (type, before) in counters)
             if (type != RunRngType.CombatCardGeneration) Assert.Equal(before, run.Rng.GetRng(type).Counter);

@@ -2,6 +2,7 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Commands.Builders;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Cards;
@@ -44,10 +45,11 @@ public sealed class Omnislice : GeneratedCardModel
             CombatState,
             teammates,
             primaryResult.TotalDamage + primaryResult.OverkillDamage,
-            ValueProp.Unpowered | ValueProp.Move,
+            ValueProp.Move,
             Owner.Creature,
             this,
-            cardPlay);
+            cardPlay,
+            ModifyDamageHookType.Cap);
         context.AddHit(splashResults);
     }
 }

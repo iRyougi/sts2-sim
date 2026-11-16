@@ -65,7 +65,7 @@ public sealed class BattlewornDummy : EventModel
                 foreach (CardModel card in cards.Take(2)) CardCmd.Upgrade(card);
                 break;
             case BattlewornRewardTier.Relic:
-                RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner);
+                RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner, Rng);
                 OfferRewards(RewardsSet.CreateCustom(Owner, relic: new RelicReward((RelicModel)relic.MutableClone(), Owner)));
                 break;
             default:

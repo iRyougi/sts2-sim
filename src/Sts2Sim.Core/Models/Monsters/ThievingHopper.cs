@@ -52,7 +52,7 @@ public sealed class ThievingHopper : MonsterModel
         {
             List<CardModel> eligible = target.Player!.PlayerCombatState!.DrawPile.Cards
                 .Concat(target.Player.PlayerCombatState.DiscardPile.Cards)
-                .Where(card => card.DeckVersion is not null)
+                .Where(card => card.DeckVersion is not null && card.Rarity != CardRarity.Quest)
                 .ToList();
             if (eligible.Count == 0) continue;
             int priority = eligible.Min(Priority);
@@ -77,7 +77,7 @@ public sealed class ThievingHopper : MonsterModel
         {
             CardRarity.Uncommon => 0,
             CardRarity.Common or CardRarity.Rare or CardRarity.Event => 1,
-            CardRarity.Basic or CardRarity.Quest => 2,
+            CardRarity.Basic => 2,
             _ => 4,
         };
     }

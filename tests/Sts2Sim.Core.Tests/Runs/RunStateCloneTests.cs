@@ -33,23 +33,50 @@ public sealed partial class RunStateCloneTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
+    private static async Task<RunState> StartCloneFixtureRunAsync(string seed, bool keyed, int floors)
+    {
+        RunState source = keyed
+            ? RunState.CreateKeyedForLabels(seed, [new Overgrowth(), new Hive(), new Glory()], 10)
+            : new RunState(seed, [new Overgrowth(), new Hive(), new Glory()], 10);
+        Player sourcePlayer = Player.CreateForNewRun(ModelDb.Character<Silent>(), source);
+        source.AddPlayer(sourcePlayer);
+        sourcePlayer.Creature.SetMaxHpInternal(10_000);
+        sourcePlayer.Creature.HealInternal(10_000);
+        await new RunDriver(source, new FirstChoiceDecisionSource()).RunAsync(floors);
+        return source;
+    }
+
+    // The fixture only needs a run that survives the first-choice policy to the clone floor in both
+    // RNG modes. #946 + #944 moved "clone-floor-6" (keyed) into TabletOfTruth, whose first option
+    // drains max HP to death. Deterministic rule: the prefix itself, then prefix-1, prefix-2, ...
+    private static async Task<string> FirstSeedReachingFloorInBothModesAsync(string prefix, int floors)
+    {
+        const int maxSeeds = 32;
+        for (int k = 0; k < maxSeeds; k++)
+        {
+            string candidate = k == 0 ? prefix : $"{prefix}-{k}";
+            if ((await StartCloneFixtureRunAsync(candidate, keyed: false, floors)).TotalFloor >= floors &&
+                (await StartCloneFixtureRunAsync(candidate, keyed: true, floors)).TotalFloor >= floors)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"No {prefix}[-1..{maxSeeds - 1}] seed reaches floor {floors} in both modes.");
+    }
+
     [Theory]
     [InlineData("clone-floor-2", 2)]
     [InlineData("clone-floor-6", 6)]
     [InlineData("clone-next-act", 17)]
-    public async Task CloneExact_ForksKeepFullRngStateAndIndependentContinuations(string seed, int floorsBeforeClone)
+    public async Task CloneExact_ForksKeepFullRngStateAndIndependentContinuations(string seedPrefix, int floorsBeforeClone)
     {
+        string seed = await FirstSeedReachingFloorInBothModesAsync(seedPrefix, floorsBeforeClone);
         foreach (bool keyed in new[] { false, true })
         {
-            RunState source = keyed
-                ? RunState.CreateKeyedForLabels(seed, [new Overgrowth(), new Hive(), new Glory()], 10)
-                : new RunState(seed, [new Overgrowth(), new Hive(), new Glory()], 10);
-            Player sourcePlayer = Player.CreateForNewRun(ModelDb.Character<Silent>(), source);
-            source.AddPlayer(sourcePlayer);
-            sourcePlayer.Creature.SetMaxHpInternal(10_000);
-            sourcePlayer.Creature.HealInternal(10_000);
-            await new RunDriver(source, new FirstChoiceDecisionSource()).RunAsync(floorsBeforeClone);
-            Assert.True(source.TotalFloor >= floorsBeforeClone);
+            RunState source = await StartCloneFixtureRunAsync(seed, keyed, floorsBeforeClone);
+            Player sourcePlayer = source.Players.Single();
+            Assert.True(source.TotalFloor >= floorsBeforeClone, $"seed={seed}, keyed={keyed}");
             if (floorsBeforeClone == 17) Assert.True(source.CurrentActIndex >= 1);
 
             RunState child = source.CloneExact();
@@ -1019,11 +1046,9 @@ internal static class RunCloneCurrentActHistoryFixture
         RunState nextAct = observed.CloneReseeded(377);
         Assert.Equal(observed.Odds.UnknownMapPoint.PublicBaseRules.Monster, nextAct.Odds.UnknownMapPoint.MonsterOdds);
 
-        // Fixed real setup which naturally assigns the shared Darv to the second act.
-        var ancientHistory = new RunState("seen-shared-ancient-5",
-            [new Overgrowth(), new Hive(), new Glory()], 10);
-        ancientHistory.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Silent>(), ancientHistory));
-        ancientHistory.AdvanceToNextAct();
+        // Real setup which naturally assigns the shared Darv to the second act: the first
+        // "seen-shared-ancient-{k}" seed with that property (deterministic search, #946).
+        RunState ancientHistory = FirstRunWithSharedDarvInSecondAct();
         await new RunDriver(ancientHistory, new FirstChoiceDecisionSource()).ContinueAsync(0);
         Assert.Null(ancientHistory.CurrentRoom); // Real Ancient options consumed; room has exited.
         Assert.Equal(typeof(Darv), ancientHistory.CurrentAncientEventType);
@@ -1031,6 +1056,22 @@ internal static class RunCloneCurrentActHistoryFixture
         Assert.Equal(typeof(Darv), future.CurrentAncientEventType); // Already observed, even after exit.
         future.AdvanceToNextAct();
         Assert.NotEqual(typeof(Darv), future.CurrentAncientEventType);
+    }
+
+    private static RunState FirstRunWithSharedDarvInSecondAct()
+    {
+        const int maxSeeds = 64;
+        for (int k = 0; k < maxSeeds; k++)
+        {
+            var run = new RunState($"seen-shared-ancient-{k}",
+                [new Overgrowth(), new Hive(), new Glory()], 10);
+            run.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Silent>(), run));
+            run.AdvanceToNextAct();
+            if (run.CurrentAncientEventType == typeof(Darv)) return run;
+        }
+
+        throw new InvalidOperationException(
+            $"No seen-shared-ancient-{{0..{maxSeeds - 1}}} seed assigns Darv to the second act.");
     }
 
     private sealed class UnknownThenLeavePolicy : IRunDecisionSource

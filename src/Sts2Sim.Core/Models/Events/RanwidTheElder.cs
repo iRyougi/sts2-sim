@@ -60,7 +60,7 @@ public sealed class RanwidTheElder : EventModel
     }
     private async Task Obtain(int count)
     {
-        for (int i = 0; i < count; i++) await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
+        for (int i = 0; i < count; i++) await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner, Rng), Owner);
         Finish();
     }
     protected override void AfterCloned()

@@ -89,8 +89,10 @@ public sealed class AbundanceTests : IDisposable
 
         await abundance.PlayAsync(target: null);
 
+        // v0.113.1（#946）：整池洗牌改为先从父流取 1 次 NextUnsignedLong 播种子 Rng，
+        // 父流只前进 1 次，与池大小无关（旧版为 n-1=15 次）。
         Assert.Equal(
-            counterBefore + 15,
+            counterBefore + 1,
             room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 

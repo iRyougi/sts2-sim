@@ -121,12 +121,15 @@ public sealed class CeremonialBeast : MonsterModel
     private async Task PlowMove(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(PlowDamage).FromMonster(this).Execute();
-        await PowerCmd.Apply<StrengthPower>(
-            Creature.CombatState!,
-            Creature,
-            PlowStrength,
-            Creature,
-            cardSource: null);
+        if (Creature.HasPower<PlowPower>())
+        {
+            await PowerCmd.Apply<StrengthPower>(
+                Creature.CombatState!,
+                Creature,
+                PlowStrength,
+                Creature,
+                cardSource: null);
+        }
     }
 
     public Task StunnedMove(IReadOnlyList<Creature> targets)

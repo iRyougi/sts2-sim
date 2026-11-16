@@ -2,6 +2,7 @@ using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Runs.Transplant;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Runs;
 
@@ -37,7 +38,7 @@ public sealed class RelicGrabBag
                      .GroupBy(relic => relic.Rarity))
         {
             List<RelicModel> bucket = group.ToList();
-            shuffleRng.Shuffle(bucket);
+            bucket.UnstableShuffle(shuffleRng);
             _buckets[group.Key] = bucket;
         }
     }
@@ -89,7 +90,7 @@ public sealed class RelicGrabBag
             var bucket = new List<RelicModel>(_buckets[rarity]);
             bucket.Sort(static (left, right) =>
                 StringComparer.Ordinal.Compare(left.Id.Entry, right.Id.Entry));
-            rng.Shuffle(bucket);
+            bucket.UnstableShuffle(rng);
             buckets.Add(rarity, bucket);
         }
         return new RelicGrabBag(buckets);

@@ -66,6 +66,7 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         }
         if (name == "ZenWeaver") Assert.Equal(300, player.Gold);
         int nicheBefore = run.Rng.Niche.Counter;
+        int transformationsBefore = player.PlayerRng.Transformations.Counter;
         CardModel[] chosen = request.Candidates.TakeLast(count).Reverse().ToArray();
         CardModel untouched = request.Candidates[0];
         Assert.All(chosen, c => Assert.False(c.IsUpgraded));
@@ -85,7 +86,7 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         }
         else Assert.All(chosen, c => Assert.DoesNotContain(player.Deck.Cards, other => ReferenceEquals(c, other)));
         if (name == "ZenWeaver") Assert.Equal(option == "EMOTIONAL_AWARENESS" ? 175 : 50, player.Gold);
-        if (name == "NewLeaf") Assert.True(run.Rng.Niche.Counter > nicheBefore);
+        if (name == "NewLeaf") Assert.True(player.PlayerRng.Transformations.Counter > transformationsBefore);
     }
 
     [Theory]

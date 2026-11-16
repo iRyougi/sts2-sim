@@ -25,7 +25,7 @@ public sealed class Tunneler : MonsterModel
     public override int MaxInitialHp => MinInitialHp;
     private int BiteDamage => Ascension(AscensionLevel.DeadlyEnemies, 15, 13);
     private int BurrowBlock => Ascension(AscensionLevel.ToughEnemies, 37, 32);
-    private int BelowDamage => Ascension(AscensionLevel.DeadlyEnemies, 26, 23);
+    private int FromBelowDamage => Ascension(AscensionLevel.DeadlyEnemies, 28, 24);
 
     public void GetStunned() => IsStunned = true;
 
@@ -56,11 +56,11 @@ public sealed class Tunneler : MonsterModel
             return DamageCmd.Attack(BiteDamage).FromMonster(this).Execute();
         }, new SingleAttackIntent(BiteDamage));
         var burrow = new MoveState("BURROW_MOVE", Burrow, new BuffIntent(), new DefendIntent());
-        var below = new MoveState("BELOW_MOVE", _ =>
+        var below = new MoveState("FROM_BELOW_MOVE", _ =>
         {
             IsStunned = false;
-            return DamageCmd.Attack(BelowDamage).FromMonster(this).Execute();
-        }, new SingleAttackIntent(BelowDamage));
+            return DamageCmd.Attack(FromBelowDamage).FromMonster(this).Execute();
+        }, new SingleAttackIntent(FromBelowDamage));
         bite.FollowUpState = burrow;
         burrow.FollowUpState = below;
         below.FollowUpState = below;

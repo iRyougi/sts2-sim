@@ -11,13 +11,28 @@ namespace Sts2Sim.Core.Factories;
 /// Rarity odds are Common 50% / Uncommon 33% / Rare 17%, without Ascension adjustments.</summary>
 public static class RelicFactory
 {
-    public static RelicModel PullNextRelicFromFront(Player player)
+    /// <summary>
+    /// v0.113.1：用调用方给的 rng 掷稀有度后从 front 抽取。事件用自身 <c>Rng</c>（#946）。
+    /// </summary>
+    public static RelicModel PullNextRelicFromFront(Player player, Rng rng)
     {
         ArgumentNullException.ThrowIfNull(player);
-        RelicRarity rarity = RollRarity(player.PlayerRng.Rewards);
+        ArgumentNullException.ThrowIfNull(rng);
         // 偏离 #70：严格从所滚稀有度桶 front 抽取；空桶直接兜底 Circlet，不跨桶降级。
-        return PullNextRelicFromFront(player, rarity);
+        return PullNextRelicFromFront(player, RollRarity(rng));
     }
+
+    /// <summary>
+    /// v0.113.1 由无 RNG 参数的 <c>PullNextRelicFromFront(Player)</c> 改名而来，隐式使用
+    /// <c>PlayerRng.Rewards</c>；原版注明不得用于商店与事件。
+    /// </summary>
+    public static RelicModel PullNextRelicForRewardFromFront(Player player)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        return PullNextRelicFromFront(player, RollRarityForReward(player));
+    }
+
+    public static RelicRarity RollRarityForReward(Player player) => RollRarity(player.PlayerRng.Rewards);
 
     public static RelicModel PullNextRelicFromFront(
         Player player, RelicRarity rarity, Predicate<RelicModel>? filter = null)

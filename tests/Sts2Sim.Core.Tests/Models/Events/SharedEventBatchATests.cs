@@ -82,7 +82,8 @@ public sealed class SharedEventBatchATests : IDisposable
         await Choose(ev, "EXAMINE");
         Assert.Equal(hp - 15, player.Creature.CurrentHp);
         Assert.Equal(3, ev.CurrentOptions.Count);
-        Assert.Equal(2, ev.Rng.Counter);
+        // v0.113.1 StableShuffle of the three dolls: one parent draw seeds the child RNG (#946).
+        Assert.Equal(1, ev.Rng.Counter);
         await ev.ChooseOption(ev.CurrentOptions[0]);
         Assert.Contains(player.Relics, r => r is DaughterOfTheWind or BingBong or MrStruggles);
     }
@@ -125,8 +126,10 @@ public sealed class SharedEventBatchATests : IDisposable
         var owned = player.Relics.ToArray();
         int rng = player.PlayerRng.Rewards.Counter;
         var ev = Begin<RelicTrader>(run, player);
+        // v0.113.1 (#946): one parent draw for the owned-relic StableShuffle plus three rarity rolls,
+        // all on the event's own Rng; PlayerRng.Rewards is untouched.
         Assert.Equal(4, ev.Rng.Counter);
-        Assert.Equal(3, player.PlayerRng.Rewards.Counter - rng);
+        Assert.Equal(0, player.PlayerRng.Rewards.Counter - rng);
         Assert.Equal(new[] { "TOP", "MIDDLE", "BOTTOM" }, ev.CurrentOptions.Select(o => o.Key));
         await Choose(ev, "MIDDLE");
         Assert.Equal(1, owned.Count(r => !player.Relics.Contains(r)));
@@ -197,7 +200,8 @@ public sealed class SharedEventBatchATests : IDisposable
         var ev = Assert.IsType<FakeMerchant>(room.Event);
         Assert.Empty(ev.CurrentOptions);
         Assert.False(ev.IsFinished);
-        Assert.Equal(8, ev.Rng.Counter);
+        // v0.113.1 UnstableShuffle of the nine fake relics: one parent draw seeds the child RNG (#946).
+        Assert.Equal(1, ev.Rng.Counter);
         Assert.Equal(6, player.PlayerRng.Shops.Counter - shops);
         Assert.Equal(6, ev.Inventory.Relics.Count);
         Assert.All(ev.Inventory.Relics, e => Assert.InRange(e.Price, 43, 57));

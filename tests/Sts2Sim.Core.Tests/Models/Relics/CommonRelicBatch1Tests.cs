@@ -361,7 +361,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
     }
 
     [Fact]
-    public async Task JuzuBracelet_RemovesMonsterFromUnknownRoomCandidates_WithoutMutatingInput()
+    public async Task JuzuBracelet_RemovesMonsterAndEliteFromUnknownRoomCandidates_WithoutMutatingInput()
     {
         (RunState runState, Player player) = CreateRun("juzu-bracelet");
         await RelicCmd.Obtain(ModelDb.Relic<JuzuBracelet>(), player);
@@ -375,7 +375,8 @@ public sealed class CommonRelicBatch1Tests : IDisposable
         IReadOnlySet<RoomType> result = Hook.ModifyUnknownMapPointRoomTypes(runState, original);
 
         Assert.DoesNotContain(RoomType.Monster, result);
-        Assert.Contains(RoomType.Elite, result);
+        Assert.DoesNotContain(RoomType.Elite, result); // v0.113.1 同时移除 Elite
+        Assert.Contains(RoomType.Elite, original);
         Assert.Contains(RoomType.Event, result);
         Assert.Contains(RoomType.Monster, original);
     }

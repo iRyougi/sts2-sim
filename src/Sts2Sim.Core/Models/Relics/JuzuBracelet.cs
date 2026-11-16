@@ -14,6 +14,7 @@ public sealed class JuzuBracelet : RelicModel
     {
         var result = new HashSet<RoomType>(roomTypes);
         result.Remove(RoomType.Monster);
+        result.Remove(RoomType.Elite); // v0.113.1
         return result;
     }
 }

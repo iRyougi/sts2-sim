@@ -34,6 +34,26 @@ public sealed class SpoilsMap : CardModel
         return Task.CompletedTask;
     }
 
+    // v0.113.1 新增：本卡在藏宝幕进入牌组（例如复制出的新实例）且宝箱点已定时，补挂到该宝箱点的任务列表。
+    public override Task AfterCardChangedPiles(CardModel card, PileType oldPileType, AbstractModel? clonedBy)
+    {
+        if (!ReferenceEquals(card, this) || Pile?.Type != PileType.Deck ||
+            Owner.RunState is not RunState run || SpoilsActIndex != run.CurrentActIndex ||
+            SpoilsCoord is not { } coord)
+        {
+            return Task.CompletedTask;
+        }
+
+        MapPoint? point = run.Map.GetPoint(coord);
+        if (point is null || point.PointType != MapPointType.Treasure || point.Quests.Contains(this))
+        {
+            return Task.CompletedTask;
+        }
+
+        point.AddQuest(this);
+        return Task.CompletedTask;
+    }
+
     public override Task BeforeCardRemoved(CardModel card)
     {
         if (ReferenceEquals(card, this) && Owner.RunState is RunState run && run.CurrentActIndex == SpoilsActIndex)

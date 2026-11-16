@@ -27,9 +27,9 @@ public sealed class LargeCapsuleTests : IDisposable
     public async Task AfterObtained_PullsAndObtainsTwoFrontRelicsThenAddsRegentBasics()
     {
         Player oracle = CreatePlayer("large-capsule");
-        RelicModel firstExpected = RelicFactory.PullNextRelicFromFront(oracle);
+        RelicModel firstExpected = RelicFactory.PullNextRelicForRewardFromFront(oracle);
         await RelicCmd.Obtain(firstExpected, oracle);
-        RelicModel secondExpected = RelicFactory.PullNextRelicFromFront(oracle);
+        RelicModel secondExpected = RelicFactory.PullNextRelicForRewardFromFront(oracle);
 
         Player player = CreatePlayer("large-capsule");
         int relicCountBefore = player.Relics.Count;

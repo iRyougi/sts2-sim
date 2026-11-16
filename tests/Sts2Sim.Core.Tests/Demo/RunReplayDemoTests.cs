@@ -79,8 +79,14 @@ public class RunReplayDemoTests : IDisposable
         // #918: v0.113.1 merchant draws use the Shops stream, so post-shop card rewards (and this
         // automatic route) change. Seed chosen by the #919 rule: probe v01131-rng-demo-boss-0..255 in
         // order, stop at the first real Boss resolution (hit at 254; receipts in the #918 report).
+        // #946: v0.113.1 child-RNG shuffle changed map/encounter/draw order; same rule re-probed,
+        // After merging #944 (new shared events / event pools) the same rule re-probed again:
+        // first hit was v01131-rng-demo-boss-15 (16 floors; misses 0..14 reached 4-13 floors).
+        // v0.113.1.0 release (after #956/#957/#953/#958 merged): the same rule re-probed on main +
+        // #958 (cfd620f1); first hit is v01131-rng-demo-boss-20 (16 floors; misses 0..19 reached
+        // 4-13 floors).
         // Smoke fixture only, not a fidelity or policy measurement. Assertions are unchanged.
-        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("v01131-rng-demo-boss-254", log.Add);
+        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("v01131-rng-demo-boss-20", log.Add);
 
         Assert.True(
             result.FloorsVisited >= 15,

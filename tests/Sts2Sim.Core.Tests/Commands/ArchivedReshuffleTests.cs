@@ -15,7 +15,7 @@ public sealed class ArchivedReshuffleTests : IDisposable
     public ArchivedReshuffleTests() { ModelDb.ResetForTests(); ModelDb.Init(ContentRegistry.AllTypes); }
     public void Dispose() => ModelDb.ResetForTests();
 
-    [Fact]
+    [Fact(Skip = "v0.111 native capture; v0.113.1 child-RNG shuffle (#946) requires #930 recertification")]
     public async Task XWDT4877APQF_FirstDiscardReshuffle_DrawsArchivedInstances()
     {
         var run = new RunState("XWDT4877APQF", ascensionLevel: 10);

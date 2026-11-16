@@ -66,8 +66,8 @@ public sealed class Trial : EventModel
     private async Task MerchantGuiltyAsync()
     {
         await AddCurseAsync<Regret>();
-        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
-        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
+        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner, Rng), Owner);
+        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner, Rng), Owner);
         Finish();
     }
 

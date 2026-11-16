@@ -22,8 +22,8 @@ public sealed class MusicBox : RelicModel
     public override async Task AfterCardPlayed(CardPlay cardPlay)
     {
         if (!ReferenceEquals(cardPlay.Card, _cardBeingPlayed) || Owner.Creature.CombatState is null) return;
-        var copy = (CardModel)cardPlay.Card.MutableClone();
-        copy.AssignOwner(Owner);
+        // 原版 MusicBox：CreateClone（保留实例状态与来源；dupe 回溯原卡），再加虚无（#922）。
+        CardModel copy = cardPlay.Card.CreateClone();
         copy.AddKeywordInternal(CardKeyword.Ethereal);
         await CardPileCmd.Generate(Owner.Creature.CombatState, copy, PileType.Hand, Owner);
         _wasUsedThisTurn = true;

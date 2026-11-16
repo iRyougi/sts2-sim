@@ -4,6 +4,7 @@ using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Powers;
+using Sts2Sim.Core.Hooks;
 
 namespace Sts2Sim.Core.Models.Powers;
 
@@ -38,7 +39,11 @@ public sealed class ImitationLearningPower : PowerModel
         if (index < 0) return;
         CardModel clone = _pending[index].Clone;
         _pending.RemoveAt(index);
-        await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
+        // v0.113.1：克隆被禁止打出时不消耗层数（原版 Hook.ShouldPlay(..., AutoPlayType.Default)）。
+        if (Hook.ShouldPlay(Owner.CombatState!, clone, isAutoPlay: true))
+        {
+            await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
+        }
         await AutoPlayCmd.FromCards(Owner.CombatState!, Owner.Player!, [clone]);
     }
 

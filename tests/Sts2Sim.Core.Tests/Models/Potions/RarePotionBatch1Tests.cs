@@ -229,7 +229,8 @@ public sealed class RarePotionBatch1Tests : IDisposable
             Assert.True(card.IsColorless);
             Assert.True(card.IsUpgraded);
         });
-        Assert.Equal(rngBefore + 50, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter); // 51 eligible colorless incl. MyShinies (#927)
+        // v0.113.1 TakeRandom over the colorless pool: one parent draw seeds the child shuffle (#946).
+        Assert.Equal(rngBefore + 1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 
     [Fact]

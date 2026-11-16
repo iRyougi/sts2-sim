@@ -1,40 +1,20 @@
-using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Entities.Cards;
-using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
-using Sts2Sim.Core.Rooms;
-using Sts2Sim.Core.Combat.StateDescription;
 
 namespace Sts2Sim.Core.Models.Relics;
 
+/// <summary>v0.113.1 原版 <c>VelvetChoker</c>：+1 最大能量；本回合本玩家已开始的出牌（含进行中的嵌套出牌）
+/// 达到 6 张后禁止打出。原版数 <c>History.CardPlaysStarted</c>，这里用同一时点（BeforeCardPlayed 之后）
+/// 记录的 <see cref="PlayerCombatState.CardPlaysStartedThisTurn"/>。</summary>
 public sealed class VelvetChoker : RelicModel
 {
-    private int _cardsPlayedThisTurn;
+    private const int MaxCardsPerTurn = 6;
+
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override decimal ModifyMaxEnergy(Player player, decimal amount) => player == Owner ? amount + 1m : amount;
-    public override bool ShouldPlay(CardModel card, bool isAutoPlay) => card.Owner != Owner || _cardsPlayedThisTurn < 6;
-    public override Task AfterCardPlayed(CardPlay cardPlay)
-    {
-        if (cardPlay.Card.Owner == Owner) _cardsPlayedThisTurn++;
-        return Task.CompletedTask;
-    }
-    public override Task AfterRoomEntered(AbstractRoom room)
-    {
-        if (room is CombatRoom) _cardsPlayedThisTurn = 0;
-        return Task.CompletedTask;
-    }
-    public override Task AfterCombatEnd()
-    {
-        _cardsPlayedThisTurn = 0;
-        return Task.CompletedTask;
-    }
-    public override Task BeforeSideTurnStart(CombatSide side, IReadOnlyList<Creature> participants)
-    {
-        if (participants.Contains(Owner.Creature)) _cardsPlayedThisTurn = 0;
-        return Task.CompletedTask;
-    }
-    internal override void AppendCombatStateDescription(
-        ref CombatStateDescriptionBuilder builder, CombatStateDescriptionContext context) =>
-        builder.Append(_cardsPlayedThisTurn);
+    public override bool ShouldPlay(CardModel card, bool isAutoPlay) =>
+        card.Owner != Owner || CardPlaysStartedThisTurn < MaxCardsPerTurn;
+
+    private int CardPlaysStartedThisTurn => Owner.PlayerCombatState?.CardPlaysStartedThisTurn ?? 0;
 }

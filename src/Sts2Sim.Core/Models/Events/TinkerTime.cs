@@ -4,6 +4,7 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Cards;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Events;
 
@@ -87,8 +88,6 @@ public sealed class TinkerTime : EventModel
 
     private IReadOnlyList<T> TakeTwo<T>(IEnumerable<T> source)
     {
-        List<T> candidates = source.ToList();
-        Rng.Shuffle(candidates);
-        return candidates.Take(2).ToArray();
+        return source.TakeRandom(2, Rng).ToArray();
     }
 }

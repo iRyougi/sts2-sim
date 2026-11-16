@@ -16,7 +16,8 @@ public sealed class NewLeaf : RelicModel
             .FirstOrDefault();
         if (selected is not null)
         {
-            await CardCmd.TransformToRandom(selected, Owner.RunState.Rng.Niche, Owner.RunState);
+            // v0.113.1：变形改用 PlayerRng.Transformations（原 RunState.Rng.Niche）。
+            await CardCmd.TransformToRandom(selected, Owner.PlayerRng.Transformations, Owner.RunState);
         }
     }
 }

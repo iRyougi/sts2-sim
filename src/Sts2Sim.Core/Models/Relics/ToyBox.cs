@@ -20,7 +20,7 @@ public sealed class ToyBox : RelicModel
         var rewards = new List<Reward>(RelicCount);
         for (int i = 0; i < RelicCount; i++)
         {
-            RelicModel relic = (RelicModel)RelicFactory.PullNextRelicFromFront(Owner).MutableClone();
+            RelicModel relic = (RelicModel)RelicFactory.PullNextRelicForRewardFromFront(Owner).MutableClone();
             relic.IsWax = true;
             rewards.Add(new RelicReward(relic, Owner));
         }

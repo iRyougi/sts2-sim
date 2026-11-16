@@ -466,6 +466,15 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     private HashSet<CardKeyword>? _keywordOverride;
 
+    /// <summary>原版 v0.113.1 <c>_keywordsAddedFromOutside/_keywordsRemovedFromOutside</c>：非升级来源的关键字增删，
+    /// 降级时在 canonical 关键字上重放（#922）。</summary>
+    private HashSet<CardKeyword> _keywordsAddedFromOutside = new();
+
+    private HashSet<CardKeyword> _keywordsRemovedFromOutside = new();
+
+    /// <summary>原版 <c>_isUpgrading</c>：OnUpgrade 期间为真，升级自身的关键字改动不记为外部来源。</summary>
+    private bool _isUpgrading;
+
     private List<EnchantmentModel> _enchantments = new();
 
     private AfflictionModel? _affliction;
@@ -486,7 +495,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     /// <see cref="Hook.ModifyKeywordsInCombat"/> 按需计算全局关键字，结果不写回卡牌。
     /// </summary>
     /// <remarks>
-    /// 已构造类型仅包含原版 HexPower 覆写时，无 Hexed 的卡不可能获得全局关键字，直接返回本地集合。
+    /// 已构造类型仅包含原版 HexPower / PhantomBladesPower 覆写时，既无 Hexed 又非 Shiv 的卡不可能获得全局关键字，直接返回本地集合。
     /// 其它情况仍逐次派发；为了不在每次读取时新建集合，这里借用线程内的临时集合；
     /// 全局关键字没有改变结果时直接返回本地集合，有改变时才复制。监听者在修改过程中如果重入读取关键字，
     /// 会拿到新的临时集合，不会互相覆盖。
@@ -501,7 +510,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             return local;
         }
 
-        if (Affliction is not Hexed && GlobalKeywordsRequireHexed)
+        if (Affliction is not Hexed && GlobalKeywordsRequireHexed && !Tags.Contains(CardTag.Shiv))
         {
             return local;
         }
@@ -594,7 +603,16 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
 
         CurrentUpgradeLevel++;
-        OnUpgrade();
+        // 原版 v0.113.1 UpgradeInternal：升级自身的关键字增删不记为外部来源。
+        _isUpgrading = true;
+        try
+        {
+            OnUpgrade();
+        }
+        finally
+        {
+            _isUpgrading = false;
+        }
     }
 
     protected virtual void OnUpgrade()
@@ -615,9 +633,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         Dictionary<FieldInfo, object> lowerNumeric = lowerLevel.CaptureUpgradeNumericState();
         Dictionary<FieldInfo, object> currentNumeric = currentLevel.CaptureUpgradeNumericState();
 
-        var restoredKeywords = new HashSet<CardKeyword>(LocalKeywords);
-        restoredKeywords.ExceptWith(currentLevel.Keywords.Except(lowerLevel.Keywords));
-        restoredKeywords.UnionWith(lowerLevel.Keywords.Except(currentLevel.Keywords));
+        // 原版 v0.113.1 DowngradeInternal：canonical 本地关键字 ∪ 外部增加 − 外部移除（#922）。
+        // 数值仍用升级差值法（偏离登记 Thrash 条目），运行时增长不回退。
+        var restoredKeywords = new HashSet<CardKeyword>(lowerLevel.LocalKeywords);
+        restoredKeywords.UnionWith(_keywordsAddedFromOutside);
+        restoredKeywords.ExceptWith(_keywordsRemovedFromOutside);
         foreach ((FieldInfo field, object currentCanonicalValue) in currentNumeric)
         {
             object lowerCanonicalValue = lowerNumeric[field];
@@ -718,6 +738,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         _keywordOverride = new HashSet<CardKeyword>(LocalKeywords) { keyword };
+        if (!_isUpgrading)
+        {
+            _keywordsAddedFromOutside.Add(keyword);
+            _keywordsRemovedFromOutside.Remove(keyword);
+        }
     }
 
     internal void AddKeywordInternal(CardKeyword keyword) => AddKeyword(keyword);
@@ -728,6 +753,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         var updated = new HashSet<CardKeyword>(LocalKeywords);
         updated.Remove(keyword);
         _keywordOverride = updated;
+        if (!_isUpgrading)
+        {
+            _keywordsRemovedFromOutside.Add(keyword);
+            _keywordsAddedFromOutside.Remove(keyword);
+        }
     }
 
     internal void RemoveKeywordInternal(CardKeyword keyword) => RemoveKeyword(keyword);
@@ -906,6 +936,54 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     protected virtual Task OnPlay(CardPlay cardPlay) => Task.CompletedTask;
 
+    private CardModel? _transformIntoAfterPlay;
+
+    /// <summary>原版 v0.113.1 <c>TransformIntoAfterPlay</c>：只在 <see cref="OnPlay"/> 中设置；该次打出的
+    /// AfterCardPlayed 之后把本卡变形为它，变形成功则中止剩余重放，结果牌堆改用变形后的卡。OnPlay 之外设置会被忽略。</summary>
+    public CardModel? TransformIntoAfterPlay
+    {
+        get => _transformIntoAfterPlay;
+        protected set
+        {
+            AssertMutable();
+            _transformIntoAfterPlay = value;
+        }
+    }
+
+    /// <summary>原版 <c>AfterThisWasTransformedInto</c>：本卡被变形为 <paramref name="card"/> 之后调用。</summary>
+    public void AfterThisWasTransformedInto(CardModel card) => AfterThisWasTransformedIntoInternal(card);
+
+    protected virtual void AfterThisWasTransformedIntoInternal(CardModel card)
+    {
+    }
+
+    /// <summary>原版 <c>AfterThisWasTransformedFrom</c>：本卡由 <paramref name="card"/> 变形而来之后调用。</summary>
+    public virtual void AfterThisWasTransformedFrom(CardModel card)
+    {
+    }
+
+    /// <summary>原版 <c>CardModel.EndOfTurnCleanup</c> 的逐卡部分：清掉本回合临时状态（免费、保留、狡诈、
+    /// 本回合费用覆写与增减、下次打出消耗）。完整 CardEnergyCost 修饰符链仍按偏离 #32 窄化。</summary>
+    public void EndOfTurnCleanup()
+    {
+        ClearTemporaryFreeThisTurn();
+        ClearTemporaryRetainThisTurn();
+        ClearTemporarySlyThisTurn();
+        ClearTemporaryCostOverrideThisTurn();
+        ClearTemporaryCostOverrideThisTurnOrUntilPlayed();
+        ClearTemporaryStarCostOverrideThisTurn();
+        ClearEnergyCostThisTurn();
+        ExhaustOnNextPlay = false;
+    }
+
+    /// <summary>原版 v0.113.1 <c>IsAllowedInRun</c>：单人局排除仅多人卡（模拟器只有单人；Blitz 模式不在范围，
+    /// SingleplayerOnly 在单人局恒允许）。</summary>
+    public bool IsAllowedInRun(Runs.RunState runState)
+    {
+        ArgumentNullException.ThrowIfNull(runState);
+        return runState.Players.Count > 1 || !IsMultiplayerOnly;
+    }
+
     /// <summary>
     /// 出牌总控,对应游戏 <c>CardModel.OnPlayWrapper</c> 的精简版。不在内部自检 <see cref="CanPlay"/>——
     /// 真实游戏的 OnPlayWrapper 同样不做这个检查,可玩性门禁是调用方（UI 或 CombatEngine.PlayCardAsync）的职责,
@@ -1062,6 +1140,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
 
         CardPlay? firstPlay = null;
+        // 原版 v0.113.1：OnPlay 之外设置的 TransformIntoAfterPlay 记错误日志并忽略。
+        _transformIntoAfterPlay = null;
+        CardModel resultCard = this;
         playerCombatState.CardOrPotionEffectDepth++;
         try
         {
@@ -1125,6 +1206,24 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                 {
                     return firstPlay;
                 }
+
+                // 原版 v0.113.1 OnPlayWrapper：变形成功即中止剩余重放，后续落堆改用变形后的卡（#922）。
+                if (_transformIntoAfterPlay is { } transformInto)
+                {
+                    // 原版 CardCmd.Transform(IEnumerable) 对不在牌堆的原卡抛异常；单卡模拟器版会静默返回 null，这里保持 fail-closed。
+                    if (Pile is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"{GetType().Name} set TransformIntoAfterPlay but is no longer in a pile.");
+                    }
+                    CardModel? transformed = await CardCmd.Transform(this, transformInto);
+                    if (transformed is not null)
+                    {
+                        _transformIntoAfterPlay = null;
+                        resultCard = transformed;
+                        break;
+                    }
+                }
             }
         }
         finally
@@ -1133,31 +1232,32 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
 
         Player? ownerBeforeTransfer = null;
+        // 原版比较的是出牌卡（this）的原 owner，转移的是落堆卡。
         if (resultLocation.PileType != PileType.None && !ReferenceEquals(resultLocation.Player, Owner))
         {
             ownerBeforeTransfer = Owner;
-            GiveToAnotherPlayer(resultLocation.Player);
+            resultCard.GiveToAnotherPlayer(resultLocation.Player);
         }
 
-        if (Pile?.Type == PileType.Play)
+        if (resultCard.Pile?.Type == PileType.Play)
         {
             if (resultLocation.PileType == PileType.None)
             {
-                CardPileCmd.Remove(this);
+                CardPileCmd.Remove(resultCard);
             }
             else if (resultLocation.PileType == PileType.Exhaust)
             {
-                await CardPileCmd.Exhaust(combatState, this);
+                await CardPileCmd.Exhaust(combatState, resultCard);
             }
             else
             {
-                CardPileCmd.Add(this, resultLocation.PileType, resultLocation.Position);
+                CardPileCmd.Add(resultCard, resultLocation.PileType, resultLocation.Position);
             }
         }
 
         if (ownerBeforeTransfer is not null)
         {
-            await Hook.AfterCardOwnerChanged(combatState, this, ownerBeforeTransfer);
+            await Hook.AfterCardOwnerChanged(combatState, resultCard, ownerBeforeTransfer);
         }
 
         await CardPileCmd.CheckForEmptyHand(combatState, originalOwner);
@@ -1192,6 +1292,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         base.DeepCloneFields();
         _localEnergyModifiers = _localEnergyModifiers.ToList();
         _keywordOverride = _keywordOverride is null ? null : new HashSet<CardKeyword>(_keywordOverride);
+        _keywordsAddedFromOutside = new HashSet<CardKeyword>(_keywordsAddedFromOutside);
+        _keywordsRemovedFromOutside = new HashSet<CardKeyword>(_keywordsRemovedFromOutside);
         _enchantments = _enchantments
             .Select(enchantment => (EnchantmentModel)enchantment.MutableClone())
             .ToList();
@@ -1227,6 +1329,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             modifier.Kind != LocalEnergyModifierKind.AddThisCombat);
         _deckVersion = null;
         _cloneOf = null;
+        // 原版 v0.113.1 AfterCloned：出牌后变形目标与升级标记不随克隆保留。
+        _transformIntoAfterPlay = null;
+        _isUpgrading = false;
     }
 
     internal virtual void RestoreCombatCloneReferencesFrom(
@@ -1273,10 +1378,12 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         {
             throw new InvalidOperationException("Cannot create a combat clone of a persistent deck card.");
         }
-        CardModel clone = CloneForCombat(Owner);
+        // 原版 v0.113.1 CreateClone：复制 dupe 时先回溯到 DupeOf（原卡），克隆原卡状态并以原卡为来源（#922）。
+        CardModel source = IsDupe && _cloneOf is not null ? _cloneOf : this;
+        CardModel clone = source.CloneForCombat(source.Owner);
         clone.ExhaustOnNextPlay = false;
         clone._deckVersion = null;
-        clone._cloneOf = this;
+        clone._cloneOf = source;
         return clone;
     }
 
@@ -1287,10 +1394,16 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     internal CardModel CreateDupe(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        // 原版 CreateDupe：dupe 再 dupe 时交给 DupeOf.CreateDupe；经 CreateClone 清 ExhaustOnNextPlay（#922）。
+        if (IsDupe && _cloneOf is not null)
+        {
+            return _cloneOf.CreateDupe(owner);
+        }
         var dupe = CloneForCombat(owner);
         dupe.IsDupe = true;
+        dupe.ExhaustOnNextPlay = false;
         dupe._deckVersion = null;
-        dupe._cloneOf = IsDupe ? _cloneOf ?? this : this;
+        dupe._cloneOf = this;
         dupe._floorAddedToDeck = null;
         dupe.RemoveKeywordInternal(CardKeyword.Exhaust);
         return dupe;
@@ -1318,12 +1431,42 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             builder.Append(modifier.Amount);
         }
         builder.Append(TemporaryStarCostOverrideThisTurn ?? int.MinValue);
+        AppendDowngradeKeywords(ref builder);
         builder.Append(IsDupe);
         builder.Append(ExhaustOnNextPlay);
         builder.Append(_cloneOf is not null);
         if (_cloneOf is not null)
         {
             context.AppendCardCloneOrigin(ref builder, _cloneOf);
+        }
+    }
+
+    /// <summary>外部关键字增删只在降级时被读取，结果是 D = (canonical 0 级本地关键字 ∪ 外部增) − 外部删；
+    /// 每次增删只把 D 加/减同一关键字，所以 D 完整决定后续行为。描述只写 D 与 canonical 是否不同及其内容。</summary>
+    private void AppendDowngradeKeywords(ref CombatStateDescriptionBuilder builder)
+    {
+        if (_keywordsAddedFromOutside.Count == 0 && _keywordsRemovedFromOutside.Count == 0)
+        {
+            builder.Append(false);
+            return;
+        }
+
+        // 现有卡牌的 CanonicalKeywords 都是常量（不依赖升级等级），等于 0 级 canonical 的本地关键字。
+        IReadOnlyCollection<CardKeyword> canonical = CanonicalKeywords;
+        var downgradeKeywords = new HashSet<CardKeyword>(canonical);
+        downgradeKeywords.UnionWith(_keywordsAddedFromOutside);
+        downgradeKeywords.ExceptWith(_keywordsRemovedFromOutside);
+        if (downgradeKeywords.SetEquals(canonical))
+        {
+            builder.Append(false);
+            return;
+        }
+
+        builder.Append(true);
+        builder.Append(downgradeKeywords.Count);
+        foreach (CardKeyword keyword in downgradeKeywords.OrderBy(keyword => (int)keyword))
+        {
+            builder.Append((int)keyword);
         }
     }
 

@@ -9,6 +9,7 @@ using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Tests.Rooms;
 
@@ -83,6 +84,9 @@ public sealed class AncientPoolTests : IDisposable
             "ancient-switch-act",
             new TestAct(0, firstPool),
             new TestAct(1, secondPool));
+        // Act 2 candidates also include the shared-ancient subset drawn by RunManager.GenerateRooms.
+        Type[] expected = SelectAncientsWithAuthoritativeUpFrontOrder(
+            runState.Rng.UpFront.CloneExact(), firstPool, secondPool);
 
         Type firstSelection = runState.CurrentAncientEventType;
         runState.AdvanceToNextAct();
@@ -92,8 +96,9 @@ public sealed class AncientPoolTests : IDisposable
         await room.Enter(runState);
 
         Assert.Equal(typeof(Neow), firstSelection);
-        Assert.Equal(typeof(DenseVegetation), secondSelection);
-        Assert.IsType<DenseVegetation>(room.Event);
+        Assert.Equal(expected[1], secondSelection);
+        Assert.Contains(secondSelection, secondPool.Concat(SharedAncientPool.All));
+        Assert.IsType(expected[1], room.Event);
         Assert.Equal(counterBeforeRoomAccess, runState.Rng.UpFront.Counter);
     }
 
@@ -123,24 +128,49 @@ public sealed class AncientPoolTests : IDisposable
         IReadOnlyList<Type> ancientPool,
         out int counter)
     {
-        var act = new TestAct(0, ancientPool);
-        // Shared events now participate in the same single shuffle before Ancient selection.
-        var events = act.EventPool.Concat(SharedEventPool.All).ToList();
-        rng.Shuffle(events);
-
-        for (int i = 0; i < act.BaseNumberOfRooms; i++)
-        {
-            _ = act.PickEncounter(RoomType.Monster, rng);
-        }
-
-        for (int i = 0; i < 15; i++)
-        {
-            _ = act.PickEncounter(RoomType.Elite, rng);
-        }
-
-        _ = act.PickEncounter(RoomType.Boss, rng);
-        Type selected = rng.NextItem(ancientPool)!;
+        Type selected = SelectAncientsWithAuthoritativeUpFrontOrder(rng, ancientPool)[0];
         counter = rng.Counter;
+        return selected;
+    }
+
+    // Mirrors v0.113.1 RunManager.GenerateRooms + ActModel.GenerateRooms on UpFront:
+    // shared-ancient UnstableShuffle (one parent draw even for a single item), one subset count
+    // per later act, then per act: event shuffle, normal/elite/boss encounters, Ancient NextItem.
+    private static Type[] SelectAncientsWithAuthoritativeUpFrontOrder(
+        Rng rng,
+        params IReadOnlyList<Type>[] ancientPools)
+    {
+        List<Type> remaining = SharedAncientPool.All.ToList().UnstableShuffle(rng);
+        var subsets = new List<Type>[ancientPools.Length];
+        subsets[0] = new List<Type>();
+        for (int a = 1; a < ancientPools.Length; a++)
+        {
+            int count = rng.NextInt(remaining.Count + 1);
+            subsets[a] = remaining.Take(count).ToList();
+            remaining = remaining.Except(subsets[a]).ToList();
+        }
+
+        var selected = new Type[ancientPools.Length];
+        for (int a = 0; a < ancientPools.Length; a++)
+        {
+            var act = new TestAct(a, ancientPools[a]);
+            var events = act.EventPool.Concat(SharedEventPool.All).ToList();
+            events.UnstableShuffle(rng);
+
+            for (int i = 0; i < act.BaseNumberOfRooms; i++)
+            {
+                _ = act.PickEncounter(RoomType.Monster, rng);
+            }
+
+            for (int i = 0; i < 15; i++)
+            {
+                _ = act.PickEncounter(RoomType.Elite, rng);
+            }
+
+            _ = act.PickEncounter(RoomType.Boss, rng);
+            selected[a] = rng.NextItem(ancientPools[a].Concat(subsets[a]))!;
+        }
+
         return selected;
     }
 

@@ -108,6 +108,7 @@ internal static class ImaginationHiddenStateRegistry
         Event("TheFutureOfPotions", V, "Each rolled card type is shown in its POTION option description.", "_cardTypes");
         Event("TheLanternKey", V, reward, "_combatRewards");
         Event("ThisOrThat", V, "Displayed event gold DynamicVar.", "_gold");
+        Event("WuppyInTrouble", V, "Displayed BE_CAUTIOUS HP-loss DynamicVar (5% of current HP).", "_hpLoss");
         Event("TinkerTime", V, history, "_chosenType");
         Event("WelcomeToWongos", V, "Featured relic is shown on the current offer.", "_featuredItem");
         Event("WhisperingHollow", V, "Displayed event cost DynamicVar.", "_cost");
@@ -155,6 +156,7 @@ internal static class ImaginationHiddenStateRegistry
             "<Player>k__BackingField <GoldGained>k__BackingField <RelicGained>k__BackingField");
 
         Add(typeof(RestSiteDecision).FullName! + "+Smith", V, "Card target was chosen by the player.", "<Card>k__BackingField");
+        Add(typeof(Entities.RestSite.RestoreRestSiteOption).FullName!, V, "Displayed enabled state of RESTORE (Wuppy below max HP).", "<Enabled>k__BackingField");
         return fields;
     }
 }

@@ -2,7 +2,6 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Powers;
-using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Powers;
@@ -20,9 +19,7 @@ public sealed class ThornsPower : PowerModel
         Creature? dealer,
         CardModel? cardSource)
     {
-        if (target != Owner ||
-            dealer is null ||
-            (!props.IsPoweredAttack() && cardSource is not Omnislice))
+        if (target != Owner || dealer is null || !props.IsPoweredAttack())
         {
             return;
         }

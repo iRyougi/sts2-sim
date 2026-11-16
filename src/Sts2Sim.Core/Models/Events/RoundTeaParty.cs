@@ -44,7 +44,7 @@ public sealed class RoundTeaParty : EventModel
             Owner.Creature,
             11m,
             ValueProp.Unblockable | ValueProp.Unpowered);
-        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
+        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner, Rng), Owner);
         Finish();
     }
 }

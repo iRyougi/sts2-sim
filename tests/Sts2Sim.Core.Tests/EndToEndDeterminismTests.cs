@@ -1,6 +1,7 @@
 namespace Sts2Sim.Core.Tests;
 
 using Sts2Sim.Core.Entities.Ascension;
+using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Odds;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
@@ -24,7 +25,7 @@ public class EndToEndDeterminismTests
             trace.Append(playerOdds.CardRarity.Roll(CardRarityOddsType.RegularEncounter));
             trace.Append(playerOdds.PotionReward.Roll(floor % 5 == 0 ? RoomType.Elite : RoomType.Monster));
             var deck = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
-            runRng.Shuffle.Shuffle(deck);
+            deck.UnstableShuffle(runRng.Shuffle);
             trace.Append(string.Join('-', deck));
             trace.Append(runRng.MonsterAi.NextInt(4));
             trace.Append(runRng.CombatTargets.NextBool());

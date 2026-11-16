@@ -56,7 +56,7 @@ public sealed class RelicAcquisitionEligibilityTests : IDisposable
         string seed = FindSeed(requireCommonRewardRoll: true);
         Player player = CreatePlayerAtFloor(seed, 41);
 
-        RelicModel relic = RelicFactory.PullNextRelicFromFront(player);
+        RelicModel relic = RelicFactory.PullNextRelicForRewardFromFront(player);
 
         Assert.IsNotType<AmethystAubergine>(relic);
         Assert.IsType<AmethystAubergine>(player.RelicGrabBag.PullFromFront(RelicRarity.Common));

@@ -225,7 +225,7 @@ public readonly record struct UnknownMapPointPublicRules(
 {
     internal bool Allows(RoomType type) =>
         (type == RoomType.Event || !GoldenPathForCurrentAct && !HasActThreeLanternKey) &&
-        !(type == RoomType.Monster && HasJuzuBracelet) &&
+        !(type is RoomType.Monster or RoomType.Elite && HasJuzuBracelet) &&
         !(DowsingForbidsCombat && type is RoomType.Monster or RoomType.Elite) &&
         !(type == RoomType.Shop && (PreviousPointHadShop || AllChildrenAreShops));
 }

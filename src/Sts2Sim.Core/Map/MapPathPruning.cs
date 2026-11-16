@@ -46,7 +46,8 @@ public static class MapPathPruning
         Rng rng,
         Func<MapPointType, MapPoint, bool> isValidPointType)
     {
-        int current = map.GetAllMapPoints().Count(p => p.PointType == type);
+        // v0.113.1: only modifiable points count toward the existing total (#941).
+        int current = map.GetAllMapPoints().Count(p => p.PointType == type && p.CanBeModified);
         int deficit = targetCount - current;
         if (deficit <= 0)
         {
@@ -58,6 +59,16 @@ public static class MapPathPruning
             .Where(p => p.PointType == MapPointType.Monster && p.CanBeModified)
             .ToList();
         candidates.StableShuffle(rng);
+        if (type != MapPointType.Unknown)
+        {
+            // v0.113.1: Unknown rooms are a second, separately shuffled candidate pool,
+            // consumed after the Monster pool on the same rng (#941).
+            List<MapPoint> unknownCandidates = map.GetAllMapPoints()
+                .Where(p => p.PointType == MapPointType.Unknown && p.CanBeModified)
+                .ToList();
+            unknownCandidates.StableShuffle(rng);
+            candidates.AddRange(unknownCandidates);
+        }
 
         foreach (MapPoint candidate in candidates)
         {

@@ -99,7 +99,9 @@ public sealed class JackOfAllTradesNoEligibleTests : IDisposable
         Assert.Empty(player.PlayerCombatState!.Hand.Cards.OfType<JackTestCard>());
         Assert.Empty(player.PlayerCombatState.DiscardPile.Cards);
         Assert.Contains(jack, player.PlayerCombatState.ExhaustPile.Cards);
-        Assert.Equal(0, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // v0.113.1（#946）：TakeRandom 无论候选池大小（含空池/单张）都先从父流取 1 次
+        // NextUnsignedLong 派生子 Rng，原版无空池守卫，因此父流固定前进 1 次（旧版 0 次）。
+        Assert.Equal(1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 
     private static IEnumerable<Type> BaseModelTypes() =>
@@ -158,7 +160,9 @@ public sealed class JackOfAllTradesOneEligibleTests : IDisposable
         Assert.Same(player.PlayerCombatState.Hand, generated.Pile);
         Assert.Empty(player.PlayerCombatState.DiscardPile.Cards);
         Assert.Contains(jack, player.PlayerCombatState.ExhaustPile.Cards);
-        Assert.Equal(0, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // v0.113.1（#946）：TakeRandom 无论候选池大小（含空池/单张）都先从父流取 1 次
+        // NextUnsignedLong 派生子 Rng，原版无空池守卫，因此父流固定前进 1 次（旧版 0 次）。
+        Assert.Equal(1, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 
     private static TCard AddToHand<TCard>(Player player)

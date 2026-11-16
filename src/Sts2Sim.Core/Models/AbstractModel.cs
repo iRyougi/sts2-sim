@@ -19,9 +19,10 @@ namespace Sts2Sim.Core.Models;
 /// </summary>
 public abstract class AbstractModel : IComparable<AbstractModel>
 {
-    // v0.111.0's only global keyword override is sealed HexPower, which requires Hexed.
-    // Observe concrete types at construction (including unregistered models). Once another
-    // override exists, never re-enable this shortcut: old instances may outlive ModelDb reset.
+    // v0.113.1's global keyword overrides are sealed HexPower (requires Hexed) and sealed
+    // PhantomBladesPower (requires the Shiv tag, #922). Observe concrete types at construction
+    // (including unregistered models). Once another override exists, never re-enable this
+    // shortcut: old instances may outlive ModelDb reset.
     // This is type capability metadata, not a cache of combat state or hook results.
     private static int _hasOtherGlobalKeywordModifier;
     internal static bool GlobalKeywordsRequireHexed => Volatile.Read(ref _hasOtherGlobalKeywordModifier) == 0;
@@ -64,6 +65,7 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         }
         Id = ModelDb.GetId(type);
         if (GlobalKeywordsRequireHexed && type != typeof(Powers.HexPower) &&
+            type != typeof(Powers.PhantomBladesPower) &&
             type.GetMethod(nameof(TryModifyKeywordsInCombat), [typeof(CardModel), typeof(ISet<CardKeyword>)])!
                 .DeclaringType != typeof(AbstractModel))
         {

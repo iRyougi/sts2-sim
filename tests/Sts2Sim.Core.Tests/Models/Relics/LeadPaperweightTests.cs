@@ -26,7 +26,7 @@ public sealed class LeadPaperweightTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
-    [Theory]
+    [Theory(Skip = "v0.111 native capture; v0.113.1 child-RNG shuffle (#946) requires #930 recertification")]
     [InlineData("367ZPGQGPUEH", 10, "CARD.SEEKER_STRIKE", "CARD.STRATAGEM")]
     [InlineData("ANG5LBQQNZ9B", 10, "CARD.THINKING_AHEAD", "CARD.SHOCKWAVE")]
     [InlineData("U66QY28XY3JN", 0, "CARD.SECRET_TECHNIQUE", "CARD.PANIC_BUTTON")]
@@ -71,7 +71,7 @@ public sealed class LeadPaperweightTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Skip = "v0.111 native capture; v0.113.1 child-RNG shuffle (#946) requires #930 recertification")]
     public async Task ArchivedR8P62QK7DEDJ_NeowLeadPaperweightAddsChosenThinkingAhead()
     {
         // Archive F1: LeadPaperweight chosen, ThinkingAhead gained, FlashOfSteel unpicked.

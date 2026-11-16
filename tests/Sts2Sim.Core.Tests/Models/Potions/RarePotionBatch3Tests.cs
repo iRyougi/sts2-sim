@@ -84,8 +84,9 @@ public sealed class RarePotionBatch3Tests : IDisposable
         room.Engine.State.RunState.Rng.MockRng(RunRngType.CombatCardGeneration, generationSeed);
         int rngBefore = room.Engine.State.RunState.Rng.CombatCardGeneration.Counter;
 
-        // 原版对每种类型各调一次 GetDistinctForCombat(..., 1, rng)：整池 UnstableShuffle 后取第一张，
-        // 每次消耗"候选数 - 1"个随机数。期望值用独立的 Fisher–Yates 镜像算，不经过被测的工厂。
+        // 原版对每种类型各调一次 GetDistinctForCombat(..., 1, rng)：整池 UnstableShuffle 后取第一张。
+        // v0.113.1（#946）：父流每次只消耗一次 NextUnsignedLong 派生子 Rng，Fisher–Yates 走子 Rng。
+        // 期望值用独立的镜像算，不经过被测的工厂。
         var mirror = new Rng(generationSeed);
         var expectedIds = new List<ModelId>();
         int expectedDraws = 0;
@@ -95,12 +96,13 @@ public sealed class RarePotionBatch3Tests : IDisposable
                     player.Character.CardPool.GetUnlockedCards(player.UnlockState, isMultiplayer: false)
                         .Where(card => card.Type == type))
                 .ToList();
+            var child = new Rng(mirror.NextUnsignedLong());
+            expectedDraws++;
             for (int n = pool.Count; n > 1;)
             {
                 n--;
-                int k = mirror.NextInt(n + 1);
+                int k = child.NextInt(n + 1);
                 (pool[k], pool[n]) = (pool[n], pool[k]);
-                expectedDraws++;
             }
             expectedIds.Add(pool[0].Id);
         }

@@ -289,7 +289,7 @@ public sealed class AncientRelicBatch1Tests : IDisposable
     }
 
     [Fact]
-    public async Task NewLeaf_TransformsFirstEligibleDeckCardUsingNicheRng()
+    public async Task NewLeaf_TransformsFirstEligibleDeckCardUsingTransformationsRng()
     {
         (RunState runState, Player player) = CreateRun("new-leaf");
         CardModel[] deckBefore = player.Deck.Cards.ToArray();
@@ -308,16 +308,16 @@ public sealed class AncientRelicBatch1Tests : IDisposable
         Assert.NotEqual(original.Id, replacement.Id);
         Assert.Same(player, replacement.Owner);
         Assert.Same(player.Deck, replacement.Pile);
-        Assert.Equal(nicheCounterBefore + 1, runState.Rng.Niche.Counter);
+        Assert.Equal(nicheCounterBefore, runState.Rng.Niche.Counter);
         Assert.Equal(rewardsCounterBefore, player.PlayerRng.Rewards.Counter);
-        Assert.Equal(transformationsCounterBefore, player.PlayerRng.Transformations.Counter);
+        Assert.Equal(transformationsCounterBefore + 1, player.PlayerRng.Transformations.Counter);
         NewLeaf relic = Assert.Single(player.Relics.OfType<NewLeaf>());
         Assert.Equal(RelicRarity.Ancient, relic.Rarity);
         Assert.True(relic.HasUponPickupEffect);
     }
 
     [Fact]
-    public async Task NewLeaf_WhenNoTransformableCardExists_LeavesDeckAndNicheRngUntouched()
+    public async Task NewLeaf_WhenNoTransformableCardExists_LeavesDeckAndTransformationsRngUntouched()
     {
         (RunState runState, Player player) = CreateRun("new-leaf-empty");
         foreach (CardModel card in player.Deck.Cards.ToArray())
@@ -327,12 +327,12 @@ public sealed class AncientRelicBatch1Tests : IDisposable
         CardModel greed = Assert.Single(await CardPileCmd.AddCursesToDeck(
             new[] { ModelDb.Card<Greed>() },
             player));
-        int nicheCounterBefore = runState.Rng.Niche.Counter;
+        int transformationsCounterBefore = player.PlayerRng.Transformations.Counter;
 
         await RelicCmd.Obtain(ModelDb.Relic<NewLeaf>(), player);
 
         Assert.Same(greed, Assert.Single(player.Deck.Cards));
-        Assert.Equal(nicheCounterBefore, runState.Rng.Niche.Counter);
+        Assert.Equal(transformationsCounterBefore, player.PlayerRng.Transformations.Counter);
     }
 
     [Fact]

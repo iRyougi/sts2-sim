@@ -2,6 +2,7 @@ using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Tests.Runs;
 
@@ -26,7 +27,7 @@ public class RelicGrabBagBackDrawTests : IDisposable
         const ulong shuffleSeed = 7u;
         List<RelicModel> pool = ModelDb.All<RelicModel>().ToList();
         List<RelicModel> expectedOrder = pool.Where(relic => relic.Rarity == RelicRarity.Common).ToList();
-        new Rng(shuffleSeed).Shuffle(expectedOrder);
+        expectedOrder.UnstableShuffle(new Rng(shuffleSeed));
         var bag = new RelicGrabBag(new Rng(shuffleSeed), pool);
 
         RelicModel? fromFront = bag.PullFromFront(RelicRarity.Common);

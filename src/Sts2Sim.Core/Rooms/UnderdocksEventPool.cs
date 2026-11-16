@@ -18,6 +18,6 @@ public static class UnderdocksEventPool
         typeof(TrashHeap),
         typeof(WaterfallOfObviousSecrets),
         typeof(WaterloggedScriptorium),
-        // v0.113.1 appends WuppyInTrouble here; it is owned by #928 (偏离登记 #927 暂缺项).
+        typeof(WuppyInTrouble), // v0.113.1 appended (#928)
     });
 }

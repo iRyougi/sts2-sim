@@ -135,7 +135,8 @@ public class CardPileCmdTests
         const ulong seed = 20260925;
 
         List<CardModel> mirror = input.OrderBy(card => card.Id).ThenBy(card => card.CurrentUpgradeLevel).ToList();
-        var mirrorRng = new Rng(seed);
+        // v0.113.1（#946）：洗牌先从父流取一次 NextUnsignedLong 派生子 Rng，Fisher-Yates 在子 Rng 上做。
+        var mirrorRng = new Rng(new Rng(seed).NextUnsignedLong());
         for (int n = mirror.Count - 1; n > 0; n--)
         {
             int k = mirrorRng.NextInt(n + 1);

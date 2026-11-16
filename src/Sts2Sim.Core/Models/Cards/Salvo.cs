@@ -4,10 +4,10 @@ using Sts2Sim.Core.Models.Powers;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>12伤害,1层"保留手牌"。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.Salvo</c>）。</summary>
+/// <summary>10伤害,1层"保留手牌"。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.Salvo</c>）。</summary>
 public sealed class Salvo : CardModel, ICardDamageVariableProvider
 {
-    private decimal _damage = 12m;
+    private decimal _damage = 10m;
 
     public bool TryGetThrashDamageVariable(out decimal amount)
     {

@@ -13,7 +13,7 @@ public sealed class LargeCapsule : RelicModel
     {
         for (int i = 0; i < 2; i++)
         {
-            RelicModel relic = RelicFactory.PullNextRelicFromFront(Owner);
+            RelicModel relic = RelicFactory.PullNextRelicForRewardFromFront(Owner);
             await RelicCmd.Obtain(relic, Owner);
         }
 

@@ -218,14 +218,7 @@ public sealed class PlayerCombatState(Player player)
     {
         foreach (CardModel card in AllPiles.SelectMany(pile => pile.Cards))
         {
-            card.ClearTemporaryFreeThisTurn();
-            card.ClearTemporaryRetainThisTurn();
-            card.ClearTemporarySlyThisTurn();
-            card.ClearTemporaryCostOverrideThisTurn();
-            card.ClearTemporaryCostOverrideThisTurnOrUntilPlayed();
-            card.ClearTemporaryStarCostOverrideThisTurn();
-            card.ClearEnergyCostThisTurn();
-            card.ExhaustOnNextPlay = false;
+            card.EndOfTurnCleanup();
         }
 
         StarsGainedThisTurn = 0m;

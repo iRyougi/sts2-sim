@@ -88,7 +88,6 @@ public sealed class V01131RngMigrationTests : IDisposable
             await ancient.Enter(run);
         }
 
-        int upgradeCount = player.Deck.Cards.Count(card => card.IsUpgradable);
         int draws = effect switch
         {
             "EntropicBrew" or "DelicateFrond" => 2 * player.MaxPotionCount,
@@ -96,16 +95,14 @@ public sealed class V01131RngMigrationTests : IDisposable
             "PhialHolster" => 4,
             "DistinguishedCape" => 2,
             "FishingRod" or "NeowsBonesCurse" => 1,
-            "Whetstone" => player.Deck.Cards.Count(card => card.IsUpgradable && card.Type == CardType.Attack) - 1,
-            "WarPaint" => player.Deck.Cards.Count(card => card.IsUpgradable && card.Type == CardType.Skill) - 1,
-            "RoyalStamp" => player.Deck.Cards.Count(ModelDb.GetById<RoyallyApproved>(ModelDb.GetId<RoyallyApproved>()).CanEnchant) - 1,
-            "BeautifulBracelet" => player.Deck.Cards.Count(ModelDb.GetById<Swift>(ModelDb.GetId<Swift>()).CanEnchant) - 1,
-            "Kaleidoscope" => 2 * (player.UnlockState.CharacterCardPools.Count(pool => pool.GetType() != player.Character.CardPool.GetType()) - 1),
-            "NeowsBones" => ((AncientEventModel)((EventRoom)run.CurrentRoom!).Event).AllPossibleOptions.Count(relic => relic is not NeowsBones && relic.IsAllowedAtNeow(run)) - 1,
-            "BeatDown" or "Uproar" => 2,
-            "Catastrophe" => 3,
+            // v0.113.1（#946）：每次 UnstableShuffle / StableShuffle / TakeRandom 只从父流取一次
+            // NextUnsignedLong 派生子 Rng，与候选数无关；下列值是各效果的洗牌调用次数。
+            "Whetstone" or "WarPaint" or "RoyalStamp" or "BeautifulBracelet" or "NeowsBones" => 1,
+            "Kaleidoscope" => 2,
+            "BeatDown" or "Uproar" => 1,
+            "Catastrophe" => 2,
             "StampedePower" or "EntropyPower" or "ThievingHopper" => 1,
-            _ => upgradeCount - 1,
+            _ => 1, // FragrantMushroom / SandCastle / WarHammer：各一次 StableShuffle
         };
         int rewardsBefore = player.PlayerRng.Rewards.Counter;
         Rng rewardOracle = player.PlayerRng.Rewards.CloneExact();

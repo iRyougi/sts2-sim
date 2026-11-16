@@ -154,7 +154,7 @@ public sealed class NeowTests : IDisposable
         {
             Assert.DoesNotContain(nameof(LavaRock), snapshot.OptionKeys);
             Assert.DoesNotContain(nameof(SmallCapsule), snapshot.OptionKeys);
-            Assert.Equal(17, snapshot.RngCounter);
+            Assert.Equal(4, snapshot.RngCounter);
         });
 
         AssertPairedBranchHasExclusiveOutcomes(snapshots, nameof(LavaRock), nameof(SmallCapsule));
@@ -208,12 +208,12 @@ public sealed class NeowTests : IDisposable
         return runState;
     }
 
+    // v0.113.1 (#946): curse NextItem (1) + paired-branch NextBool draws (2, or 3 unless LargeCapsule)
+    // + one parent draw for the positive-pool UnstableShuffle, independent of the pool size.
     private static int ExpectedRngCounter(string curseName) => curseName switch
     {
-        nameof(CursedPearl) or nameof(HeftyTablet) or nameof(LeafyPoultice) or
-            nameof(PrecariousShears) => 18,
-        nameof(NeowsSacrifice) or nameof(LargeCapsule) => 17,
-        _ => 19,
+        nameof(LargeCapsule) => 4,
+        _ => 5,
     };
 
     private static void AssertExcluded(

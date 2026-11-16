@@ -29,7 +29,7 @@ public sealed class ThisOrThat : EventModel
 
     private async Task Ornate()
     {
-        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner), Owner);
+        await RelicCmd.Obtain(RelicFactory.PullNextRelicFromFront(Owner, Rng), Owner);
         await CardPileCmd.AddCursesToDeck([ModelDb.Card<Clumsy>()], Owner);
         Finish();
     }

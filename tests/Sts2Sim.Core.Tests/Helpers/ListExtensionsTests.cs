@@ -5,16 +5,29 @@ namespace Sts2Sim.Core.Tests.Helpers;
 
 public class ListExtensionsTests
 {
+    /// <summary>
+    /// v0.113.1（#946）：父流只取一次 NextUnsignedLong 派生子 Rng，Fisher-Yates 全部用子 Rng。
+    /// 期望值按原版 ListExtensions.UnstableShuffle 逐行手写。
+    /// </summary>
     [Fact]
-    public void UnstableShuffle_MatchesRngShuffle_ForSameSeed()
+    public void UnstableShuffle_DerivesChildRngFromOneParentDraw()
     {
-        var listA = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
-        var listB = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
+        var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
+        var oracleParent = new Rng(42UL);
+        var child = new Rng(oracleParent.NextUnsignedLong());
+        for (int num = expected.Count - 1; num > 0; num--)
+        {
+            int num2 = child.NextInt(num + 1);
+            (expected[num], expected[num2]) = (expected[num2], expected[num]);
+        }
 
-        new Rng(42UL).Shuffle(listA);
-        listB.UnstableShuffle(new Rng(42UL));
+        var parent = new Rng(42UL);
+        var actual = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
+        actual.UnstableShuffle(parent);
 
-        Assert.Equal(listA, listB);
+        Assert.Equal(expected, actual);
+        Assert.Equal(1, parent.Counter);
+        Assert.Equal(oracleParent.NextInt(1_000_000), parent.NextInt(1_000_000));
     }
 
     [Fact]

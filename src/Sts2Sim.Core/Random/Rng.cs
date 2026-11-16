@@ -485,25 +485,6 @@ public class Rng
         return fallback;
     }
 
-    /// <summary>
-    /// Shuffles a list in place using the Fisher-Yates algorithm.
-    /// </summary>
-    /// <param name="list">The list to shuffle.</param>
-    /// <typeparam name="T">Type of items in the list.</typeparam>
-    public void Shuffle<T>(IList<T> list)
-    {
-        for (int num = list.Count - 1; num > 0; num--)
-        {
-            int num2 = NextInt(num + 1);
-            int index = num;
-            int index2 = num2;
-            T value = list[num2];
-            T value2 = list[num];
-            list[index] = value;
-            list[index2] = value2;
-        }
-    }
-
     public SerializableRng ToSerializable()
     {
         SerializableRng serializableRng = new SerializableRng

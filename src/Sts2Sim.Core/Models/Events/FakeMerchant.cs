@@ -10,6 +10,7 @@ using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Events;
 
@@ -78,7 +79,7 @@ public sealed class FakeMerchant : EventModel
             ModelDb.Relic<FakeHappyFlower>(), ModelDb.Relic<FakeLeesWaffle>(), ModelDb.Relic<FakeMango>(),
             ModelDb.Relic<FakeOrichalcum>(), ModelDb.Relic<FakeSneckoEye>(),
             ModelDb.Relic<FakeStrikeDummy>(), ModelDb.Relic<FakeVenerableTeaSet>()];
-        Rng.Shuffle(relics);
+        relics.UnstableShuffle(Rng);
         // Event-room stock does not use the normal merchant-room price hooks.
         var entries = relics.Take(6).Select(r => new MerchantRelicEntry((RelicModel)r.MutableClone(),
             (int)Math.Round(r.MerchantCost * Owner.PlayerRng.Shops.NextFloat(0.85f, 1.15f))));

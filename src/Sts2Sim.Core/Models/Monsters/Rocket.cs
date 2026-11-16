@@ -11,33 +11,41 @@ public sealed class Rocket : MonsterModel
 {
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 209, 199);
     public override int MaxInitialHp => MinInitialHp;
-    private int ReticleDamage => Ascension(AscensionLevel.DeadlyEnemies, 4, 3);
-    private int BeamDamage => Ascension(AscensionLevel.DeadlyEnemies, 20, 18);
+    private int CalculatingDamage => Ascension(AscensionLevel.DeadlyEnemies, 4, 3);
+    private int PreciseSmashDamage => Ascension(AscensionLevel.DeadlyEnemies, 20, 18);
     private int ChargeStrength => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
-    private int LaserDamage => Ascension(AscensionLevel.DeadlyEnemies, 35, 31);
+    private int RocketClawDamage => Ascension(AscensionLevel.DeadlyEnemies, 35, 31);
 
     public override async Task AfterAddedToRoom()
     {
-        await PowerCmd.Apply<BackAttackRightPower>(Creature.CombatState!, Creature, 1m, Creature, null);
-        await PowerCmd.Apply<CrabRagePower>(Creature.CombatState!, Creature, 1m, Creature, null);
+        await base.AfterAddedToRoom();
         foreach (Creature player in Creature.CombatState!.Allies)
             await PowerCmd.Apply<SurroundedPower>(Creature.CombatState!, player, 1m, Creature, null);
+        await PowerCmd.Apply<BackAttackRightPower>(Creature.CombatState!, Creature, 1m, Creature, null);
+        await PowerCmd.Apply<CrabRagePower>(Creature.CombatState!, Creature, 1m, Creature, null);
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
-        var reticle = new MoveState("TARGETING_RETICLE_MOVE", _ => DamageCmd.Attack(ReticleDamage).FromMonster(this).Execute(), new SingleAttackIntent(ReticleDamage));
-        var beam = new MoveState("PRECISION_BEAM_MOVE", _ => DamageCmd.Attack(BeamDamage).FromMonster(this).Execute(), new SingleAttackIntent(BeamDamage));
+        var calculating = new MoveState("CALCULATING_MOVE", _ => DamageCmd.Attack(CalculatingDamage).FromMonster(this).Execute(), new SingleAttackIntent(CalculatingDamage));
+        var preciseSmash = new MoveState("PRECISE_SMASH_MOVE", PreciseSmashMove, new SingleAttackIntent(PreciseSmashDamage));
+        // v0.113.1 registers a second PRECISE_SMASH state that no follow-up reaches in the normal cycle.
+        var preciseSmash2 = new MoveState("PRECISE_SMASH_MOVE_2", PreciseSmashMove, new SingleAttackIntent(PreciseSmashDamage));
         var charge = new MoveState("CHARGE_UP_MOVE", _ => PowerCmd.Apply<StrengthPower>(Creature.CombatState!, Creature, ChargeStrength, Creature, null), new BuffIntent());
-        var laser = new MoveState("LASER_MOVE", _ => DamageCmd.Attack(LaserDamage).FromMonster(this).Execute(), new SingleAttackIntent(LaserDamage));
+        var rocketClaw = new MoveState("ROCKET_CLAW_MOVE", _ => DamageCmd.Attack(RocketClawDamage).FromMonster(this).Execute(), new SingleAttackIntent(RocketClawDamage));
         var recharge = new MoveState("RECHARGE_MOVE", _ => Task.CompletedTask, new SleepIntent());
-        reticle.FollowUpState = beam;
-        beam.FollowUpState = charge;
-        charge.FollowUpState = laser;
-        laser.FollowUpState = recharge;
-        recharge.FollowUpState = reticle;
-        return new MonsterMoveStateMachine([reticle, beam, charge, laser, recharge], reticle);
+        calculating.FollowUpState = preciseSmash;
+        preciseSmash.FollowUpState = charge;
+        charge.FollowUpState = rocketClaw;
+        rocketClaw.FollowUpState = recharge;
+        recharge.FollowUpState = calculating;
+        return new MonsterMoveStateMachine(
+            [calculating, preciseSmash, preciseSmash2, charge, rocketClaw, recharge],
+            calculating);
     }
+
+    private Task PreciseSmashMove(IReadOnlyList<Creature> targets) =>
+        DamageCmd.Attack(PreciseSmashDamage).FromMonster(this).Execute();
 
     private int Ascension(AscensionLevel level, int high, int low) =>
         Creature?.CombatState?.RunState.Ascension.GetValueIfAscension(level, high, low) ?? low;

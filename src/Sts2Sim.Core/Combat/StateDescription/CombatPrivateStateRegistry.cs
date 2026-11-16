@@ -10,8 +10,10 @@ internal static class CombatPrivateStateRegistry
 {
     private static readonly HashSet<string> ContributorFields =
     [
-        "VelvetChoker._cardsPlayedThisTurn", "DustyTome._ancientCard",
+        "DustyTome._ancientCard",
         "Girya._timesLifted", "LastingCandy._combatRewardsSeen",
+        // v0.113.1 pets (#928): native [SavedProperty] counters/HP that drive rest-site options and pet HP.
+        "Byrdpip._swoopsPlayed", "Wuppy._currentHp", "Wuppy._maxHp", "Wuppy._currentHpSet",
         "Momentum._extraDamage",
         "CacophonyPower._cardsLeft", "TheScythe._increasedDamage",
         "Fetch._finishedRound", "Fetch._finishedSide", "Fetch._finishedTurnNumbers",
@@ -71,8 +73,7 @@ internal static class CombatPrivateStateRegistry
         "SpoilsMap.<SpoilsActIndex>k__BackingField", "SpoilsMap.<SpoilsCoord>k__BackingField",
         "Guilty._combatsCompleted", "TheHunt._pendingCardRewards", "ThrummingHatchet._playedOnTurnNumber",
         "MadScience.<Rider>k__BackingField",
-        "NightmarePower._hasSelectedCard", "NightmarePower._selectedCardId",
-        "NightmarePower._selectedCardUpgradeLevel",
+        "NightmarePower._selectedCard",
         "HardenedShellPower._damageReceivedThisTurn", "HeistPower.<Target>k__BackingField",
         "SkittishPower._hasGainedBlockThisTurn", "SmoggyPower._skillCardPlayStartedThisTurn",
         "ThieveryPower._goldStolen", "ThieveryPower.<Target>k__BackingField",
@@ -103,7 +104,7 @@ internal static class CombatPrivateStateRegistry
         "DemonTongue._triggeredThisTurn", "RedSkull._strengthApplied", "RuinedHelmet._usedThisCombat",
         "CrimsonMantlePower._selfDamage", "DarkEmbracePower._etherealExhausts",
         "HellraiserPower._infiniteAutoPlaysThisTurn", "InfernoPower._selfDamage",
-        "JugglingPower._attacksPlayedThisTurn", "RupturePower._pendingStrength",
+        "JugglingPower._attacksPlayedThisTurn", "JugglingPower._cardToClone", "RupturePower._pendingStrength",
         "Rampage._damage", "Thrash._damage",
         "Metronome._orbsChanneled", "FeralPower._zeroCostAttacksPlayed",
         "ImitationLearningPower._playerTarget", "ImitationLearningPower._pending",
@@ -171,6 +172,8 @@ internal static class CombatPrivateStateRegistry
 
     private static readonly HashSet<string> DerivedFields =
     [
+        // #928: Wuppy.CombatWuppy is the owner's Wuppy pet creature, already fingerprinted as a combat ally.
+        "Wuppy._combatWuppy",
         "Queen._burnBrightForMeState", "Queen._enragedState",
         "Alignment.<Spec>k__BackingField",
         "Arsenal.<Spec>k__BackingField",
@@ -296,6 +299,8 @@ internal static class CombatPrivateStateRegistry
         // v0.113.1 event/colorless card literals (#927), fixed by model ID and upgrade level.
         "DingyDagger._damage", "MightyShield._block", "MightyWeapon._damage",
         "MyShinies._damage", "MyShinies._goldPerHit",
+        // v0.113.1 GodByrd literal (#928), fixed by model ID and upgrade level.
+        "GodByrd._damage",
         "TheBomb._damage", "ThinkingAhead._draw", "ThrummingHatchet._damage",
         "ToricToughness._block", "Venerate._starsGranted", "MadScience._type",
         "PhantasmalGardener.<CurrentScale>k__BackingField",
@@ -305,7 +310,7 @@ internal static class CombatPrivateStateRegistry
         "Breakthrough._damage", "Bully._damagePerVulnerable", "BurningPact._cards", "Cinder._damage",
         "Colossus._block", "Conflagration._repeats", "CrimsonMantle._block", "Cruelty._bonusPercent",
         "DefendIronclad._block", "DemonForm._strengthPerTurn", "Dismantle._damage", "Dominate._vulnerable",
-        "DrumOfBattle._energy", "EvilEye._block", "ExpectAFight._baseBlock", "ExpectAFight._blockPerStrength",
+        "DrumOfBattle._energy", "EvilEye._block", "ExpectAFight._block",
         "Feed._damage", "Feed._maxHp", "FeelNoPain._blockPerExhaust", "FiendFire._damage",
         "FightMe._damage", "FightMe._strength", "FlameBarrier._block", "FlameBarrier._damageBack",
         "ForgottenRitual._energy", "GiantRock._damage", "Headbutt._damage", "Hemokinesis._damage",

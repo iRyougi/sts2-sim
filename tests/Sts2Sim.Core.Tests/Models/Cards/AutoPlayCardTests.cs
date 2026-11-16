@@ -110,7 +110,8 @@ public sealed class AutoPlayCardTests : IDisposable
         Assert.Equal(hpBefore - 12, enemy.CurrentHp);
         Assert.Equal(blockBefore + 5, player.Creature.Block);
         Assert.Equal(targetsBefore + 4, player.RunState.Rng.CombatTargets.Counter);
-        Assert.Equal(shuffleBefore + 1, player.RunState.Rng.CombatCardSelection.Counter);
+        // v0.113.1（#946）：两次 StableShuffle 各让父流前进 1 次（含单张候选那次；旧版 1+0）。
+        Assert.Equal(shuffleBefore + 2, player.RunState.Rng.CombatCardSelection.Counter);
         Assert.Equal(includeUnplayableCard ? 1 : 0, player.PlayerCombatState.DrawPile.Cards.Count);
         if (unplayable is not null)
         {
@@ -138,7 +139,8 @@ public sealed class AutoPlayCardTests : IDisposable
         foreach (CardModel c in player.PlayerCombatState!.DrawPile.Cards.ToList())
             CardPileCmd.Add(c, PileType.Discard);
 
-        // CombatCardSelection seed 8 selects Ricochet first from this two-card list.
+        // v0.111 旧洗牌下 CombatCardSelection 种子 8 先选 Ricochet；v0.113.1（#946）子 Rng 洗牌下
+        // 同一种子在 {Ricochet, TheBomb} 中先选 TheBomb（不换种子，按新版重算）。
         player.RunState.Rng.MockRng(RunRngType.CombatCardSelection, 8uL);
         AddTo<Ricochet>(player, PileType.Draw);
         TheBomb bomb = AddTo<TheBomb>(player, PileType.Draw);
@@ -157,14 +159,33 @@ public sealed class AutoPlayCardTests : IDisposable
 
         Assert.True(room.Engine.IsEnding);
         Assert.True(enemy.IsDead);
-        Assert.Equal(2, player.PlayerCombatState.DrawPile.Cards.Count);
-        Assert.Contains(bomb, player.PlayerCombatState.DrawPile.Cards);
+        // unplayable=false：TheBomb 先被自动打出，Ricochet 再击杀，抽牌堆只剩 fallback；
+        // unplayable=true：只有 Ricochet 可选，击杀后 TheBomb 与 fallback 留在抽牌堆。
+        Assert.Equal(unplayable ? 2 : 1, player.PlayerCombatState.DrawPile.Cards.Count);
+        if (unplayable)
+        {
+            Assert.Contains(bomb, player.PlayerCombatState.DrawPile.Cards);
+            Assert.Null(player.Creature.GetPower<TheBombPower>());
+        }
+        else
+        {
+            Assert.DoesNotContain(bomb, player.PlayerCombatState.DrawPile.Cards);
+            Assert.NotNull(player.Creature.GetPower<TheBombPower>());
+        }
         Assert.Contains(fallback, player.PlayerCombatState.DrawPile.Cards);
-        Assert.Null(player.Creature.GetPower<TheBombPower>());
-        Assert.Equal(playsBefore + 2, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(playsBefore + (unplayable ? 2 : 3), player.PlayerCombatState.CardsPlayedThisTurn);
         Assert.Equal(energyBefore - 2, player.PlayerCombatState.Energy);
         // Native Catastrophe still selects on later iterations before AutoPlay refuses.
-        Assert.Equal(shuffleBefore + (upgraded && unplayable ? 2 : 1),
+        // v0.113.1（#946）：每次 StableShuffle（含空列表、单张列表）父流都前进 1 次。
+        // 逐轮：可出候选洗牌 1 次；可出候选为空时再加 fallback 整堆洗牌 1 次。
+        int expectedShuffles = (upgraded, unplayable) switch
+        {
+            (false, false) => 2, // {Ricochet,Bomb}、{Ricochet}
+            (true, false) => 4,  // 再加第 3 轮：{} + fallback {StrikeRegent}
+            (false, true) => 3,  // {Ricochet}；第 2 轮 {} + fallback {Bomb,StrikeRegent}
+            (true, true) => 5,   // 第 3 轮再 {} + fallback
+        };
+        Assert.Equal(shuffleBefore + expectedShuffles,
             player.RunState.Rng.CombatCardSelection.Counter);
     }
 
@@ -195,9 +216,12 @@ public sealed class AutoPlayCardTests : IDisposable
 
         await card.PlayAsync(target: null);
 
-        Assert.Equal(hpBefore - 27, enemy.CurrentHp); // 原生：Clash 14 + Neutralize 3 + Dash 10。
-        Assert.Equal(blockBefore + 10, player.Creature.Block); // Dash 必须被自动打出。
-        Assert.Equal(shuffleBefore + 3, player.RunState.Rng.CombatCardSelection.Counter);
+        // v0.113.1（#946）：mock 种子 8 在子 Rng 洗牌下取前三张为 StrikeRegent、Clash、Neutralize（Dash 落在第四位，
+        // 不换种子，按新版重算）：StrikeRegent 6 + Clash 14 + Neutralize 3。
+        Assert.Equal(hpBefore - 23, enemy.CurrentHp);
+        Assert.Equal(blockBefore, player.Creature.Block); // Dash 未被选中，不获得格挡。
+        // 整表洗牌父流只前进 1 次（旧版 n-1=3 次）。
+        Assert.Equal(shuffleBefore + 1, player.RunState.Rng.CombatCardSelection.Counter);
         Assert.Equal(7, player.PlayerCombatState.Energy);
         if (unplayable is not null)
             Assert.Contains(unplayable, player.PlayerCombatState.DiscardPile.Cards);

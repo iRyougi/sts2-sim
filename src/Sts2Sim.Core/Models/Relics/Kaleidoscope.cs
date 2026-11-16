@@ -4,6 +4,7 @@ using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Models.CardPools;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Relics;
 
@@ -46,7 +47,7 @@ public sealed class Kaleidoscope : RelicModel
             .Where(pool => pool.GetType() != Owner.Character.CardPool.GetType())
             .OrderBy(pool => ModelDb.GetEntry(pool.GetType()), StringComparer.Ordinal)
             .ToList();
-        Owner.PlayerRng.NonCombatGeneration.Shuffle(pools);
+        pools.UnstableShuffle(Owner.PlayerRng.NonCombatGeneration);
 
         var options = new List<CardModel>();
         foreach (CardPoolModel pool in pools.Take(3))

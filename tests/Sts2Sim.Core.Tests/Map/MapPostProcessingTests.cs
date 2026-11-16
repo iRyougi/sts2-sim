@@ -95,7 +95,7 @@ public class MapPostProcessingTests
     /// 同一种子算出的列号是 {0,3,4,6}——图连接关系相同，但列号对不上。这个测试直接走生产构造路径
     /// （RunState -&gt; StandardActMap.CreateFor 的等价路径），锁定修复后的结果与真实游戏一致。
     /// </summary>
-    [Fact]
+    [Fact(Skip = "v0.111 native capture; v0.113.1 child-RNG shuffle (#946) requires #930 recertification")]
     public void RunState_Seed_QVCMPZ1BVD08_Floor2ColumnsMatchRealGame()
     {
         var runState = new RunState("QVCMPZ1BVD08", new Overgrowth());
