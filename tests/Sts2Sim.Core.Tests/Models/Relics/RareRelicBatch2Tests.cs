@@ -130,6 +130,17 @@ public sealed class RareRelicBatch2Tests : IDisposable
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Equal(starsBefore + 1, player.PlayerCombatState!.Stars);
+
+        // #1002: the star is granted in the player's AfterSideTurnEnd, before CombatManager.SwitchSides
+        // increments TurnNumber, so the original's StarsModifiedEntry.HappenedThisTurn excludes it from the
+        // extra turn that follows.
+        await PowerCmd.Apply<ExtraTurnPower>(
+            room.Engine.State, player.Creature, 1m, player.Creature, cardSource: null);
+        await room.Engine.EndPlayerTurnAsync();
+
+        Assert.True(room.Engine.State.IsPlayerExtraTurn);
+        Assert.Equal(starsBefore + 2, player.PlayerCombatState.Stars);
+        Assert.Equal(0m, player.PlayerCombatState.StarsGainedThisTurn);
     }
 
     [Fact]

@@ -302,6 +302,15 @@ public sealed class PlayerCombatState
             card.EndOfTurnCleanup();
         }
 
+        ResetTurnCounters();
+    }
+
+    /// <summary>清零本回合计数。这些计数对应原版 <c>CombatHistoryEntry.HappenedThisTurn</c>（同时比对
+    /// RoundNumber、CurrentSide 与各玩家 TurnNumber）的查询。原版额外回合在 <c>CombatManager.SwitchSides</c>
+    /// 递增玩家 TurnNumber，所以额外回合同样从零计数；换边之前（AfterSideTurnEnd 等）记下的事件归属刚结束的回合。
+    /// 因此 <see cref="Combat.CombatEngine"/> 在每次换边时再清一次（#1002）。</summary>
+    internal void ResetTurnCounters()
+    {
         StarsGainedThisTurn = 0m;
         SkillCardsPlayedThisTurn = 0;
         AttackCardsPlayedThisTurn = 0;

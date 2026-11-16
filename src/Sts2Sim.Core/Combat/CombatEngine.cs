@@ -359,6 +359,7 @@ public sealed class CombatEngine
             // Deviation #157: the simulator is currently single-player, so the source snapshot of
             // extra-turn players is represented by this one selected player. Consumption still occurs
             // before the extra turn starts, matching CombatManager's authoritative sequencing.
+            ResetPlayerTurnCountersAtSideSwitch();
             await Hook.AfterTakingExtraTurn(State, extraTurnPlayer, extraTurnSource!);
             foreach (Player p in State.Players)
                 p.PlayerCombatState!.ResetMelodyTurnCounters();
@@ -372,6 +373,7 @@ public sealed class CombatEngine
         foreach (Player p in State.Players)
             p.PlayerCombatState!.ResetMelodyTurnCounters();
         State.IsPlayerExtraTurn = false;
+        ResetPlayerTurnCountersAtSideSwitch();
         State.CurrentSide = CombatSide.Enemy;
         NotifySideSwitch();
         _observer?.EnemyTurnStarting(State);
@@ -636,6 +638,7 @@ public sealed class CombatEngine
         }
 
         _observer?.PlayerTurnEnded(State);
+        ResetPlayerTurnCountersAtSideSwitch();
         State.CurrentSide = CombatSide.Player;
         State.RoundNumber++;
         NotifySideSwitch();
@@ -644,6 +647,19 @@ public sealed class CombatEngine
 
     /// <summary><c>CombatManager.SwitchSides</c> 末尾对全体生物调用 <c>OnSideSwitch</c>：清掉怪物的
     /// <c>SpawnedThisTurn</c>（玩家侧的实现为空）。开局怪物也带着这个标记，第一次换边后才会行动。</summary>
+    /// <summary>原版 <c>CombatManager.SwitchSides</c> 改 CurrentSide / RoundNumber / 玩家 TurnNumber 的时点，
+    /// 即 <c>CombatHistoryEntry.HappenedThisTurn</c> 翻转的时点（#1002）。FlushPlayerHand 里的
+    /// EndOfTurnCleanup 已清过一次；此后到换边之间（AfterSideTurnEnd，例如 LunarPastry 给星）记下的事件在原版
+    /// 属于刚结束的回合，不能带进下一回合（含额外回合）。额外回合也要清：原版只递增该玩家 TurnNumber，
+    /// 但所有历史条目都快照了 TurnNumber，因此上一回合条目同样失效。</summary>
+    private void ResetPlayerTurnCountersAtSideSwitch()
+    {
+        foreach (Player player in State.Players)
+        {
+            player.PlayerCombatState!.ResetTurnCounters();
+        }
+    }
+
     private void NotifySideSwitch()
     {
         foreach (Creature creature in State.Allies.Concat(State.Enemies).ToList())

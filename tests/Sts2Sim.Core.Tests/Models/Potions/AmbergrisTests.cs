@@ -82,6 +82,11 @@ public sealed class AmbergrisTests : IDisposable
         Assert.Empty(player.Creature.Powers.OfType<ExtraTurnPower>());
         Assert.Equal(5, player.Creature.Block);
         Assert.Equal(1, Assert.Single(player.Creature.Powers.OfType<ToricToughnessPower>()).Amount);
+        // #1002: SwitchSides increments TurnNumber for the extra turn, and HappenedThisTurn compares it,
+        // so the previous turn's plays are not "this turn" in the original either.
+        Assert.Equal(0, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(0, player.PlayerCombatState.SkillCardsPlayedThisTurn);
+        Assert.Equal(0, player.PlayerCombatState.CardPlaysStartedThisTurn);
 
         await room.Engine.EndPlayerTurnAsync();
 
