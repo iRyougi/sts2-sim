@@ -6,9 +6,9 @@ using Sts2Sim.Core.Models.Powers;
 namespace Sts2Sim.Core.Tests.Models.Powers;
 
 [Collection("ModelDb")]
-public sealed class AmbergrisPowerTests : IDisposable
+public sealed class ExtraTurnPowerTests : IDisposable
 {
-    public AmbergrisPowerTests()
+    public ExtraTurnPowerTests()
     {
         ModelDb.ResetForTests();
         ModelDb.Init(ContentRegistry.AllTypes);
@@ -19,7 +19,7 @@ public sealed class AmbergrisPowerTests : IDisposable
     [Fact]
     public void Metadata_IsBuffCounter()
     {
-        AmbergrisPower power = ModelDb.Power<AmbergrisPower>();
+        ExtraTurnPower power = ModelDb.Power<ExtraTurnPower>();
 
         Assert.Equal(PowerType.Buff, power.Type);
         Assert.Equal(PowerStackType.Counter, power.StackType);

@@ -32,11 +32,14 @@ public sealed class PaelsEye : RelicModel
         CombatSide side,
         IEnumerable<Creature> participants)
     {
+        bool suppressedByEarring = Owner.PlayerCombatState?.TurnNumber == 1 &&
+            Owner.Relics.Any(relic => relic is WhisperingEarring);
         _eligibleForExtraTurn =
             !_usedThisCombat &&
             _wasOwnerPartOfLastPlayerTurn &&
             side == CombatSide.Player &&
             participants.Contains(Owner.Creature) &&
+            !suppressedByEarring &&
             Owner.PlayerCombatState?.ManualCardsPlayedThisTurn == 0;
         if (!_eligibleForExtraTurn)
         {
@@ -50,7 +53,7 @@ public sealed class PaelsEye : RelicModel
         }
     }
 
-    public override bool ShouldTakeExtraTurn(Player player) =>
+    public override bool ShouldTakeExtraTurnEarly(Player player) =>
         player == Owner && !_usedThisCombat && _eligibleForExtraTurn;
 
     public override Task AfterTakingExtraTurn(Player player)

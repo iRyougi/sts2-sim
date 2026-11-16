@@ -724,17 +724,35 @@ public static class Hook
         }
     }
 
-    public static bool ShouldTakeExtraTurn(ICombatState combatState, Player player)
+    public static bool ShouldTakeExtraTurn(ICombatState combatState, Player player, out AbstractModel? source)
     {
-        return IterateCombatHookListeners(combatState)
-            .Any(model => IsEligibleHookListener(model) && model.ShouldTakeExtraTurn(player));
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            if (IsEligibleHookListener(model) && model.ShouldTakeExtraTurnEarly(player))
+            {
+                source = model;
+                return true;
+            }
+        }
+
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            if (IsEligibleHookListener(model) && model.ShouldTakeExtraTurn(player))
+            {
+                source = model;
+                return true;
+            }
+        }
+
+        source = null;
+        return false;
     }
 
-    public static async Task AfterTakingExtraTurn(ICombatState combatState, Player player)
+    public static async Task AfterTakingExtraTurn(ICombatState combatState, Player player, AbstractModel source)
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
         {
-            if (!IsEligibleHookListener(model)) continue;
+            if (!IsEligibleHookListener(model) || !ReferenceEquals(model, source)) continue;
             await model.AfterTakingExtraTurn(player);
             model.InvokeExecutionFinished();
         }

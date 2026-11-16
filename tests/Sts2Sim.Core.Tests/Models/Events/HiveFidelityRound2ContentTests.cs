@@ -141,7 +141,7 @@ public sealed class HiveFidelityRound2ContentTests : IDisposable
 
         Assert.Equal(2, player.PlayerCombatState.TurnNumber);
         Assert.True(player.PlayerCombatState.ExhaustPile.Cards.Count >= initialHand);
-        Assert.False(Hook.ShouldTakeExtraTurn(first.Engine.State, player));
+        Assert.False(Hook.ShouldTakeExtraTurn(first.Engine.State, player, out _));
         await first.Exit(run);
 
         CombatRoom second = await EnterCombat(run);
@@ -164,6 +164,18 @@ public sealed class HiveFidelityRound2ContentTests : IDisposable
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Contains(marker, player.PlayerCombatState!.ExhaustPile.Cards);
+
+        (RunState earringRun, Player earringPlayer) = CreateRun("paels-eye-earring-turn1");
+        await RelicCmd.Obtain(ModelDb.Relic<WhisperingEarring>(), earringPlayer);
+        await RelicCmd.Obtain(ModelDb.Relic<PaelsEye>(), earringPlayer);
+        CombatRoom earringRoom = await EnterCombat(earringRun);
+        DefendRegent earringMarker = AddToHand<DefendRegent>(earringPlayer);
+
+        await earringRoom.Engine.EndPlayerTurnAsync();
+
+        Assert.Contains(earringMarker, earringPlayer.PlayerCombatState!.DiscardPile.Cards);
+        Assert.Equal(2, earringRoom.Engine.State.RoundNumber);
+        Assert.Equal(2, earringPlayer.PlayerCombatState.TurnNumber);
     }
 
     [Fact]
@@ -184,7 +196,7 @@ public sealed class HiveFidelityRound2ContentTests : IDisposable
             room.Engine.State, CombatSide.Player, [player.Creature]);
 
         Assert.Contains(marker, player.PlayerCombatState.Hand.Cards);
-        Assert.False(Hook.ShouldTakeExtraTurn(room.Engine.State, player));
+        Assert.False(Hook.ShouldTakeExtraTurn(room.Engine.State, player, out _));
     }
 
     [Fact]
@@ -201,7 +213,7 @@ public sealed class HiveFidelityRound2ContentTests : IDisposable
             room.Engine.State, CombatSide.Player, [player.Creature]);
 
         Assert.Contains(marker, player.PlayerCombatState!.Hand.Cards);
-        Assert.False(Hook.ShouldTakeExtraTurn(room.Engine.State, player));
+        Assert.False(Hook.ShouldTakeExtraTurn(room.Engine.State, player, out _));
     }
 
     [Theory]

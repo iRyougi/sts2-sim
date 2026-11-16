@@ -51,7 +51,6 @@ The following can be met in a single-player run but are missing or incomplete:
 
 - The victory event after the final boss (TheArchitect) is not modelled; the simulator declares the win when the final boss dies.
 - **The new character Fool is not ported yet** (cards, relics, potions, the arrow and melody mechanics); it is planned for v0.113.1.1. Other characters can still obtain Fool cards through cross-colour sources such as Kaleidoscope, PrismaticGem, Splash, Orobas and ColorfulPhilosophers; when one of these triggers, the simulator draws only from the existing characters' pools, so the rest of the run will differ from the game.
-- The two-phase extra-turn source selection of v0.113.1 (PaelsEye first, the Ambergris power renamed to ExtraTurnPower, only one of them consumed) is not ported yet and still follows v0.111.0; it only differs from the game when both conditions hold in the same turn.
 
 Multiplayer-only content, and content that exists in the game but cannot be obtained, is out of scope.
 

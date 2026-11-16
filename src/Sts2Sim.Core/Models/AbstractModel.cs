@@ -806,6 +806,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
 
     public virtual Task AfterStarsSpent(int amount, Player spender) => Task.CompletedTask;
 
+    public virtual bool ShouldTakeExtraTurnEarly(Player player) => false;
+
     public virtual bool ShouldTakeExtraTurn(Player player) => false;
 
     public virtual Task AfterTakingExtraTurn(Player player) => Task.CompletedTask;

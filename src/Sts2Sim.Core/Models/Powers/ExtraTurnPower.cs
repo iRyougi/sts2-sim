@@ -6,9 +6,9 @@ namespace Sts2Sim.Core.Models.Powers;
 
 /// <summary>
 /// Deviation #157: extra-turn scheduling targets the simulator's single-player combat model;
-/// multiplayer subset scheduling and the source game's hidden-power UI are omitted.
+/// multiplayer subset scheduling is omitted (in v0.113.1, ExtraTurnPower replaces hidden AmbergrisPower and is visible).
 /// </summary>
-public sealed class AmbergrisPower : PowerModel
+public sealed class ExtraTurnPower : PowerModel
 {
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;

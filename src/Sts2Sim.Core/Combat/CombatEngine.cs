@@ -343,14 +343,23 @@ public sealed class CombatEngine
 
         await Hook.AfterSideTurnEnd(State, CombatSide.Player, State.Allies);
 
-        Player? extraTurnPlayer = State.Players.FirstOrDefault(player =>
-            player.Creature.IsAlive && Hook.ShouldTakeExtraTurn(State, player));
+        Player? extraTurnPlayer = null;
+        AbstractModel? extraTurnSource = null;
+        foreach (Player player in State.Players)
+        {
+            if (player.Creature.IsAlive && Hook.ShouldTakeExtraTurn(State, player, out AbstractModel? candidateSource))
+            {
+                extraTurnPlayer = player;
+                extraTurnSource = candidateSource;
+                break;
+            }
+        }
         if (extraTurnPlayer is not null)
         {
             // Deviation #157: the simulator is currently single-player, so the source snapshot of
             // extra-turn players is represented by this one selected player. Consumption still occurs
             // before the extra turn starts, matching CombatManager's authoritative sequencing.
-            await Hook.AfterTakingExtraTurn(State, extraTurnPlayer);
+            await Hook.AfterTakingExtraTurn(State, extraTurnPlayer, extraTurnSource!);
             _observer?.PlayerTurnEnded(State);
             State.CurrentSide = CombatSide.Player;
             NotifySideSwitch();

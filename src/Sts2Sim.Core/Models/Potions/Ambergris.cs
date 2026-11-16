@@ -21,7 +21,7 @@ public sealed class Ambergris : PotionModel
             combatState.IsLiveCombat() &&
             combatState.ContainsCreature(target))
         {
-            await PowerCmd.Apply<AmbergrisPower>(
+            await PowerCmd.Apply<ExtraTurnPower>(
                 combatState,
                 target,
                 1m,

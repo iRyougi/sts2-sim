@@ -51,7 +51,6 @@
 
 - 第三幕 Boss 之后的胜利事件（TheArchitect）未建模，模拟器在击败最终 Boss 时直接判定胜利。
 - **新角色 Fool 尚未移植**（卡牌、遗物、药水、箭矢与旋律机制），计划随 v0.113.1.1 上线。注意：其他角色也能通过 Kaleidoscope、PrismaticGem、Splash、Orobas、ColorfulPhilosophers 等跨色入口拿到 Fool 的牌；触发这些入口时，模拟器只从既有角色卡池中抽取，之后的对局会与游戏不同。
-- 额外回合的两阶段选源（v0.113.1：PaelsEye 优先，Ambergris 能力改名为 ExtraTurnPower，且两者只消耗一个）尚未移植，仍是 v0.111.0 的做法；只有同一回合两者条件同时满足时才会与游戏不同。
 
 多人模式专用的内容，以及游戏里存在但没有任何途径获得的内容，不在移植范围内。
 
