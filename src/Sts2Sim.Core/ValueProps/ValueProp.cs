@@ -11,6 +11,7 @@ public enum ValueProp
     Unpowered = 4,
     Move = 8,
     SkipHurtAnim = 0x10,
+    FromArrow = 0x20,
 }
 
 public static class ValuePropExtensions

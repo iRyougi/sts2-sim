@@ -72,7 +72,9 @@ public sealed class ToughEgg : MonsterModel
             await PowerCmd.Remove(hatchPower);
         }
 
-        foreach (PowerModel power in Creature.Powers.Where(power => power is not MinionPower).ToList())
+        foreach (PowerModel power in Creature.Powers
+                     .Where(power => power is not MinionPower and not ImpaledPower)
+                     .ToList())
         {
             await PowerCmd.Remove(power);
         }

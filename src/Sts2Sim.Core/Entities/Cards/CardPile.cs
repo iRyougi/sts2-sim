@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Helpers;
@@ -35,6 +36,17 @@ public sealed class CardPile(PileType type)
             _cards.Insert(index, card);
         }
         card.AssignPileInternal(this);
+
+        if (Type is not (PileType.None or PileType.Deck) &&
+            card.Owner is { PlayerCombatState: { } pcs } owner &&
+            owner.Creature.CombatState is { } combatState &&
+            combatState.IsLiveCombat() &&
+            card.Tags.Contains(CardTag.Shoot) &&
+            owner.Character.BaseArrowSlotCount == 0 &&
+            pcs.Arrows.Count == 0)
+        {
+            ArrowCmd.GainArrowSlot(owner);
+        }
     }
 
     public void RemoveInternal(CardModel card)

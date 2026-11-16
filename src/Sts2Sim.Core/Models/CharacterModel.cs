@@ -21,6 +21,8 @@ public abstract class CharacterModel : AbstractModel
 
     public virtual int BaseOrbSlotCount => 0;
 
+    public virtual int BaseArrowSlotCount => 0;
+
     public override bool ShouldReceiveCombatHooks => false;
 
     /// <summary>起始牌组的卡类型列表。</summary>

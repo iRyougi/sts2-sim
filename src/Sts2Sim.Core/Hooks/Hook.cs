@@ -2,10 +2,12 @@ using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands.Builders;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.FoolArrows;
 using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Afflictions;
+using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
@@ -1473,6 +1475,48 @@ public static class Hook
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCardExhausted(card, causedByEthereal);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task AfterArrowDislodged(
+        ICombatState combatState,
+        ImpaledPower power,
+        ArrowSlot arrow,
+        CardModel? source)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            await model.AfterArrowDislodged(power, arrow, source);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task AfterArrowImpaled(
+        ICombatState combatState,
+        ImpaledPower power,
+        ArrowSlot arrow,
+        CardModel? source)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            await model.AfterArrowImpaled(power, arrow, source);
+            model.InvokeExecutionFinished();
+        }
+    }
+
+    public static async Task AfterArrowShot(
+        ICombatState combatState,
+        Player owner,
+        ArrowSlot? arrow,
+        CardModel? source)
+    {
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState).ToArray())
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            await model.AfterArrowShot(owner, arrow, source);
             model.InvokeExecutionFinished();
         }
     }

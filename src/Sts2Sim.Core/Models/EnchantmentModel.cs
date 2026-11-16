@@ -37,6 +37,8 @@ public abstract class EnchantmentModel : AbstractModel, ICombatStateDescriptionC
 
     public virtual bool ShouldStartAtBottomOfDrawPile => false;
 
+    public virtual bool GainsBlock => false;
+
     public void AssignMagnitude(decimal magnitude)
     {
         AssertMutable();

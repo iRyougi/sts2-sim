@@ -305,14 +305,19 @@ public static class CreatureCmd
     }
 
     /// <summary>Removes a living creature from combat without running the death lifecycle.</summary>
-    public static Task Escape(Creature creature)
+    public static async Task Escape(Creature creature)
     {
         ArgumentNullException.ThrowIfNull(creature);
         ICombatState? combatState = creature.CombatState;
         if (creature.IsDead || combatState is null || !combatState.IsLiveCombat() ||
             !combatState.ContainsCreature(creature))
         {
-            return Task.CompletedTask;
+            return;
+        }
+
+        foreach (Models.Powers.ImpaledPower impaled in creature.Powers.OfType<Models.Powers.ImpaledPower>().ToList())
+        {
+            await impaled.DislodgeAllArrows(null);
         }
 
         foreach (PowerModel power in creature.Powers.ToArray())
@@ -321,7 +326,6 @@ public static class CreatureCmd
         }
 
         combatState.CreatureEscaped(creature);
-        return Task.CompletedTask;
     }
 
     /// <summary>Applies run-level damage outside combat through the normal damage hook phases.</summary>

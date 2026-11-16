@@ -111,6 +111,9 @@ internal static class CombatPrivateStateRegistry
         "Claw._damage", "Claw._increase",
         "GeneticAlgorithm._currentBlock", "GeneticAlgorithm._increasedBlock",
         "GeneticAlgorithm._increase",
+        // #929 G1: Fool arrow/shot state
+        "ImpaledPower._arrowSources", "ImpaledPower._hitCounter",
+        "TheShot._cardsExhaustedByFlorescence",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =
@@ -168,6 +171,8 @@ internal static class CombatPrivateStateRegistry
         "SerpentFormPower._amountsForPlayedCards",
         "StormPower._amountsForPlayedCards", "SubroutinePower._amountsForPlayedCards",
         "SoulboundPower._isAddingSoul",
+        "AimPower._commandToModify", "AimPower._amountWhenAttackStarted",
+        "StretchPower._cardPlay", "StretchPower._amountWhenCardStarted", "StretchPower._gaveBonusBlock",
     ];
 
     private static readonly HashSet<string> DerivedFields =
@@ -351,6 +356,8 @@ internal static class CombatPrivateStateRegistry
         "StrikeDefect._damage", "Sunder._damage", "Supercritical._energy", "SweepingBeam._damage",
         "Synchronize._focusPerDistinctOrb", "Synthesis._damage", "TeslaCoil._damage", "Thunder._power",
         "Turbo._energy", "Uproar._damage",
+        // Fool G1 card literals, fixed by model ID and upgrade level.
+        "StrikeFool._damage", "DefendFool._block", "FoolishShot._damage", "Joy._energy", "TheShot._extraDamage",
     ];
 
     public static bool TryGetClassification(

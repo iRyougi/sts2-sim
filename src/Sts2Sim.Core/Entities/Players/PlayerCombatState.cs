@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.FoolArrows;
 using Sts2Sim.Core.Entities.Orbs;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Models;
@@ -9,8 +10,21 @@ namespace Sts2Sim.Core.Entities.Players;
 
 /// <summary>玩家的战斗期状态：能量/星愿/回合阶段/牌堆/宠物/充能球。
 /// 偏离：Stars 无回合重置逻辑（对照真实源码核实，只由 GainStars/LoseStars 显式增减）。</summary>
-public sealed class PlayerCombatState(Player player)
+public sealed class PlayerCombatState
 {
+    private readonly Player _player;
+    private readonly List<ArrowSlot> _arrows = new();
+
+    public PlayerCombatState(Player player)
+    {
+        _player = player;
+        OrbQueue = NewOrbQueue(player);
+        for (int i = 0; i < player.Character.BaseArrowSlotCount; i++)
+        {
+            GainArrow();
+        }
+    }
+
     private static OrbQueue NewOrbQueue(Player owner)
     {
         var queue = new OrbQueue(owner);
@@ -19,7 +33,26 @@ public sealed class PlayerCombatState(Player player)
         return queue;
     }
 
-    public OrbQueue OrbQueue { get; private set; } = NewOrbQueue(player);
+    public OrbQueue OrbQueue { get; private set; }
+
+    public IReadOnlyList<ArrowSlot> Arrows => _arrows;
+
+    public int AvailableArrowCount => _arrows.Count(arrow => arrow.IsAvailable);
+
+    public void GainArrow() => _arrows.Add(new ArrowSlot(_player));
+
+    internal void ReplaceClonedArrows(IEnumerable<ArrowSlot> sourceArrows)
+    {
+        _arrows.Clear();
+        foreach (ArrowSlot source in sourceArrows)
+        {
+            _arrows.Add(new ArrowSlot(_player)
+            {
+                Status = source.Status,
+                DestroyAfterImpaled = source.DestroyAfterImpaled,
+            });
+        }
+    }
 
     private readonly List<Creature> _pets = new();
 
@@ -32,7 +65,7 @@ public sealed class PlayerCombatState(Player player)
     public int Stars { get; private set; }
 
     /// <summary>逐字移植：经 Hook.ModifyMaxEnergy 折叠玩家的基础 MaxEnergy。</summary>
-    public int MaxEnergy => (int)Hook.ModifyMaxEnergy(player.Creature.CombatState!, player, player.MaxEnergy);
+    public int MaxEnergy => (int)Hook.ModifyMaxEnergy(_player.Creature.CombatState!, _player, _player.MaxEnergy);
 
     public PlayerTurnPhase Phase { get; set; }
 
@@ -116,14 +149,34 @@ public sealed class PlayerCombatState(Player player)
     /// <summary>Card starts with PlayIndex zero; replay continuations do not count.</summary>
     public int FirstInSeriesCardPlaysStartedThisTurn { get; private set; }
 
+    /// <summary>本回合首个开始打出对应旋律标签时的 PlayOrdinal（0 表示尚未打出）。</summary>
+    public int FirstWahPlayOrdinalThisTurn { get; private set; }
+    public int FirstChoPlayOrdinalThisTurn { get; private set; }
+    public int FirstKiPlayOrdinalThisTurn { get; private set; }
+
+    /// <summary>本回合已完成的含对应旋律标签出牌次数（含自动出牌与重放）。</summary>
+    public int WahFinishedThisTurn { get; private set; }
+    public int ChoFinishedThisTurn { get; private set; }
+    public int KiFinishedThisTurn { get; private set; }
+    public int MelodyCardsFinishedThisTurn { get; private set; }
+
     internal void RecordCardPlayStarted(CardPlay cardPlay)
     {
         CardType type = cardPlay.Card.Type;
         RecordCardPlayStarted(type);
         if (type == CardType.Attack && cardPlay.Resources.EnergyValue == 0)
             ZeroCostAttacksStartedThisTurn++;
-        if (cardPlay.IsFirstInSeries && ReferenceEquals(cardPlay.Card.Owner, player))
+        if (cardPlay.IsFirstInSeries && ReferenceEquals(cardPlay.Card.Owner, _player))
             FirstInSeriesCardPlaysStartedThisTurn++;
+        if (ReferenceEquals(cardPlay.Player, _player))
+        {
+            if (FirstWahPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Wah))
+                FirstWahPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            if (FirstChoPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Cho))
+                FirstChoPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            if (FirstKiPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Ki))
+                FirstKiPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+        }
     }
 
     // Existing synthetic fixtures record only the card type; live plays use the CardPlay overload.
@@ -160,6 +213,14 @@ public sealed class PlayerCombatState(Player player)
         {
             ShivsPlayedThisTurn++;
         }
+
+        bool hasWah = card.Tags.Contains(CardTag.Wah);
+        bool hasCho = card.Tags.Contains(CardTag.Cho);
+        bool hasKi = card.Tags.Contains(CardTag.Ki);
+        if (hasWah) WahFinishedThisTurn++;
+        if (hasCho) ChoFinishedThisTurn++;
+        if (hasKi) KiFinishedThisTurn++;
+        if (hasWah || hasCho || hasKi) MelodyCardsFinishedThisTurn++;
     }
 
     public void RecordCardGenerated() => CardsGeneratedThisCombat++;
@@ -188,9 +249,9 @@ public sealed class PlayerCombatState(Player player)
             return;
         }
 
-        if (!ReferenceEquals(pet.PetOwner, player))
+        if (!ReferenceEquals(pet.PetOwner, _player))
         {
-            pet.PetOwner = player;
+            pet.PetOwner = _player;
         }
         pet.Died += OnPetDied;
         _pets.Add(pet);
@@ -235,6 +296,18 @@ public sealed class PlayerCombatState(Player player)
         CardPlaysStartedThisTurn = 0;
     }
 
+    /// <summary>在 <c>AfterSideTurnEnd</c> 派发之后、换边或进入下一回合前清零本回合旋律统计，保证回合结束钩子可见。</summary>
+    internal void ResetMelodyTurnCounters()
+    {
+        FirstWahPlayOrdinalThisTurn = 0;
+        FirstChoPlayOrdinalThisTurn = 0;
+        FirstKiPlayOrdinalThisTurn = 0;
+        WahFinishedThisTurn = 0;
+        ChoFinishedThisTurn = 0;
+        KiFinishedThisTurn = 0;
+        MelodyCardsFinishedThisTurn = 0;
+    }
+
     internal PlayerCombatState CloneForCombat(
         Player clonedPlayer,
         IDictionary<CardModel, CardModel> cardMap)
@@ -260,6 +333,13 @@ public sealed class PlayerCombatState(Player player)
             ZeroCostAttacksStartedThisTurn = ZeroCostAttacksStartedThisTurn,
             FirstInSeriesCardPlaysStartedThisTurn = FirstInSeriesCardPlaysStartedThisTurn,
             CardPlaysStartedThisTurn = CardPlaysStartedThisTurn,
+            FirstWahPlayOrdinalThisTurn = FirstWahPlayOrdinalThisTurn,
+            FirstChoPlayOrdinalThisTurn = FirstChoPlayOrdinalThisTurn,
+            FirstKiPlayOrdinalThisTurn = FirstKiPlayOrdinalThisTurn,
+            WahFinishedThisTurn = WahFinishedThisTurn,
+            ChoFinishedThisTurn = ChoFinishedThisTurn,
+            KiFinishedThisTurn = KiFinishedThisTurn,
+            MelodyCardsFinishedThisTurn = MelodyCardsFinishedThisTurn,
             OrbQueue = OrbQueue.CloneForCombat(clonedPlayer),
         };
 
@@ -273,6 +353,8 @@ public sealed class PlayerCombatState(Player player)
             }
         }
 
+        // 复制完所有战斗牌堆后再精准覆盖箭槽，防止非 Fool 角色克隆 Shoot 牌时重复追加或丢失状态。
+        clone.ReplaceClonedArrows(_arrows);
         return clone;
     }
 }

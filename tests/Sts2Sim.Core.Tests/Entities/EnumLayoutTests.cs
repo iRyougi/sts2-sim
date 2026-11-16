@@ -116,6 +116,7 @@ public class EnumLayoutTests
         Assert.Equal(4, (int)ValueProp.Unpowered);
         Assert.Equal(8, (int)ValueProp.Move);
         Assert.Equal(0x10, (int)ValueProp.SkipHurtAnim);
+        Assert.Equal(0x20, (int)ValueProp.FromArrow);
     }
 
     [Fact]

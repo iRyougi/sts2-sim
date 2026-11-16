@@ -360,6 +360,8 @@ public sealed class CombatEngine
             // extra-turn players is represented by this one selected player. Consumption still occurs
             // before the extra turn starts, matching CombatManager's authoritative sequencing.
             await Hook.AfterTakingExtraTurn(State, extraTurnPlayer, extraTurnSource!);
+            foreach (Player p in State.Players)
+                p.PlayerCombatState!.ResetMelodyTurnCounters();
             _observer?.PlayerTurnEnded(State);
             State.CurrentSide = CombatSide.Player;
             NotifySideSwitch();
@@ -367,6 +369,8 @@ public sealed class CombatEngine
             return;
         }
 
+        foreach (Player p in State.Players)
+            p.PlayerCombatState!.ResetMelodyTurnCounters();
         State.IsPlayerExtraTurn = false;
         State.CurrentSide = CombatSide.Enemy;
         NotifySideSwitch();
@@ -488,6 +492,7 @@ public sealed class CombatEngine
 
         await Hook.AfterEnergyReset(State, player);
 
+        player.PlayerCombatState!.ResetMelodyTurnCounters();
         player.PlayerCombatState!.TurnNumber++;
         await Hook.BeforeHandDraw(State, player);
         decimal handDrawCount = Hook.ModifyHandDraw(State, player, BaseHandDrawCount,

@@ -70,6 +70,7 @@ public static class ItemEffectProbe
     private static readonly ImmutableHashSet<string> ScriptedHooks =
     [
         "AfterObtained", "BeforeCombatStart", "BeforeCombatStartLate", "AfterCreatureAddedToCombat",
+        "AfterArrowShot", "AfterArrowImpaled", "AfterArrowDislodged",
         "BeforeSideTurnStart", "AfterSideTurnStart", "AfterSideTurnStartLate", "AfterPlayerTurnStartEarly",
         "AfterPlayerTurnStart", "AfterPlayerTurnStartLate", "AfterEnergyReset", "AfterEnergyResetLate",
         "ShouldPlayerResetEnergy", "ModifyMaxEnergy", "BeforeHandDraw", "ModifyHandDraw", "AfterModifyingHandDraw",

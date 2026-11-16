@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Enchantments;
 
 public sealed class Adroit : EnchantmentModel
 {
+    public override bool GainsBlock => true;
+
     public override Task OnPlay(CardModel card, CardPlay cardPlay) => CreatureCmd.GainBlock(
         card.CombatState!, card.Owner.Creature, (int)Magnitude, ValueProp.Move, card, cardPlay);
 }

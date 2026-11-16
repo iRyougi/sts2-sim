@@ -148,6 +148,12 @@ public sealed class AttackCommand
         return this;
     }
 
+    public AttackCommand FromArrow()
+    {
+        DamageProps |= ValueProp.FromArrow;
+        return this;
+    }
+
     public AttackCommand WithHitCount(int hitCount)
     {
         _hitCount = hitCount;

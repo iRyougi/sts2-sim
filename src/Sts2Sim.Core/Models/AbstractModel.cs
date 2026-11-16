@@ -149,6 +149,21 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return Task.CompletedTask;
     }
 
+    public virtual Task AfterArrowDislodged(
+        Powers.ImpaledPower power,
+        Entities.FoolArrows.ArrowSlot arrow,
+        CardModel? source) => Task.CompletedTask;
+
+    public virtual Task AfterArrowImpaled(
+        Powers.ImpaledPower power,
+        Entities.FoolArrows.ArrowSlot arrow,
+        CardModel? source) => Task.CompletedTask;
+
+    public virtual Task AfterArrowShot(
+        Player owner,
+        Entities.FoolArrows.ArrowSlot? arrow,
+        CardModel? source) => Task.CompletedTask;
+
     public virtual Task BeforeRoomEntered(Rooms.AbstractRoom room) => Task.CompletedTask;
 
     /// <summary>某个房间被进入后触发。逐字对照 <c>AbstractRoom.EnterInternal</c> 里 <c>Hook.AfterRoomEntered</c>

@@ -9,4 +9,8 @@ public enum CardTag
     Minion,
     OstyAttack,
     Shiv,
+    Wah,
+    Cho,
+    Ki,
+    Shoot,
 }

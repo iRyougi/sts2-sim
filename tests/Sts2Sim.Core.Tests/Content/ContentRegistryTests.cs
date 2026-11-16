@@ -25,13 +25,13 @@ public sealed class ContentRegistryTests : IDisposable
 
         CardModel[] cards = ModelDb.All<CardModel>().ToArray();
         // Defect adds 91 pool cards and Fuel, a generated token; Necrobinder adds 91 pool cards plus the
-        // Soul and SweepingGaze tokens.
-        Assert.Equal(600, cards.Length);
-        Assert.Equal(574, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
-        Assert.Equal(508, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        // Soul and SweepingGaze tokens; Fool G1 adds 6 starter/token/status cards (without FoolCardPool).
+        Assert.Equal(606, cards.Length);
+        Assert.Equal(577, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        Assert.Equal(511, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(66, cards.Count(card => card.IsColorless));
-        Assert.Equal(10, cards.Count(card => card.Rarity == CardRarity.Token));
-        Assert.Equal(16, cards.Count(card => card.Rarity == CardRarity.Status));
+        Assert.Equal(12, cards.Count(card => card.Rarity == CardRarity.Token));
+        Assert.Equal(17, cards.Count(card => card.Rarity == CardRarity.Status));
         Assert.IsType<Infection>(ModelDb.Card<Infection>());
         Assert.IsType<AscendersBane>(ModelDb.Card<AscendersBane>());
         Assert.IsType<Doubt>(ModelDb.Card<Doubt>());
@@ -68,8 +68,8 @@ public sealed class ContentRegistryTests : IDisposable
 
         RelicModel[] relics = ModelDb.All<RelicModel>().ToArray();
         // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, Task 3a
-        // relics, the eight Necrobinder relics, and five Orobas upgraded starters.
-        Assert.Equal(306, relics.Length);
+        // relics, the eight Necrobinder relics, five Orobas upgraded starters, and SongBow (#963).
+        Assert.Equal(307, relics.Length);
         Assert.Equal(
             145,
             relics.Count(relic =>

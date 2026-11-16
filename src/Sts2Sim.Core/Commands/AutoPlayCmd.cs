@@ -126,38 +126,41 @@ public static class AutoPlayCmd
         ICombatState combatState,
         Player player,
         int count,
-        bool forceExhaust) =>
-        FromTopOfDrawPileWithResults(combatState, player, count, forceExhaust);
+        bool forceExhaust,
+        Action<CardModel>? cardModification = null) =>
+        FromTopOfDrawPileWithResults(combatState, player, count, forceExhaust, cardModification);
 
     /// <summary>Autoplays cards and returns their resolved plays for reporting consumers.</summary>
     public static Task<IReadOnlyList<CardPlay>> FromTopOfDrawPileWithResults(
         ICombatState combatState,
         Player player,
         int count) =>
-        FromTopOfDrawPileWithResults(combatState, player, count, forceExhaust: false);
+        FromTopOfDrawPileWithResults(combatState, player, count, forceExhaust: false, cardModification: null);
 
     /// <summary>Autoplays cards and returns their resolved plays for reporting consumers.</summary>
     public static async Task<IReadOnlyList<CardPlay>> FromTopOfDrawPileWithResults(
         ICombatState combatState,
         Player player,
         int count,
-        bool forceExhaust)
+        bool forceExhaust,
+        Action<CardModel>? cardModification = null)
     {
         if (combatState is CombatState concreteState &&
             concreteState.Engine is { } engine)
         {
             return await engine.ExecuteCardActionBoundaryAsync(
-                () => FromTopOfDrawPileCore(combatState, player, count, forceExhaust));
+                () => FromTopOfDrawPileCore(combatState, player, count, forceExhaust, cardModification));
         }
 
-        return await FromTopOfDrawPileCore(combatState, player, count, forceExhaust);
+        return await FromTopOfDrawPileCore(combatState, player, count, forceExhaust, cardModification);
     }
 
     private static async Task<IReadOnlyList<CardPlay>> FromTopOfDrawPileCore(
         ICombatState combatState,
         Player player,
         int count,
-        bool forceExhaust)
+        bool forceExhaust,
+        Action<CardModel>? cardModification)
     {
         if (combatState.IsOverOrEnding()) return [];
         var cards = new List<CardModel>(count);
@@ -170,6 +173,7 @@ public static class AutoPlayCmd
                 break;
             }
 
+            cardModification?.Invoke(card);
             cards.Add(card);
             CardPileCmd.Add(card, PileType.Play);
         }

@@ -232,6 +232,19 @@ public static class CombatStateDescription
         builder.Append(combat.AttackCardsStartedThisTurn);
         builder.Append(combat.ZeroCostAttacksStartedThisTurn);
         builder.Append(combat.FirstInSeriesCardPlaysStartedThisTurn);
+        builder.Append(combat.FirstWahPlayOrdinalThisTurn);
+        builder.Append(combat.FirstChoPlayOrdinalThisTurn);
+        builder.Append(combat.FirstKiPlayOrdinalThisTurn);
+        builder.Append(combat.WahFinishedThisTurn);
+        builder.Append(combat.ChoFinishedThisTurn);
+        builder.Append(combat.KiFinishedThisTurn);
+        builder.Append(combat.MelodyCardsFinishedThisTurn);
+        builder.Append(combat.Arrows.Count);
+        foreach (var arrow in combat.Arrows)
+        {
+            builder.Append((int)arrow.Status);
+            builder.Append(arrow.DestroyAfterImpaled);
+        }
         builder.Append(combat.Pets.Count);
         foreach (Creature pet in combat.Pets)
         {
