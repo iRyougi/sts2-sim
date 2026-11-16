@@ -213,9 +213,12 @@ public sealed partial class CombatState
             {
                 if (!creatureMap.TryGetValue(source, out Creature? target))
                 {
-                    target = CloneCreature(source, targetState, runState, playerMap);
+                    CombatState? boundState = !projection
+                        ? (source.CombatState is { } bound ? states[bound] : null)
+                        : targetState;
+                    target = CloneCreature(source, boundState ?? targetState, runState, playerMap);
                     if (!projection)
-                        target.CombatState = source.CombatState is { } bound ? states[bound] : null;
+                        target.CombatState = boundState;
                     else if (detachedInProjection)
                         target.CombatState = null;
                     else if (preserveDetachedInProjection && source.CombatState is null)
@@ -290,11 +293,19 @@ public sealed partial class CombatState
         if (source.Player is { } sourcePlayer)
         {
             clone = playerMap[sourcePlayer].Creature;
+            clone.CombatId = source.CombatId;
+            clone.CombatState = combatState;
+            clone.AssignSlotName(source.SlotName);
         }
         else if (source.Monster is { } sourceMonster)
         {
             var clonedMonster = (MonsterModel)sourceMonster.MutableClone();
-            clone = new Creature(clonedMonster, source.Side);
+            clone = new Creature(clonedMonster, source.Side)
+            {
+                CombatId = source.CombatId,
+                CombatState = combatState,
+            };
+            clone.AssignSlotName(source.SlotName);
             clonedMonster.PrepareCombatCloneStateFrom(sourceMonster, clone, runState.Rng);
         }
         else
@@ -302,9 +313,6 @@ public sealed partial class CombatState
             throw new InvalidOperationException("Combat creatures must be backed by a player or monster model.");
         }
 
-        clone.CombatId = source.CombatId;
-        clone.CombatState = combatState;
-        clone.AssignSlotName(source.SlotName);
         clone.SetMaxHpInternal(source.MaxHp);
         clone.HealInternal(source.MaxHp);
         clone.LoseHpInternal(source.MaxHp - source.CurrentHp, ValueProp.Unblockable);

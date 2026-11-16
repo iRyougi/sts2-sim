@@ -64,6 +64,12 @@ public sealed class CombatStateCloneTests
             typeof(AfterimagePower),
             typeof(Accuracy),
             typeof(AccuracyPower),
+            typeof(AscendersBane),
+            typeof(BygoneEffigy),
+            typeof(MechaKnight),
+            typeof(SlowPower),
+            typeof(ArtifactPower),
+            typeof(Burn),
         });
     }
 
@@ -885,6 +891,121 @@ public sealed class CombatStateCloneTests
 
         Assert.Equal(Snapshot(control), Snapshot(searchedOriginal));
         AssertEquivalentMutableCombatFields(control, searchedOriginal);
+    }
+
+    [Theory]
+    [InlineData(typeof(BygoneEffigy), 10, new[] { "SLASHES_MOVE" }, new[] { 15 })]
+    [InlineData(typeof(MechaKnight), 10, new[] { "CHARGE_MOVE", "FLAMETHROWER_MOVE", "HEAVY_CLEAVE_MOVE" }, new[] { 30, 12, 40 })]
+    [InlineData(typeof(MechaKnight), 0, new[] { "CHARGE_MOVE", "FLAMETHROWER_MOVE", "HEAVY_CLEAVE_MOVE" }, new[] { 25, 8, 35 })]
+    public async Task Clone_MonsterMoveIntentsPreserveAscensionValues(
+        Type monsterType,
+        int ascensionLevel,
+        string[] expectedMoveIds,
+        int[] expectedDamages)
+    {
+        var runState = new RunState(
+            $"clone-asc-intent-{monsterType.Name}-{ascensionLevel}",
+            new Overgrowth(),
+            ascensionLevel);
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
+        runState.AddPlayer(player);
+        var original = new CombatState(runState);
+        Creature attached = original.AddMonster(
+            (MonsterModel)ModelDb.Get(monsterType).MutableClone(),
+            CombatSide.Enemy);
+        Creature escaped = original.AddMonster(
+            (MonsterModel)ModelDb.Get(monsterType).MutableClone(),
+            CombatSide.Enemy);
+        Creature removed = original.AddMonster(
+            (MonsterModel)ModelDb.Get(monsterType).MutableClone(),
+            CombatSide.Enemy);
+        var engine = new CombatEngine(original);
+        await engine.StartCombatAsync();
+
+        original.CreatureEscaped(escaped);
+        original.RemoveCreature(removed, unattach: true);
+        Assert.Null(escaped.CombatState);
+        Assert.Null(removed.CombatState);
+        string beforeSnapshot = Snapshot(original);
+
+        CombatState projected = original.Clone();
+
+        Assert.Same(projected, projected.Enemies[0].CombatState);
+        Assert.Null(projected.EscapedCreatures[0].CombatState);
+        Assert.Null(projected.RemovedCreatures[0].CombatState);
+        foreach (Creature creature in new[]
+                 {
+                     attached,
+                     projected.Enemies[0],
+                     projected.EscapedCreatures[0],
+                     projected.RemovedCreatures[0],
+                 })
+        {
+            AssertExpectedAttackIntents(creature, projected.PlayerCreatures);
+        }
+        if (attached.Monster!.NextMove is { } originalNext &&
+            originalNext.Intents.OfType<AttackIntent>().FirstOrDefault() is { } originalNextAttack)
+        {
+            AttackIntent projectedNextAttack = Assert.Single(
+                projected.Enemies[0].Monster!.NextMove!.Intents.OfType<AttackIntent>());
+            Assert.Equal(
+                originalNextAttack.GetSingleDamage(original.PlayerCreatures, attached),
+                projectedNextAttack.GetSingleDamage(projected.PlayerCreatures, projected.Enemies[0]));
+        }
+        Assert.Equal(beforeSnapshot, Snapshot(original));
+
+        // !projection (RunCloneContext / CloneForRun): detached source.CombatState == null monsters must also
+        // temporarily bind to targetState while rebuilding their move machine, then reset back to null.
+        var settledRun = new RunState(
+            $"clone-run-asc-{monsterType.Name}-{ascensionLevel}",
+            new Overgrowth(),
+            ascensionLevel);
+        Player settledPlayer = Player.CreateForNewRun(ModelDb.Character<Regent>(), settledRun);
+        settledRun.AddPlayer(settledPlayer);
+        settledPlayer.ResetCombatState();
+        settledPlayer.PopulateCombatState(new Rng(1));
+        var settled = new CombatState(settledRun);
+        settled.AddPlayerCreature(settledPlayer.Creature);
+        Creature settledAttached = settled.AddMonster(
+            (MonsterModel)ModelDb.Get(monsterType).MutableClone(),
+            CombatSide.Enemy);
+        Creature settledDetached = settled.AddMonster(
+            (MonsterModel)ModelDb.Get(monsterType).MutableClone(),
+            CombatSide.Enemy);
+        settledAttached.Monster!.SetUpForCombat();
+        settledDetached.Monster!.SetUpForCombat();
+        settled.RemoveCreature(settledDetached, unattach: true);
+        Assert.Null(settledDetached.CombatState);
+
+        var targetRun = new RunState(
+            $"clone-run-target-{monsterType.Name}-{ascensionLevel}",
+            new Overgrowth(),
+            ascensionLevel);
+        var cardMap = new Dictionary<CardModel, CardModel>(ReferenceEqualityComparer.Instance);
+        Player targetPlayer = settledPlayer.CloneForRun(targetRun, cardMap);
+        targetRun.AddPlayer(targetPlayer);
+        var playerMap = new Dictionary<Player, Player>(ReferenceEqualityComparer.Instance)
+        {
+            [settledPlayer] = targetPlayer,
+        };
+        var context = new CombatState.RunCloneContext(targetRun, playerMap, cardMap, [settled]);
+        CombatState runCloned = settled.CloneForRun(targetRun, playerMap, cardMap, out _, context);
+
+        Assert.Same(runCloned, runCloned.Enemies[0].CombatState);
+        Assert.Null(runCloned.RemovedCreatures[0].CombatState);
+        AssertExpectedAttackIntents(runCloned.Enemies[0], runCloned.PlayerCreatures);
+        AssertExpectedAttackIntents(runCloned.RemovedCreatures[0], runCloned.PlayerCreatures);
+
+        void AssertExpectedAttackIntents(Creature creature, IReadOnlyList<Creature> targets)
+        {
+            MonsterMoveStateMachine machine = creature.Monster!.MoveStateMachine!;
+            for (int index = 0; index < expectedMoveIds.Length; index++)
+            {
+                MoveState move = Assert.IsType<MoveState>(machine.States[expectedMoveIds[index]]);
+                AttackIntent intent = Assert.Single(move.Intents.OfType<AttackIntent>());
+                Assert.Equal(expectedDamages[index], intent.GetSingleDamage(targets, creature));
+            }
+        }
     }
 
     private static void AssertNextRngValuesMatchAndAreIndependent(
