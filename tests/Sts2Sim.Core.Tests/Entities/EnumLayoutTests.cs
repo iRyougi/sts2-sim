@@ -28,7 +28,7 @@ public class EnumLayoutTests
     [Fact]
     public void PlayerRngType_HasGameOrder()
     {
-        Assert.Equal(new[] { "Rewards", "Shops", "Transformations" }, Enum.GetNames<PlayerRngType>());
+        Assert.Equal(new[] { "Rewards", "Shops", "Transformations", "NonCombatGeneration" }, Enum.GetNames<PlayerRngType>());
     }
 
     [Fact]

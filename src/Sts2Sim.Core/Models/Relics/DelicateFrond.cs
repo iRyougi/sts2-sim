@@ -10,9 +10,11 @@ public sealed class DelicateFrond : RelicModel
 
     public override async Task BeforeCombatStart()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/DelicateFrond");
         while (Owner.PotionSlots.Contains(null))
         {
-            var potion = PotionFactory.CreateRandomOutOfCombat(Owner, Owner.RunState.Rng.CombatPotionGeneration);
+            var potion = PotionFactory.CreateRandomOutOfCombat(Owner, Owner.PlayerRng.NonCombatGeneration);
             if (potion is null || !await PotionCmd.TryToProcure(potion, Owner))
             {
                 break;

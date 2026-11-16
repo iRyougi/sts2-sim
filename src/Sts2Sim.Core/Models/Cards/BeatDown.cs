@@ -27,7 +27,7 @@ public sealed class BeatDown : CardModel
         List<CardModel> candidates = Owner.PlayerCombatState!.DiscardPile.Cards
             .Where(c => c.Type == CardType.Attack && !c.Keywords.Contains(CardKeyword.Unplayable))
             .ToList()
-            .StableShuffle(CombatState!.RunState.Rng.Shuffle);
+            .StableShuffle(CombatState!.RunState.Rng.CombatCardSelection);
 
         foreach (CardModel card in candidates.Take(_count))
         {

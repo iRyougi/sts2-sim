@@ -13,13 +13,15 @@ public sealed class DistinguishedCape : RelicModel
 
     public async override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/DistinguishedCape");
         List<CardModel> curses = CardPoolFilters.ForSinglePlayer(ModelDb.All<CardModel>())
             .Where(card => card.Rarity == CardRarity.Curse && card.CanBeGeneratedByModifiers)
             .OrderBy(card => card.Id.Entry, StringComparer.Ordinal)
             .ToList();
         for (int index = 0; index < 2 && curses.Count > 0; index++)
         {
-            CardModel canonical = Owner.RunState.Rng.Niche.NextItem(curses)
+            CardModel canonical = Owner.PlayerRng.NonCombatGeneration.NextItem(curses)
                 ?? throw new InvalidOperationException("No eligible curse is available for DistinguishedCape.");
             curses.Remove(canonical);
             var curse = (CardModel)canonical.MutableClone();

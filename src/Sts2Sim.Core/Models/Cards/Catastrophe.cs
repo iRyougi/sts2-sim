@@ -28,10 +28,10 @@ public sealed class Catastrophe : CardModel
             List<CardModel> candidates = Owner.PlayerCombatState!.DrawPile.Cards
                 .Where(c => !c.Keywords.Contains(CardKeyword.Unplayable))
                 .ToList()
-                .StableShuffle(CombatState!.RunState.Rng.Shuffle);
+                .StableShuffle(CombatState!.RunState.Rng.CombatCardSelection);
             CardModel? picked = candidates.FirstOrDefault() ?? Owner.PlayerCombatState.DrawPile.Cards
                 .ToList()
-                .StableShuffle(CombatState.RunState.Rng.Shuffle)
+                .StableShuffle(CombatState.RunState.Rng.CombatCardSelection)
                 .FirstOrDefault();
             if (picked is null)
             {

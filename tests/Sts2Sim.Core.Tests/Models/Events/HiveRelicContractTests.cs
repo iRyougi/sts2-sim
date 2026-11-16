@@ -154,11 +154,11 @@ public sealed class HiveRelicContractTests : IDisposable
     public async Task PickupRelics_ApplyPotionSlotsGoopyUpgradesAndRemovals()
     {
         (RunState run, Player player) = CreateRun("hive-pickups-role-10");
-        int potionRng = run.Rng.CombatPotionGeneration.Counter;
+        int potionRng = player.PlayerRng.NonCombatGeneration.Counter;
         await RelicCmd.Obtain(ModelDb.Relic<AlchemicalCoffer>(), player);
         Assert.Equal(Player.InitialMaxPotionSlotCount + 4, player.MaxPotionCount);
         Assert.Equal(4, player.PotionSlots.Count(potion => potion is not null));
-        Assert.Equal(8, run.Rng.CombatPotionGeneration.Counter - potionRng);
+        Assert.Equal(8, player.PlayerRng.NonCombatGeneration.Counter - potionRng);
         Assert.All(player.PotionSlots.OfType<PotionModel>(),
             potion => Assert.Contains(PotionFactory.GetOutOfCombatPool(player),
                 candidate => candidate.Id == potion.Id));

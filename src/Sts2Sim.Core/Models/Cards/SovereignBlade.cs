@@ -6,8 +6,13 @@ using Sts2Sim.Core.ValueProps;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>熔炼生成的 Token 卡；Seeking Edge 将攻击改为群体，Parry 在打出时提供格挡。</summary>
-public sealed class SovereignBlade : CardModel, ICardDamageVariableProvider
+public sealed class SovereignBlade : CardModel, ICardDamageVariableProvider, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? _damage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     public override bool GainsBlock => Owner is not null && Owner.Creature.Powers.OfType<ParryPower>().Any(power => power.Amount > 0m);
 
     private decimal _damage = 10m;

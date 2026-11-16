@@ -11,9 +11,11 @@ public sealed class RoyalStamp : RelicModel
 
     public override async Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/RoyalStamp");
         var enchantment = (RoyallyApproved)ModelDb.Get(typeof(RoyallyApproved));
         List<CardModel> eligible = Owner.Deck.Cards.Where(enchantment.CanEnchant).ToList();
-        Owner.RunState.Rng.Niche.Shuffle(eligible);
+        Owner.PlayerRng.NonCombatGeneration.Shuffle(eligible);
         CardModel? card = (await CardSelectCmd.SelectCardsAsync(
             Owner.RunState, Owner, eligible, 1, 1, this)).FirstOrDefault();
         if (card is not null)

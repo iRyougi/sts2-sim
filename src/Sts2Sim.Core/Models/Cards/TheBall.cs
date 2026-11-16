@@ -5,8 +5,13 @@ using Sts2Sim.Core.Combat.StateDescription;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-public sealed class TheBall : GeneratedCardModel
+public sealed class TheBall : GeneratedCardModel, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? _damage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private decimal _damage = 10m;
 
     public override bool TryGetThrashDamageVariable(out decimal amount)

@@ -65,7 +65,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
         {
             run.ConfigureCardSelectionSource(this);
             CardModel[] before = player.Deck.Cards.ToArray();
-            int nicheBefore = run.Rng.Niche.Counter;
+            int noncombatBefore = player.PlayerRng.NonCombatGeneration.Counter;
             await RelicCmd.Obtain(canonical, player);
             Assert.NotNull(Selection);
             int count = relicType == typeof(Kifuda) ? 3 : 1;
@@ -83,7 +83,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             });
             if (relicType == typeof(RoyalStamp))
             {
-                Assert.True(run.Rng.Niche.Counter > nicheBefore);
+                Assert.True(player.PlayerRng.NonCombatGeneration.Counter > noncombatBefore);
                 Assert.False(before.SequenceEqual(Selection.Candidates));
                 Assert.All(Selection.Candidates, card => Assert.True(card.Type is CardType.Attack or CardType.Skill));
                 Assert.True(enchanted[0].HasKeyword(CardKeyword.Innate));

@@ -15,9 +15,11 @@ public sealed class Whetstone : RelicModel
 
     public override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/Whetstone");
         IEnumerable<CardModel> selected =
             Owner.Deck.Cards.Where(card => card != null && card.Type == CardType.Attack && card.IsUpgradable)
-            .ToList().StableShuffle(Owner.RunState.Rng.Niche).Take(UpgradeCount);
+            .ToList().StableShuffle(Owner.PlayerRng.NonCombatGeneration).Take(UpgradeCount);
         foreach (CardModel card in selected)
         {
             card.Upgrade();

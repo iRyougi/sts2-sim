@@ -15,9 +15,11 @@ public sealed class WarPaint : RelicModel
 
     public override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/WarPaint");
         IEnumerable<CardModel> selected =
             Owner.Deck.Cards.Where(card => card != null && card.Type == CardType.Skill && card.IsUpgradable)
-            .ToList().StableShuffle(Owner.RunState.Rng.Niche).Take(UpgradeCount);
+            .ToList().StableShuffle(Owner.PlayerRng.NonCombatGeneration).Take(UpgradeCount);
         foreach (CardModel card in selected)
         {
             card.Upgrade();

@@ -7,8 +7,13 @@ namespace Sts2Sim.Core.Models.Cards;
 /// Deviation #156: completing Dowsing performs the gameplay transform into Abundance, but
 /// omits quest-completion history and visual bookkeeping because the simulator has no equivalent system.
 /// </summary>
-public sealed class Dowsing : CardModel
+public sealed class Dowsing : CardModel, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Rooms</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Rooms"
+        ? RoomsRemaining
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     public const int MaxRooms = 4;
     private int _unknownRoomsEntered;
 

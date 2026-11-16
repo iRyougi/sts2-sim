@@ -15,13 +15,13 @@ public sealed class StampedePower : PowerModel
         if (!ReferenceEquals(player, Owner.Player)) return;
         for (int i = 0; i < Amount; i++)
         {
-            CardModel? selected = Owner.Player!.RunState.Rng.Shuffle.NextItem(
+            CardModel? selected = Owner.Player!.RunState.Rng.CombatCardSelection.NextItem(
                 Owner.Player.PlayerCombatState!.Hand.Cards
                     .Where(card => card.Type == CardType.Attack &&
                                    !card.Keywords.Contains(CardKeyword.Unplayable))
                     .ToList());
             // Native CardCmd.AutoPlay checks the ending/death gate only after the
-            // Shuffle-stream selection has already happened in this loop.
+            // CombatCardSelection-stream selection has already happened in this loop.
             if (selected is not null &&
                 !Owner.CombatState!.IsOverOrEnding() && !Owner.IsDead)
                 await AutoPlayCmd.FromCards(Owner.CombatState!, player, [selected]);

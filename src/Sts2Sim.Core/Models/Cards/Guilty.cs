@@ -2,8 +2,13 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-public sealed class Guilty : CardModel
+public sealed class Guilty : CardModel, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Combats</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Combats"
+        ? 5m - _combatsCompleted
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private int _combatsCompleted;
 
     public override CardType Type => CardType.Curse;

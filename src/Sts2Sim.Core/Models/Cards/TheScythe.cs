@@ -7,8 +7,13 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>原版 <c>TheScythe</c>：2 费、消耗，造成 13 + 累计增幅 的伤害；打出后本牌与其牌组原件的
 /// 增幅都加 5（升级 7，取打出这张的数值）。原版把 <c>CurrentDamage</c>/<c>IncreasedDamage</c> 存档，
 /// 这里只保留增幅，伤害恒为 13 + 增幅（与原版 UpdateDamage/AfterDowngraded 的结果一致）。</summary>
-public sealed class TheScythe : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
+public sealed class TheScythe : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? CurrentDamage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private const int BaseDamage = 13;
 
     // 跨战斗累积：战斗副本通过 MutableClone 继承牌组原件的值，打出时两边同时增加。

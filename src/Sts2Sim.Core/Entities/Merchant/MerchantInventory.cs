@@ -65,9 +65,11 @@ public sealed class MerchantInventory
         using IDisposable rngScope = player.PlayerRng.BeginSemanticScope(
             $"{player.CurrentSemanticLocationKey}/merchant/phase=initial_inventory");
         Rng shopRng = player.PlayerRng.Shops;
-        List<MerchantCardEntry> cards = GenerateCardEntries(player, shopRng);
+        // v0.113.1 constructs lazy card entries but eagerly fills relic/potion entries.
+        // Setup populates cards only after those shelves, then chooses the sale.
         List<MerchantRelicEntry> relics = GenerateRelicEntries(player, shopRng);
         List<MerchantPotionEntry> potions = GeneratePotionEntries(player, shopRng);
+        List<MerchantCardEntry> cards = GenerateCardEntries(player, shopRng);
         var cardRemoval = new MerchantCardRemovalEntry(
             MerchantCardRemovalEntry.PriceFor(player.RunState.Ascension, player.CardRemovalsUsed),
             player);
@@ -77,15 +79,10 @@ public sealed class MerchantInventory
     public static MerchantInventory CreateForEvent(Player player, IEnumerable<MerchantRelicEntry> relics) =>
         new(player, [], relics.ToList(), [], new MerchantCardRemovalEntry(int.MaxValue, player));
 
-    /// <summary>Plan06a 偏离 #80（无色卡槽位缺失）/#81（角色卡槽位候选通常为0）已在 Plan06b 铺开
-    /// 91 张角色卡 + 65 张无色卡后解决——本类头部注释里的"five character-card slots and two
-    /// colorless-card slots"就是解决后的结果，见 Plan06b 文档"完成情况"小节。这条注释说明的是解决后仍保留的
-    /// 一个独立 RNG 消耗顺序细节：折扣槽位索引在生成任何卡牌之前抽取（逐字复刻真实游戏
-    /// <c>MerchantInventory.PopulateCharacterCardEntries</c> 的消耗顺序：先 <c>NextInt</c> 选槽位，
-    /// 再逐槽生成，命中槽位额外多消耗一次 <c>NextFloat</c> 重算价格），而不是先生成完全部价格再选槽位打折。</summary>
+    /// <summary>Native v0.113.1 Setup populates every card and its ordinary price,
+    /// then chooses a character slot and recalculates its sale price with a new draw.</summary>
     private static List<MerchantCardEntry> GenerateCardEntries(Player player, Rng shopRng)
     {
-        int discountIndex = shopRng.NextInt(CardSlotTypes.Length);
         var used = new HashSet<ModelId>();
         var entries = new List<MerchantCardEntry>();
         for (int i = 0; i < CardSlotTypes.Length; i++)
@@ -93,7 +90,7 @@ public sealed class MerchantInventory
             CardType type = CardSlotTypes[i];
             CardRarity rolledRarity = player.Odds.CardRarity.RollWithoutChangingFutureOdds(
                 CardRarityOddsType.Shop,
-                player.PlayerRng.Rewards);
+                player.PlayerRng.Shops);
             List<CardModel> candidates = CharacterMerchantCandidates(player, type, rolledRarity, used);
             CardModel? picked = shopRng.NextItem(candidates);
             if (picked is null)
@@ -105,14 +102,10 @@ public sealed class MerchantInventory
             CardModel card = CreateMerchantCard(picked, player);
             int basePrice = CardBasePrice(card);
             int price = (int)Math.Round(basePrice * shopRng.NextFloat(0.95f, 1.05f));
-            if (i == discountIndex)
-            {
-                price = MerchantCardEntry.CalculateDiscountedPrice(basePrice, shopRng);
-            }
-
             entries.Add(new MerchantCardEntry(card, price, player));
         }
 
+        int characterEntryCount = entries.Count;
         foreach (CardRarity rarity in new[] { CardRarity.Uncommon, CardRarity.Rare })
         {
             List<CardModel> candidates = ColorlessCardPool.Instance.GetUnlockedCards(player.UnlockState, player.RunState.Players.Count > 1)
@@ -133,6 +126,13 @@ public sealed class MerchantInventory
             entries.Add(new MerchantCardEntry(card, price, player));
         }
 
+        if (characterEntryCount > 0)
+        {
+            int discountIndex = shopRng.NextInt(characterEntryCount);
+            CardModel card = entries[discountIndex].Card;
+            entries[discountIndex] = new MerchantCardEntry(card,
+                MerchantCardEntry.CalculateDiscountedPrice(CardBasePrice(card), shopRng), player);
+        }
         return entries;
     }
 
@@ -176,8 +176,8 @@ public sealed class MerchantInventory
         var entries = new List<MerchantRelicEntry>();
         foreach (RelicRarity rarity in new[]
         {
-            RelicFactory.RollRarity(player.PlayerRng.Rewards),
-            RelicFactory.RollRarity(player.PlayerRng.Rewards),
+            RelicFactory.RollRarity(player.PlayerRng.Shops),
+            RelicFactory.RollRarity(player.PlayerRng.Shops),
         })
         {
             RelicModel relic = RelicFactory.PullNextRelicFromBack(player, rarity);
@@ -250,7 +250,7 @@ public sealed class MerchantInventory
         {
             CardRarity rarity = _player.Odds.CardRarity.RollWithoutChangingFutureOdds(
                 CardRarityOddsType.Shop,
-                _player.PlayerRng.Rewards);
+                _player.PlayerRng.Shops);
             List<CardModel> candidates = CharacterMerchantCandidates(_player, purchased.Card.Type, rarity, used);
             if (candidates.Count == 0)
             {
@@ -290,7 +290,7 @@ public sealed class MerchantInventory
         using IDisposable rngScope = _player.PlayerRng.BeginSemanticScope(
             $"{_player.CurrentSemanticLocationKey}/merchant/restock=relic/slot={index}");
         Rng shopRng = _player.PlayerRng.Shops;
-        RelicRarity rarity = RelicFactory.RollRarity(_player.PlayerRng.Rewards);
+        RelicRarity rarity = RelicFactory.RollRarity(_player.PlayerRng.Shops);
         RelicModel relic = RelicFactory.PullNextRelicFromBack(_player, rarity);
         _relics[index] = new MerchantRelicEntry(relic, RelicPrice(relic, shopRng), _player);
     }

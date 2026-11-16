@@ -56,7 +56,7 @@ public sealed class ThievingHopper : MonsterModel
                 .ToList();
             if (eligible.Count == 0) continue;
             int priority = eligible.Min(Priority);
-            CardModel combatCard = RunRng.CombatCardGeneration.NextItem(
+            CardModel combatCard = RunRng.CombatCardSelection.NextItem(
                 eligible.Where(card => Priority(card) == priority))!;
             CardPileCmd.Remove(combatCard);
             SwipePower swipe = await PowerCmd.Apply<SwipePower>(Creature.CombatState!, Creature, 1m, Creature, null)

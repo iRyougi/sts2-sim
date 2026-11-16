@@ -318,13 +318,13 @@ public sealed class RarePotionBatch1Tests : IDisposable
         var room = new CombatRoom(
             () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await room.Enter(runState);
-        runState.Rng.MockRng(RunRngType.CombatPotionGeneration, seed);
+        player.PlayerRng.NonCombatGeneration.LoadFromSerializable(new Rng(seed).ToSerializable());
         PotionModel brew = player.AddPotionInternal(GetCanonicalPotion("EntropicBrew"));
 
         await PotionCmd.Use(brew, player, player.Creature);
 
         Assert.IsType<FairyInABottle>(player.PotionSlots[0]);
-        Assert.Equal(6, runState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(6, player.PlayerRng.NonCombatGeneration.Counter);
     }
 
     [Fact]
@@ -332,13 +332,13 @@ public sealed class RarePotionBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("entropic-out-of-combat");
         PotionModel brew = player.AddPotionInternal(GetCanonicalPotion("EntropicBrew"));
-        int potionRngBefore = runState.Rng.CombatPotionGeneration.Counter;
+        int potionRngBefore = player.PlayerRng.NonCombatGeneration.Counter;
         int rewardsRngBefore = player.PlayerRng.Rewards.Counter;
 
         await PotionCmd.Use(brew, player, player.Creature);
 
         Assert.All(player.PotionSlots, potion => Assert.NotNull(potion));
-        Assert.Equal(potionRngBefore + 6, runState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(potionRngBefore + 6, player.PlayerRng.NonCombatGeneration.Counter);
         Assert.Equal(rewardsRngBefore, player.PlayerRng.Rewards.Counter);
     }
 
@@ -367,14 +367,14 @@ public sealed class RarePotionBatch1Tests : IDisposable
         PotionModel occupiedA = player.AddPotionInternal(ModelDb.Potion<EnergyPotion>());
         PotionModel occupiedB = player.AddPotionInternal(ModelDb.Potion<EnergyPotion>());
         PotionModel brew = player.AddPotionInternal(GetCanonicalPotion("EntropicBrew"));
-        int rngBefore = runState.Rng.CombatPotionGeneration.Counter;
+        int rngBefore = player.PlayerRng.NonCombatGeneration.Counter;
 
         await PotionCmd.Use(brew, player, player.Creature);
 
         Assert.Contains(occupiedA, player.PotionSlots);
         Assert.Contains(occupiedB, player.PotionSlots);
         Assert.All(player.PotionSlots, potion => Assert.NotNull(potion));
-        Assert.Equal(rngBefore + 2, runState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(rngBefore + 2, player.PlayerRng.NonCombatGeneration.Counter);
     }
 
     [Fact]
@@ -393,13 +393,13 @@ public sealed class RarePotionBatch1Tests : IDisposable
                 PotionFactory.RollRarity(new Rng(seed)) == PotionFactory.Rarity.Common);
 
         (RunState runState, Player player) = CreateRun("entropic-empty-bucket");
-        runState.Rng.MockRng(RunRngType.CombatPotionGeneration, commonSeed);
+        player.PlayerRng.NonCombatGeneration.LoadFromSerializable(new Rng(commonSeed).ToSerializable());
         PotionModel brew = player.AddPotionInternal(GetCanonicalPotion("EntropicBrew"));
 
         await PotionCmd.Use(brew, player, player.Creature);
 
         Assert.All(player.PotionSlots, potion => Assert.Null(potion));
-        Assert.Equal(1, runState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(1, player.PlayerRng.NonCombatGeneration.Counter);
     }
 
     [Fact]

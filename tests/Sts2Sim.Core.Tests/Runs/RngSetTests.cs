@@ -138,11 +138,17 @@ public class RngSetTests
     public void PlayerRngSet_DerivesStreamFromSnakeCaseName()
     {
         var set = new PlayerRngSet(42uL);
-        var manual = new Rng(42uL, "rewards");
-        for (int i = 0; i < 10; i++)
+        Assert.Equal(4, Enum.GetValues<PlayerRngType>().Length);
+        foreach (PlayerRngType type in Enum.GetValues<PlayerRngType>())
         {
-            Assert.Equal(manual.NextInt(1000), set.Rewards.NextInt(1000));
+            var manual = new Rng(42uL, StringHelper.SnakeCase(type.ToString()));
+            for (int i = 0; i < 10; i++)
+                Assert.Equal(manual.NextInt(1000), set.GetRng(type).NextInt(1000));
         }
+        Assert.Same(set.GetRng(PlayerRngType.NonCombatGeneration), set.NonCombatGeneration);
+        int rewardsBefore = set.Rewards.Counter;
+        set.NonCombatGeneration.NextInt();
+        Assert.Equal(rewardsBefore, set.Rewards.Counter);
     }
 
     [Fact]
@@ -150,15 +156,18 @@ public class RngSetTests
     {
         var set = new PlayerRngSet(7uL);
         for (int i = 0; i < 4; i++) set.Shops.NextInt(50);
+        for (int i = 0; i < 7; i++) set.NonCombatGeneration.NextInt(50);
 
         var save = set.ToSerializable();
         Assert.Equal(7uL, save.Seed);
         Assert.Equal(4, save.Rngs[PlayerRngType.Shops].counter);
+        Assert.Equal(7, save.Rngs[PlayerRngType.NonCombatGeneration].counter);
 
         var restored = PlayerRngSet.FromSerializable(save);
         for (int i = 0; i < 20; i++)
         {
             Assert.Equal(set.Shops.NextInt(50), restored.Shops.NextInt(50));
+            Assert.Equal(set.NonCombatGeneration.NextInt(50), restored.NonCombatGeneration.NextInt(50));
         }
     }
 
@@ -166,15 +175,15 @@ public class RngSetTests
     public void PlayerRngSet_LoadFromSerializable_RewindsToSavedState()
     {
         var set = new PlayerRngSet(13uL);
-        for (int i = 0; i < 10; i++) set.Shops.NextInt(100);
+        for (int i = 0; i < 10; i++) set.NonCombatGeneration.NextInt(100);
         var save = set.ToSerializable();
-        var reference = new Rng(save.Rngs[PlayerRngType.Shops]);
+        var reference = new Rng(save.Rngs[PlayerRngType.NonCombatGeneration]);
 
-        for (int i = 0; i < 5; i++) set.Shops.NextInt(100);
+        for (int i = 0; i < 5; i++) set.NonCombatGeneration.NextInt(100);
         set.LoadFromSerializable(save);
         for (int i = 0; i < 20; i++)
         {
-            Assert.Equal(reference.NextInt(100), set.Shops.NextInt(100));
+            Assert.Equal(reference.NextInt(100), set.NonCombatGeneration.NextInt(100));
         }
     }
 

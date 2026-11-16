@@ -18,7 +18,7 @@ public sealed class Kaleidoscope : RelicModel
     public override bool IsAllowedAtNeow(IRunState runState) => true;
 
     /// <summary>偏离 #187 已销案（偏离 #307，2026-09-08）：Phase 3 已到，其他角色卡池已存在，
-    /// 故按权威源码忠实实现——用 <c>RunState.Rng.Niche</c> 打乱"非本角色的卡池"取前 3 个，
+    /// 故按权威源码忠实实现——用 <c>PlayerRng.NonCombatGeneration</c> 打乱"非本角色的卡池"取前 3 个，
     /// 每池各抽 1 张。此前是"从本角色卡池再抽 3 张"，且 RNG 流走的是 <c>PlayerRng.Rewards</c>。
     ///
     /// 当前五个可玩角色均已注册，每份奖励从四个他系池洗牌后取三个。
@@ -27,6 +27,8 @@ public sealed class Kaleidoscope : RelicModel
     /// 抽取一致不能证明完整奖励等价。</summary>
     public override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/Kaleidoscope");
         CardReward first = CreateChoice();
         CardReward second = CreateChoice();
         OfferRewards(RewardsSet.CreateCustom(
@@ -44,7 +46,7 @@ public sealed class Kaleidoscope : RelicModel
             .Where(pool => pool.GetType() != Owner.Character.CardPool.GetType())
             .OrderBy(pool => ModelDb.GetEntry(pool.GetType()), StringComparer.Ordinal)
             .ToList();
-        Owner.RunState.Rng.Niche.Shuffle(pools);
+        Owner.PlayerRng.NonCombatGeneration.Shuffle(pools);
 
         var options = new List<CardModel>();
         foreach (CardPoolModel pool in pools.Take(3))

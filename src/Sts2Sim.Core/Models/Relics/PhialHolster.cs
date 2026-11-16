@@ -13,6 +13,8 @@ public sealed class PhialHolster : RelicModel
 
     public override async Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/PhialHolster");
         Owner.GrowPotionSlots(1);
         var generatedIds = new HashSet<ModelId>();
         for (int i = 0; i < 2; i++)
@@ -23,7 +25,7 @@ public sealed class PhialHolster : RelicModel
             // "本批次唯一"是本仓库既有的补充约束，保留。
             PotionModel? potion = PotionFactory.CreateRandomOutOfCombat(
                 Owner,
-                Owner.RunState.Rng.CombatPotionGeneration,
+                Owner.PlayerRng.NonCombatGeneration,
                 candidate => !generatedIds.Contains(candidate.Id));
             if (potion is null)
             {

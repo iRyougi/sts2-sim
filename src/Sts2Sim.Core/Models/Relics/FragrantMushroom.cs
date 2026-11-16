@@ -14,13 +14,15 @@ public sealed class FragrantMushroom : RelicModel
 
     public override async Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/FragrantMushroom");
         await CreatureCmd.Damage(
             Owner.RunState,
             Owner.Creature,
             15m,
             ValueProp.Unblockable | ValueProp.Unpowered);
         List<CardModel> candidates = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();
-        candidates.StableShuffle(Owner.RunState.Rng.Niche);
+        candidates.StableShuffle(Owner.PlayerRng.NonCombatGeneration);
         foreach (CardModel card in candidates.Take(2))
         {
             CardCmd.Upgrade(card);

@@ -10,8 +10,10 @@ public sealed class SandCastle : RelicModel
     public override bool HasUponPickupEffect => true;
     public override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/SandCastle");
         List<CardModel> cards = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();
-        cards.StableShuffle(Owner.RunState.Rng.Niche);
+        cards.StableShuffle(Owner.PlayerRng.NonCombatGeneration);
         foreach (CardModel card in cards.Take(6)) CardCmd.Upgrade(card);
         return Task.CompletedTask;
     }

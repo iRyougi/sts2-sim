@@ -162,7 +162,7 @@ public sealed class NeowsBonesTests : IDisposable
     }
 
     public void Dispose() => ModelDb.ResetForTests();
-    [Fact]
+    [Fact(Skip = "v0.111 native capture; v0.113.1 RNG migration requires #930 recertification")]
     public async Task ArchivedJGENKZEW4VNW_NeowsBonesAddsInjuryAfterItsRelicRewards()
     {
         // F1 archive: NeowsBones grants LeafyPoultice + NutritiousOyster, then Injury;
@@ -232,7 +232,7 @@ public sealed class NeowsBonesTests : IDisposable
             .Where(relic => relic is not NeowsBones && relic.IsAllowedAtNeow(runState))
             .Select(relic => relic.GetType())
             .ToList();
-        var rewardsOracle = player.PlayerRng.Rewards.CloneExact();
+        var rewardsOracle = player.PlayerRng.NonCombatGeneration.CloneExact();
         rewardsOracle.Shuffle(expectedTypes);
         Type[] expectedRelics = expectedTypes.Take(2).ToArray();
         List<CardModel> curseCandidates = CardPoolFilters.ForSinglePlayer(ModelDb.All<CardModel>())
@@ -242,7 +242,7 @@ public sealed class NeowsBonesTests : IDisposable
         nicheOracle.NextInt();
         Assert.DoesNotContain(curseCandidates, card => !card.CanBeGeneratedByModifiers);
         nicheOracle.NextInt();
-        CardModel expectedCurse = Assert.IsAssignableFrom<CardModel>(nicheOracle.NextItem(curseCandidates));
+        CardModel expectedCurse = Assert.IsAssignableFrom<CardModel>(rewardsOracle.NextItem(curseCandidates));
         int deckBefore = player.Deck.Cards.Count;
         int relicsBefore = player.Relics.Count;
 
@@ -260,7 +260,7 @@ public sealed class NeowsBonesTests : IDisposable
         Assert.Same(player, curse.Owner);
         Assert.IsNotType<AscendersBane>(curse);
         Assert.Same(player.Deck, curse.Pile);
-        Assert.Equal(rewardsOracle.Counter, player.PlayerRng.Rewards.Counter);
+        Assert.Equal(rewardsOracle.Counter, player.PlayerRng.NonCombatGeneration.Counter);
         Assert.Equal(nicheOracle.Counter, runState.Rng.Niche.Counter);
         Assert.Equal(RelicRarity.Ancient, bones.Rarity);
         Assert.False(bones.HasUponPickupEffect);

@@ -10,6 +10,8 @@ public sealed class NeowsBones : RelicModel
 
     public override Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/NeowsBones");
         if (Owner.RunState.CurrentRoom is not EventRoom { Event: AncientEventModel ancient })
         {
             throw new InvalidOperationException(
@@ -19,7 +21,7 @@ public sealed class NeowsBones : RelicModel
         List<RelicModel> candidates = ancient.AllPossibleOptions
             .Where(relic => relic is not NeowsBones && relic.IsAllowedAtNeow(Owner.RunState))
             .ToList();
-        Owner.PlayerRng.Rewards.Shuffle(candidates);
+        Owner.PlayerRng.NonCombatGeneration.Shuffle(candidates);
 
         // Native offers both mandatory relics together. Nested offers from taking one
         // relic must finish before the next relic or the subsequent curse is resolved.

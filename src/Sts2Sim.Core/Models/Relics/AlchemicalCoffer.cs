@@ -10,12 +10,14 @@ public sealed class AlchemicalCoffer : RelicModel
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override async Task AfterObtained()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/AlchemicalCoffer");
         Owner.GrowPotionSlots(4);
         var generatedIds = new HashSet<ModelId>();
         for (int i = 0; i < 4; i++)
         {
             PotionModel? potion = PotionFactory.CreateRandomOutOfCombat(
-                Owner, Owner.RunState.Rng.CombatPotionGeneration,
+                Owner, Owner.PlayerRng.NonCombatGeneration,
                 candidate => !generatedIds.Contains(candidate.Id));
             if (potion is not null)
             {

@@ -137,7 +137,7 @@ public sealed class SelectionMigrationBcdfTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task RandomUpgrade_UsesNicheAndOnlyUpgradableMatchingCards(bool skills)
+    public async Task RandomUpgrade_UsesNonCombatGenerationAndOnlyUpgradableMatchingCards(bool skills)
     {
         var (run, player, _) = CreateState("migration-f-" + skills);
         foreach (CardModel card in player.Deck.Cards.ToArray()) CardPileCmd.Remove(card);
@@ -146,7 +146,7 @@ public sealed class SelectionMigrationBcdfTests : IDisposable
         alreadyUpgraded.Upgrade();
         var type = skills ? CardType.Skill : CardType.Attack;
         var eligible = player.Deck.Cards.Where(c => c.Type == type && c.IsUpgradable).ToList();
-        var expectedRng = run.Rng.Niche.CloneExact();
+        var expectedRng = player.PlayerRng.NonCombatGeneration.CloneExact();
         var expected = eligible.ToList().StableShuffle(expectedRng).Take(2).ToArray();
         int rewardsBefore = run.Rng.CombatCardGeneration.Counter, selectionBefore = run.Rng.CombatCardSelection.Counter;
         var source = new ChoiceSource(_ => throw new InvalidOperationException("Random upgrades must not ask a player."));
@@ -154,7 +154,7 @@ public sealed class SelectionMigrationBcdfTests : IDisposable
         if (skills) await RelicCmd.Obtain(ModelDb.Relic<WarPaint>(), player);
         else await RelicCmd.Obtain(ModelDb.Relic<Whetstone>(), player);
         Assert.True(expected.ToHashSet().SetEquals(eligible.Where(c => c.IsUpgraded)));
-        Assert.Equal(expectedRng.Counter, run.Rng.Niche.Counter);
+        Assert.Equal(expectedRng.Counter, player.PlayerRng.NonCombatGeneration.Counter);
         Assert.Equal(rewardsBefore, run.Rng.CombatCardGeneration.Counter); Assert.Equal(selectionBefore, run.Rng.CombatCardSelection.Counter);
         Assert.Empty(source.Requests);
         Assert.All(player.Deck.Cards.Where(c => c.Type != type), card => Assert.False(card.IsUpgraded));

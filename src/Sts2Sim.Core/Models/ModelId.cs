@@ -38,6 +38,20 @@ public record ModelId : IComparable<ModelId>
         return Category + "." + Entry;
     }
 
+    /// <summary>原版静态 <c>ModelId.Compare</c>：同一对象为 0，null 排在非 null 前，再按 Category、Entry Ordinal。</summary>
+    public static int Compare(ModelId? a, ModelId? b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return 0;
+        }
+        if (a is null)
+        {
+            return -1;
+        }
+        return b is null ? 1 : a.CompareTo(b);
+    }
+
     public int CompareTo(ModelId? other)
     {
         int num = string.Compare(Category, other?.Category, StringComparison.Ordinal);

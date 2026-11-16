@@ -8,8 +8,13 @@ namespace Sts2Sim.Core.Models.Cards;
 /// Aeonglass status with gameplay-complete repeatable FakeUpgrade damage scaling.
 /// Presentation-only FakeUpgrade art/title switching is tracked by deviation #281.
 /// </summary>
-public sealed class Wither : CardModel
+public sealed class Wither : CardModel, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? TurnEndDamage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private int _fakeUpgradeLevel;
 
     public int FakeUpgradeLevel => _fakeUpgradeLevel;

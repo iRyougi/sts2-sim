@@ -6,6 +6,7 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Hooks;
+using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.CardPools;
 using Sts2Sim.Core.Models.Cards;
@@ -106,19 +107,18 @@ public sealed class HiveContentBehaviorTests : IDisposable
     }
 
     [Fact]
-    public async Task SandCastle_UsesNicheAndUpgradesExactlySix()
+    public async Task SandCastle_UsesNonCombatGenerationAndUpgradesExactlySix()
     {
         (RunState run, Player player) = CreateRun("sand-castle");
         int eligible = player.Deck.Cards.Count(card => card.IsUpgradable);
-        int rng = run.Rng.Niche.Counter;
+        int rng = player.PlayerRng.NonCombatGeneration.Counter;
+        CardModel[] expected = player.Deck.Cards.Where(card => card.IsUpgradable).ToList()
+            .StableShuffle(player.PlayerRng.NonCombatGeneration.CloneExact()).Take(6).ToArray();
         await RelicCmd.Obtain(ModelDb.Relic<SandCastle>(), player);
         Assert.Equal(6, player.Deck.Cards.Count(card => card.IsUpgraded));
-        Assert.Equal(eligible - 1, run.Rng.Niche.Counter - rng);
-        Assert.Equal((2, 3, 1, 0), (
-            player.Deck.Cards.Count(card => card is StrikeRegent && card.IsUpgraded),
-            player.Deck.Cards.Count(card => card is DefendRegent && card.IsUpgraded),
-            player.Deck.Cards.Count(card => card is FallingStar && card.IsUpgraded),
-            player.Deck.Cards.Count(card => card is Venerate && card.IsUpgraded)));
+        Assert.Equal(eligible - 1, player.PlayerRng.NonCombatGeneration.Counter - rng);
+        Assert.True(expected.ToHashSet().SetEquals(player.Deck.Cards.Where(card => card.IsUpgraded)),
+            "seed=sand-castle: upgrades differ from native stable-shuffle selection");
         Assert.True(ModelDb.Relic<SandCastle>().HasUponPickupEffect);
     }
 

@@ -7,8 +7,13 @@ using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-public sealed class Claw : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
+public sealed class Claw : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? _damage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private decimal _damage = 3m;
     private decimal _increase = 2m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)_damage);

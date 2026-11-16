@@ -57,6 +57,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     private int _energyCostThisTurnDelta;
     private List<LocalEnergyModifier> _localEnergyModifiers = [];
 
+    /// <summary>原版 <c>CardEnergyCost.CapturedXValue</c>：X 费卡在 <c>SpendEnergy</c> 或
+    /// <c>CardCmd.AutoPlay(skipXCapture: false)</c> 时写入，之后不清零，克隆时随实例复制。
+    /// v0.113.1 的 <c>CompareTo</c> 通过 <c>EnergyCost.GetResolved()</c> 读取它。</summary>
+    private int _capturedEnergyXValue;
+
     private enum LocalEnergyModifierKind
     {
         FreeThisTurn,
@@ -176,9 +181,12 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     public int CurrentUpgradeLevel { get; private set; }
 
-    /// <summary>原版 <c>CardModel.CompareTo</c>：先按 <c>Id</c>，相同再按 <see cref="CurrentUpgradeLevel"/>（普通牌在前）。
-    /// 洗牌前的 <c>StableShuffle</c> 依赖这个顺序；只按 <c>Id</c> 比较会让同名的普通牌与升级牌在不稳定的
-    /// <c>List.Sort</c> 里互换位置，同样的随机数洗出不同的抽牌堆。</summary>
+    /// <summary>v0.113.1 原版 <c>CardModel.CompareTo</c> 的完整次序：Id → <see cref="CurrentUpgradeLevel"/> →
+    /// 附魔 Id → 苦难 Id（均为可空 <c>ModelId.Compare</c>，null 在前）→ <c>EnergyCost.GetResolved()</c> →
+    /// <see cref="BaseReplayCount"/> → 按 Ordinal 排序的 DynamicVar 键逐个比较 BaseValue。
+    /// 洗牌前的 <c>StableShuffle</c> 用不稳定的 <c>List.Sort</c> 依赖这个顺序；同 Id、同升级的实例
+    /// 只有在这些实例状态上不同时才分出先后。DynamicVar 一步只比较运行时会改写的键，其余键在同 Id、
+    /// 同升级时恒等（见 <see cref="Cards.CardComparisonBaseValues"/>）。</summary>
     public override int CompareTo(AbstractModel? other)
     {
         if (ReferenceEquals(this, other))
@@ -197,7 +205,59 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             return byId;
         }
 
-        return CurrentUpgradeLevel.CompareTo(((CardModel)other).CurrentUpgradeLevel);
+        CardModel card = (CardModel)other;
+        int byUpgrade = CurrentUpgradeLevel.CompareTo(card.CurrentUpgradeLevel);
+        if (byUpgrade != 0)
+        {
+            return byUpgrade;
+        }
+
+        int byEnchantment = ModelId.Compare(EnchantmentIdForComparison, card.EnchantmentIdForComparison);
+        if (byEnchantment != 0)
+        {
+            return byEnchantment;
+        }
+
+        int byAffliction = ModelId.Compare(_affliction?.Id, card._affliction?.Id);
+        if (byAffliction != 0)
+        {
+            return byAffliction;
+        }
+
+        int byCost = ResolvedEnergyCostForComparison.CompareTo(card.ResolvedEnergyCostForComparison);
+        if (byCost != 0)
+        {
+            return byCost;
+        }
+
+        int byReplay = BaseReplayCount.CompareTo(card.BaseReplayCount);
+        if (byReplay != 0)
+        {
+            return byReplay;
+        }
+
+        return Cards.CardComparisonBaseValues.Compare(this, card);
+    }
+
+    /// <summary>原版单附魔槽 <c>Enchantment?.Id</c>；模拟器的列表最多一项（<see cref="AttachEnchantment"/>）。</summary>
+    private ModelId? EnchantmentIdForComparison => _enchantments.Count > 0 ? _enchantments[0].Id : null;
+
+    /// <summary>原版 <c>CardEnergyCost.GetResolved()</c>：X 费返回捕获值；否则
+    /// <c>Math.Max(0, GetWithModifiers(All))</c>，其中不可打出（基础费 &lt; 0）的卡不经修饰直接得 0。</summary>
+    internal int ResolvedEnergyCostForComparison =>
+        IsXEnergyCost ? _capturedEnergyXValue
+        : CanonicalEnergyCost < 0 ? 0
+        : Math.Max(0, EnergyCost);
+
+    /// <summary>原版 <c>CardEnergyCost.CapturedXValue</c> 当前值（仅 X 费卡有意义）。</summary>
+    internal int CapturedEnergyXValue => _capturedEnergyXValue;
+
+    private void CaptureEnergyXValue(int amount)
+    {
+        if (IsXEnergyCost)
+        {
+            _capturedEnergyXValue = amount;
+        }
     }
 
     public virtual int MaxUpgradeLevel => 1;
@@ -777,6 +837,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         int energyToSpend = IsXEnergyCost
             ? combatState.Energy
             : Math.Max(0, Math.Min(resolvedEnergyCost, combatState.Energy));
+        // Native SpendEnergy stores the X capture before spending, including zero.
+        CaptureEnergyXValue(energyToSpend);
         if (energyToSpend > 0 && CombatState is CombatState concreteState &&
             concreteState.IsLiveCombat())
             concreteState.SemanticHistory.RecordEnergySpent(concreteState, Owner, energyToSpend);
@@ -802,6 +864,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         // Native SpendResources resolves both amounts before either spending hook runs.
         int resolvedStarCost = ResolveStarCost();
         int starsToSpend = Math.Max(0, Math.Min(resolvedStarCost, playerState.Stars));
+        // Native SpendEnergy stores the X capture; the following AutoPlay passes skipXCapture: true.
+        CaptureEnergyXValue(energyToSpend);
         if (energyToSpend > 0 && combatState is CombatState concreteState && concreteState.IsLiveCombat())
             concreteState.SemanticHistory.RecordEnergySpent(concreteState, Owner, energyToSpend);
         playerState.LoseEnergy(energyToSpend);
@@ -903,6 +967,13 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             }
 
             return null;
+        }
+
+        // Native CardCmd.AutoPlay(skipXCapture: false) captures current energy after its playability
+        // checks. Paid autoplays capture in SpendResources; Whispering Earring captured while prepaying.
+        if (isAutoPlay && !spendResources && prepaidXCapture is null)
+        {
+            CaptureEnergyXValue(Owner.PlayerCombatState!.Energy);
         }
 
         ICombatObserver? observer = (combatState as CombatState)?.Observer;

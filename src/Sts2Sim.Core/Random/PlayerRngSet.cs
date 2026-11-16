@@ -25,6 +25,9 @@ public class PlayerRngSet
 
     public Rng Transformations => GetRng(PlayerRngType.Transformations);
 
+    /// <summary>Card and potion generation outside combat (v0.113.1).</summary>
+    public Rng NonCombatGeneration => GetRng(PlayerRngType.NonCombatGeneration);
+
     public ulong Seed { get; }
 
     /// <summary>偏离 #73：直接用 <c>seed</c>（run 种子）播种，不加玩家槽位偏移——本计划及可预见的

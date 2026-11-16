@@ -76,9 +76,11 @@ public class RunReplayDemoTests : IDisposable
     {
         var log = new List<string>();
 
-        // v0.113.1 map rules change this automatic route; a bounded offline fixture probe
-        // selected this seed. Retain real Boss reach and resolution assertions.
-        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("v01131-demo-boss-18", log.Add);
+        // #918: v0.113.1 merchant draws use the Shops stream, so post-shop card rewards (and this
+        // automatic route) change. Seed chosen by the #919 rule: probe v01131-rng-demo-boss-0..255 in
+        // order, stop at the first real Boss resolution (hit at 254; receipts in the #918 report).
+        // Smoke fixture only, not a fidelity or policy measurement. Assertions are unchanged.
+        RunReplayDemo.Result result = await RunReplayDemo.RunAsync("v01131-rng-demo-boss-254", log.Add);
 
         Assert.True(
             result.FloorsVisited >= 15,

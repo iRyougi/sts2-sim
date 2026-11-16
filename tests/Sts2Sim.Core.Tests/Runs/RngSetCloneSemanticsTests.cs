@@ -62,6 +62,20 @@ public class RngSetCloneSemanticsTests
                 PlayerRngType.Rewards, "floor=5/room_kind=monster/slot=card_0").NextInt(1_000_000);
             Assert.Equal(baselineReward, variantReward);
             Assert.Throws<InvalidOperationException>(() => baseline.Rewards.NextInt(100));
+            Assert.Throws<InvalidOperationException>(() => baseline.NonCombatGeneration.NextInt(100));
+            Rng noncombat = baseline.ForSemanticKey(PlayerRngType.NonCombatGeneration, "pickup");
+            Rng expected = new(KeyedRngSeed.Derive(12345uL, "non_combat_generation", "pickup"));
+            Assert.Equal(Draw(expected, 8), Draw(noncombat, 8));
+            PlayerRngSet clone = baseline.CloneExact();
+            Assert.Equal(Draw(baseline.ForSemanticKey(PlayerRngType.NonCombatGeneration, "next"), 8),
+                Draw(clone.ForSemanticKey(PlayerRngType.NonCombatGeneration, "next"), 8));
+            using (baseline.BeginSemanticScope("scoped"))
+            {
+                Assert.Same(baseline.NonCombatGeneration, baseline.NonCombatGeneration);
+                Assert.Equal(Draw(clone.ForSemanticKey(PlayerRngType.NonCombatGeneration, "scoped"), 8),
+                    Draw(baseline.NonCombatGeneration, 8));
+            }
+            Assert.Contains(baseline.GetKeyedDraws(), draw => draw.StreamName == "non_combat_generation");
         }
 
         {
@@ -106,6 +120,7 @@ public class RngSetCloneSemanticsTests
     {
         var source = new PlayerRngSet(9001uL);
         source.Rewards.NextInt(50);
+        source.NonCombatGeneration.NextInt(50);
 
         PlayerRngSet clone = source.CloneExact();
 
@@ -122,8 +137,11 @@ public class RngSetCloneSemanticsTests
         var source = new PlayerRngSet(9001uL);
         source.Rewards.NextInt(50);
         source.Shops.NextInt(50);
+        source.NonCombatGeneration.NextInt(50);
 
-        PlayerRngSet branch = source.CloneReseeded(4242uL, [PlayerRngType.Rewards]);
+        PlayerRngSet branch = source.CloneReseeded(4242uL, [PlayerRngType.Rewards, PlayerRngType.NonCombatGeneration]);
+        Assert.Equal(0, branch.NonCombatGeneration.Counter);
+        Assert.Equal(Draw(new Rng(4242uL, "non_combat_generation"), 8), Draw(branch.NonCombatGeneration, 8));
 
         Assert.Equal(0, branch.Rewards.Counter);
         Assert.Equal(source.Shops.Counter, branch.Shops.Counter);

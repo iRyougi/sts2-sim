@@ -383,6 +383,7 @@ public static class CombatStateDescription
         builder.Append(card.CostsXEnergy);
         builder.Append(card.HasStarCost);
         builder.Append(card.BaseReplayCount);
+        builder.Append(card.CapturedEnergyXValue);
         builder.Append(card.TemporaryFreeThisTurn);
         builder.Append(card.TemporaryRetainThisTurn);
         builder.Append(card.TemporarySlyThisTurn);

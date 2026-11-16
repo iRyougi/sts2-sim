@@ -249,7 +249,7 @@ public static class CardFactory
 
     // Merchant generation consumes the upgrade roll even though its base probability is negative.
     internal static void RollForMerchantUpgrade(Player player, CardModel card) =>
-        RollForUpgrade(player, card, -999999999m);
+        RollForUpgrade(player, card, -999999999m, player.PlayerRng.Shops);
 
     private static void RollForUpgrade(Player player, CardModel card, decimal baseChance)
         => RollForUpgrade(player, card, baseChance, player.PlayerRng.Rewards);

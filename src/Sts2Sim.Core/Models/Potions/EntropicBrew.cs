@@ -18,11 +18,13 @@ public sealed class EntropicBrew : PotionModel
         ArgumentNullException.ThrowIfNull(target);
         Player player = target.Player ?? throw new InvalidOperationException("Entropic Brew requires a player target.");
 
+        using IDisposable rngScope = player.PlayerRng.BeginSemanticScope(
+            $"{player.CurrentSemanticLocationKey}/noncombat/EntropicBrew");
         while (player.PotionSlots.Contains(null))
         {
             // The real potion deliberately uses the out-of-combat pool even when consumed during combat.
             PotionModel? potion = PotionFactory.CreateRandomOutOfCombat(
-                player, player.RunState.Rng.CombatPotionGeneration);
+                player, player.PlayerRng.NonCombatGeneration);
             if (potion is null || !await PotionCmd.TryToProcure(potion, player))
             {
                 break;

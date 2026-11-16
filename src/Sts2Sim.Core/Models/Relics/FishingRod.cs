@@ -12,6 +12,8 @@ public sealed class FishingRod : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/FishingRod");
         if (Owner.RunState.CurrentRoom is not CombatRoom { RoomType: RoomType.Monster })
         {
             return Task.CompletedTask;
@@ -26,7 +28,7 @@ public sealed class FishingRod : RelicModel
         CardModel[] upgradable = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToArray();
         if (upgradable.Length > 0)
         {
-            CardCmd.Upgrade(Owner.RunState.Rng.Niche.NextItem(upgradable)!);
+            CardCmd.Upgrade(Owner.PlayerRng.NonCombatGeneration.NextItem(upgradable)!);
         }
 
         return Task.CompletedTask;

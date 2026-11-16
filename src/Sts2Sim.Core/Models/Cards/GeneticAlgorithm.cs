@@ -5,8 +5,13 @@ using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-public sealed class GeneticAlgorithm : CardModel, ICardChoiceBaseValueProvider
+public sealed class GeneticAlgorithm : CardModel, ICardChoiceBaseValueProvider, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Block</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Block"
+        ? _currentBlock
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private int _currentBlock = 1;
     private int _increasedBlock;
     private int _increase = 3;

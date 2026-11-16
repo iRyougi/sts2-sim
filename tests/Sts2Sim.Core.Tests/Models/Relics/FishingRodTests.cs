@@ -46,8 +46,9 @@ public sealed class FishingRodTests : IDisposable
         Assert.Equal(3, relic.CombatsSeen);
         Assert.Equal(ownerUpgradedBefore + 1, owner.Deck.Cards.Count(card => card.IsUpgraded));
         Assert.Equal(foreignUpgradedBefore, foreign.Deck.Cards.Count(card => card.IsUpgraded));
-        // Three HP draws plus the relic's one upgrade selection.
-        Assert.Equal(nicheBefore + 4, runState.Rng.Niche.Counter);
+        // Three HP draws stay on Niche; the upgrade uses NonCombatGeneration.
+        Assert.Equal(nicheBefore + 3, runState.Rng.Niche.Counter);
+        Assert.Equal(1, owner.PlayerRng.NonCombatGeneration.Counter);
         Assert.Null(owner.PlayerCombatState);
     }
 

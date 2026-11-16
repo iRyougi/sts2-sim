@@ -10,9 +10,11 @@ public sealed class WarHammer : RelicModel
     public override RelicRarity Rarity => RelicRarity.Ancient;
     public override Task AfterCombatVictory()
     {
+        using IDisposable rngScope = Owner.PlayerRng.BeginSemanticScope(
+            $"{Owner.CurrentSemanticLocationKey}/noncombat/WarHammer");
         if (Owner.RunState.CurrentRoom is not CombatRoom { RoomType: RoomType.Elite }) return Task.CompletedTask;
         List<CardModel> cards = Owner.Deck.Cards.Where(card => card.IsUpgradable).ToList();
-        cards.StableShuffle(Owner.RunState.Rng.Niche);
+        cards.StableShuffle(Owner.PlayerRng.NonCombatGeneration);
         foreach (CardModel card in cards.Take(4)) CardCmd.Upgrade(card);
         return Task.CompletedTask;
     }

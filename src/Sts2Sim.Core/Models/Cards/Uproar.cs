@@ -21,10 +21,10 @@ public sealed class Uproar : CardModel, ICardChoiceBaseValueProvider, ICardDamag
             .Targeting(cardPlay.Target).Execute();
         CardModel? chosen = Owner.PlayerCombatState!.DrawPile.Cards
             .Where(card => card.Type == CardType.Attack && !card.HasKeyword(CardKeyword.Unplayable))
-            .ToList().StableShuffle(Owner.RunState.Rng.Shuffle).FirstOrDefault();
+            .ToList().StableShuffle(Owner.RunState.Rng.CombatCardSelection).FirstOrDefault();
         if (chosen is null)
             chosen = Owner.PlayerCombatState.DrawPile.Cards.Where(card => card.Type == CardType.Attack)
-                .ToList().StableShuffle(Owner.RunState.Rng.Shuffle).FirstOrDefault();
+                .ToList().StableShuffle(Owner.RunState.Rng.CombatCardSelection).FirstOrDefault();
         if (chosen is not null) await AutoPlayCmd.FromCards(CombatState!, Owner, [chosen]);
     }
 

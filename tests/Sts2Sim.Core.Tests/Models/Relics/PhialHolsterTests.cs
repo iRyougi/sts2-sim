@@ -71,7 +71,7 @@ public sealed class PhialHolsterTests : IDisposable
     {
         Player player = CreatePlayer("phial-two-potions");
         int maxBefore = player.MaxPotionCount;
-        int rngBefore = player.RunState.Rng.CombatPotionGeneration.Counter;
+        int rngBefore = player.PlayerRng.NonCombatGeneration.Counter;
 
         await RelicCmd.Obtain(ModelDb.Relic<PhialHolster>(), player);
 
@@ -85,7 +85,7 @@ public sealed class PhialHolsterTests : IDisposable
             Assert.False(potion.IsCanonical);
             Assert.Same(player, potion.Owner);
         });
-        Assert.Equal(rngBefore + 4, player.RunState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(rngBefore + 4, player.PlayerRng.NonCombatGeneration.Counter);
     }
 
     [Fact]
@@ -97,13 +97,13 @@ public sealed class PhialHolsterTests : IDisposable
         {
             player.AddPotionInternal(canonical);
         }
-        int rngBefore = player.RunState.Rng.CombatPotionGeneration.Counter;
+        int rngBefore = player.PlayerRng.NonCombatGeneration.Counter;
 
         await RelicCmd.Obtain(ModelDb.Relic<PhialHolster>(), player);
 
         Assert.Equal(Player.InitialMaxPotionSlotCount + 1, player.MaxPotionCount);
         Assert.Equal(player.MaxPotionCount, player.PotionSlots.OfType<PotionModel>().Count());
-        Assert.Equal(rngBefore + 4, player.RunState.Rng.CombatPotionGeneration.Counter);
+        Assert.Equal(rngBefore + 4, player.PlayerRng.NonCombatGeneration.Counter);
     }
 
     [Fact]

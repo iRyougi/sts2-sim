@@ -30,20 +30,21 @@ public sealed class KaleidoscopeTests : IDisposable
     [InlineData("kaleidoscope-offer", false, null, null)]
     [InlineData("34WWJ6MXE9NN", true,
         new[] { "WISP", "SWEEPING_BEAM", "CRUSH_UNDER" },
-        new[] { "SOW", "VICIOUS", "ASTRAL_PULSE" })]
+        new[] { "SOW", "VICIOUS", "ASTRAL_PULSE" }, Skip = "v0.111 native capture; v0.113.1 RNG migration requires #930 recertification")]
     [InlineData("7LTB4PEDGP3E", true,
         new[] { "TESLA_COIL", "SHROUD", "TREMBLE" },
-        new[] { "ITERATION", "PALE_BLUE_DOT", "DEATHS_DOOR" })]
+        new[] { "ITERATION", "PALE_BLUE_DOT", "DEATHS_DOOR" }, Skip = "v0.111 native capture; v0.113.1 RNG migration requires #930 recertification")]
     public async Task AfterObtained_OffersTwoCardChoicesDrawnFromOtherCharacterPools(
         string seed, bool isSilent, string[]? firstNativeCandidates, string[]? secondNativeCandidates)
     {
         (RunState runState, Player player) = CreateRun(seed, isSilent);
         EventRoom room = await EnterEventRoom(runState);
         int deckCountBefore = player.Deck.Cards.Count;
-        int nicheCounterBefore = runState.Rng.Niche.Counter;
+        int nicheCounterBefore = player.PlayerRng.NonCombatGeneration.Counter;
         int rewardsCounterBefore = player.PlayerRng.Rewards.Counter;
 
-        // v0.111.0 sorts other character pools by their ModelId before Niche shuffling.
+        // v0.113.1 sorts other pools by ModelId before NonCombatGeneration shuffling.
+        // Historical native rows above remain version-isolated until #930.
         // All five character pools are registered: each choice draws from three of the other four.
         List<CardPoolModel> otherPools = player.UnlockState.CharacterCardPools
             .Where(pool => pool.GetType() != player.Character.CardPool.GetType())
@@ -63,8 +64,8 @@ public sealed class KaleidoscopeTests : IDisposable
 
         await RelicCmd.Obtain(ModelDb.Relic<Kaleidoscope>(), player);
 
-        Assert.True(runState.Rng.Niche.Counter - nicheCounterBefore == 6,
-            $"seed={seed}, obtain: Niche delta={runState.Rng.Niche.Counter - nicheCounterBefore}, expected=6");
+        Assert.True(player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore == 6,
+            $"seed={seed}, obtain: Niche delta={player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore}, expected=6");
         Assert.True(player.PlayerRng.Rewards.Counter - rewardsCounterBefore == 18,
             $"seed={seed}, obtain: Rewards delta={player.PlayerRng.Rewards.Counter - rewardsCounterBefore}, expected=18");
 

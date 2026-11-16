@@ -88,7 +88,7 @@ public sealed class AutoPlayCardTests : IDisposable
             CardPileCmd.Add(c, PileType.Discard);
         }
 
-        player.RunState.Rng.MockRng(RunRngType.Shuffle, 8uL);
+        player.RunState.Rng.MockRng(RunRngType.CombatCardSelection, 8uL);
         AddTo<Ricochet>(player, PileType.Draw);
         AddTo<DefendRegent>(player, PileType.Draw);
         StrikeRegent? unplayable = null;
@@ -103,14 +103,14 @@ public sealed class AutoPlayCardTests : IDisposable
         int hpBefore = enemy.CurrentHp;
         int blockBefore = player.Creature.Block;
         int targetsBefore = player.RunState.Rng.CombatTargets.Counter;
-        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+        int shuffleBefore = player.RunState.Rng.CombatCardSelection.Counter;
 
         await card.PlayAsync(target: null);
 
         Assert.Equal(hpBefore - 12, enemy.CurrentHp);
         Assert.Equal(blockBefore + 5, player.Creature.Block);
         Assert.Equal(targetsBefore + 4, player.RunState.Rng.CombatTargets.Counter);
-        Assert.Equal(shuffleBefore + 1, player.RunState.Rng.Shuffle.Counter);
+        Assert.Equal(shuffleBefore + 1, player.RunState.Rng.CombatCardSelection.Counter);
         Assert.Equal(includeUnplayableCard ? 1 : 0, player.PlayerCombatState.DrawPile.Cards.Count);
         if (unplayable is not null)
         {
@@ -138,8 +138,8 @@ public sealed class AutoPlayCardTests : IDisposable
         foreach (CardModel c in player.PlayerCombatState!.DrawPile.Cards.ToList())
             CardPileCmd.Add(c, PileType.Discard);
 
-        // Shuffle seed 8 selects Ricochet first from this two-card list.
-        player.RunState.Rng.MockRng(RunRngType.Shuffle, 8uL);
+        // CombatCardSelection seed 8 selects Ricochet first from this two-card list.
+        player.RunState.Rng.MockRng(RunRngType.CombatCardSelection, 8uL);
         AddTo<Ricochet>(player, PileType.Draw);
         TheBomb bomb = AddTo<TheBomb>(player, PileType.Draw);
         if (unplayable) bomb.AddKeywordInternal(CardKeyword.Unplayable);
@@ -151,7 +151,7 @@ public sealed class AutoPlayCardTests : IDisposable
         enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
         int playsBefore = player.PlayerCombatState.CardsPlayedThisTurn;
         int energyBefore = player.PlayerCombatState.Energy;
-        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+        int shuffleBefore = player.RunState.Rng.CombatCardSelection.Counter;
 
         await card.PlayAsync(target: null);
 
@@ -165,7 +165,7 @@ public sealed class AutoPlayCardTests : IDisposable
         Assert.Equal(energyBefore - 2, player.PlayerCombatState.Energy);
         // Native Catastrophe still selects on later iterations before AutoPlay refuses.
         Assert.Equal(shuffleBefore + (upgraded && unplayable ? 2 : 1),
-            player.RunState.Rng.Shuffle.Counter);
+            player.RunState.Rng.CombatCardSelection.Counter);
     }
 
     [Theory]
@@ -175,7 +175,7 @@ public sealed class AutoPlayCardTests : IDisposable
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("beat-down");
         player.PlayerCombatState!.Energy = 10;
-        player.RunState.Rng.MockRng(RunRngType.Shuffle, 8uL);
+        player.RunState.Rng.MockRng(RunRngType.CombatCardSelection, 8uL);
         AddTo<StrikeRegent>(player, PileType.Discard);
         AddTo<Clash>(player, PileType.Discard);
         AddTo<Neutralize>(player, PileType.Discard);
@@ -191,13 +191,13 @@ public sealed class AutoPlayCardTests : IDisposable
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hpBefore = enemy.CurrentHp;
         int blockBefore = player.Creature.Block;
-        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+        int shuffleBefore = player.RunState.Rng.CombatCardSelection.Counter;
 
         await card.PlayAsync(target: null);
 
         Assert.Equal(hpBefore - 27, enemy.CurrentHp); // 原生：Clash 14 + Neutralize 3 + Dash 10。
         Assert.Equal(blockBefore + 10, player.Creature.Block); // Dash 必须被自动打出。
-        Assert.Equal(shuffleBefore + 3, player.RunState.Rng.Shuffle.Counter);
+        Assert.Equal(shuffleBefore + 3, player.RunState.Rng.CombatCardSelection.Counter);
         Assert.Equal(7, player.PlayerCombatState.Energy);
         if (unplayable is not null)
             Assert.Contains(unplayable, player.PlayerCombatState.DiscardPile.Cards);

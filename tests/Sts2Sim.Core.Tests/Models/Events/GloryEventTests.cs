@@ -230,16 +230,16 @@ public sealed class GloryEventTests : IDisposable
         (RunState runState, Player player, HungryForMushrooms ev) = Begin<HungryForMushrooms>("mushroom-fragrant");
         int hpBefore = player.Creature.CurrentHp;
         List<CardModel> candidates = player.Deck.Cards.Where(card => card.IsUpgradable).ToList();
-        var probe = runState.Rng.Niche.CloneExact();
+        var probe = player.PlayerRng.NonCombatGeneration.CloneExact();
         List<CardModel> expected = candidates.ToList().StableShuffle(probe).Take(2).ToList();
-        int counterBefore = runState.Rng.Niche.Counter;
+        int counterBefore = player.PlayerRng.NonCombatGeneration.Counter;
 
         await Choose(ev, "FRAGRANT_MUSHROOM");
 
         Assert.Equal(hpBefore - 15, player.Creature.CurrentHp);
         Assert.Equal(2, player.Deck.Cards.Count(card => card.IsUpgraded));
         Assert.All(expected, card => Assert.True(card.IsUpgraded));
-        Assert.Equal(probe.Counter - counterBefore, runState.Rng.Niche.Counter - counterBefore);
+        Assert.Equal(probe.Counter - counterBefore, player.PlayerRng.NonCombatGeneration.Counter - counterBefore);
         Assert.Single(player.Relics.OfType<FragrantMushroom>());
         Assert.True(ev.IsFinished);
     }

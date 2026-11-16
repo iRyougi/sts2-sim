@@ -4,8 +4,13 @@ using Sts2Sim.Core.Entities.Cards;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>8伤害;每次被抽到永久+4伤害(叠加)。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.KinglyPunch</c>）。</summary>
-public sealed class KinglyPunch : CardModel, ICardDamageVariableProvider
+public sealed class KinglyPunch : CardModel, ICardDamageVariableProvider, ICardComparisonBaseValueSource
 {
+    /// <summary>v0.113.1 CompareTo 视图：原版 <c>Damage</c> 的当前 BaseValue。</summary>
+    public decimal GetComparisonBaseValue(string key) => key == "Damage"
+        ? _damage
+        : throw new ArgumentOutOfRangeException(nameof(key), key, "Not a runtime-mutable comparison key.");
+
     private decimal _damage = 8m;
     private decimal _increasePerDraw = 4m;
 
