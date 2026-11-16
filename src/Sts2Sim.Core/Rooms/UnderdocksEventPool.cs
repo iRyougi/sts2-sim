@@ -2,7 +2,7 @@ using Sts2Sim.Core.Models.Events;
 
 namespace Sts2Sim.Core.Rooms;
 
-/// <summary>Underdocks events; ActDefinition.EffectiveEventPool appends the existing SharedEventPool once.</summary>
+/// <summary>Underdocks events in v0.113.1 source order; ActDefinition.EffectiveEventPool appends the existing SharedEventPool once.</summary>
 public static class UnderdocksEventPool
 {
     public static IReadOnlyList<Type> All { get; } = Array.AsReadOnly(new[]
@@ -16,6 +16,8 @@ public static class UnderdocksEventPool
         typeof(SunkenTreasury),
         typeof(DoorsOfLightAndDark),
         typeof(TrashHeap),
+        typeof(WaterfallOfObviousSecrets),
         typeof(WaterloggedScriptorium),
+        // v0.113.1 appends WuppyInTrouble here; it is owned by #928 (偏离登记 #927 暂缺项).
     });
 }

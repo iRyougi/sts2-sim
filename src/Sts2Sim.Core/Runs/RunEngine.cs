@@ -692,7 +692,8 @@ public sealed class RunEngine
         EventRoom eventRoom,
         ICollection<string>? chosenOptionKeys = null)
     {
-        for (int choices = 0; !eventRoom.Event.IsFinished; choices++)
+        // Native death ends the run at once; a dead party never takes another event option.
+        for (int choices = 0; !eventRoom.Event.IsFinished && !IsRunOver(eventRoom); choices++)
         {
             if (choices >= MaximumEventChoices)
             {
@@ -729,7 +730,8 @@ public sealed class RunEngine
         EventRoom eventRoom,
         ICollection<string>? chosenOptionKeys = null)
     {
-        for (int choices = 0; !eventRoom.Event.IsFinished; choices++)
+        // Native death ends the run at once; a dead party never takes another event option.
+        for (int choices = 0; !eventRoom.Event.IsFinished && !IsRunOver(eventRoom); choices++)
         {
             if (choices >= MaximumEventChoices)
             {
@@ -753,6 +755,8 @@ public sealed class RunEngine
 
         await DrainEventRewardOffersAsync(eventRoom);
     }
+    private static bool IsRunOver(EventRoom eventRoom) => eventRoom.Event.RunState is RunState { IsGameOver: true };
+
     private static async Task DrainEventRewardOffersAsync(EventRoom eventRoom)
     {
         while (eventRoom.Event.TryDequeuePendingRewardOffer(out RewardsSet? rewards))

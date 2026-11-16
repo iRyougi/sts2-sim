@@ -16,7 +16,7 @@ public sealed class ArchivedEncounterBagOrderTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
     }
 
-    [Fact]
+    [Fact(Skip = "v0.111.0 archived run; v0.113.1 act event pools (#927) change the up-front room-generation RNG; same-version reference pending #930")]
     public void ArchivedRuns_FirstRegularAndGloryEliteEncountersMatchHistory()
     {
         // Independent run_history observations: the third ordinary encounter follows two weak slots.

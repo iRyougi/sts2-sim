@@ -33,10 +33,12 @@ public sealed class GloryTests
                 typeof(HungryForMushrooms),
                 typeof(Reflections),
                 typeof(RoundTeaParty),
-                typeof(Trial),
+                typeof(ShrineOfTheWarlord),
+                typeof(ThermaeNonupeipe),
                 typeof(TinkerTime),
+                typeof(Trial),
             },
-            act.EventPool);
+            act.EventPool); // v0.113.1 Glory.AllEvents (#927)
         Assert.Equal(new[] { typeof(Nonupeipe), typeof(Tanx), typeof(Vakuu) }, act.AncientPool);
     }
 

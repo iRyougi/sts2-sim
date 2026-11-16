@@ -39,6 +39,15 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
+    // The colorless vectors are v0.111.0 native evidence; v0.113.1 ColorlessCardPool adds MyShinies (#927),
+    // so the pool and RNG picks differ. Kept verbatim, not refreshed, until same-version vectors exist (#930).
+    [Theory(Skip = "v0.111.0 native colorless vectors; v0.113.1 adds MyShinies to ColorlessCardPool (#927); same-version vectors pending #930")]
+    [InlineData("Colorless", "HSP7P798XTVC", "UltimateStrike Impatience UltimateDefend", 49, 714604651)]
+    [InlineData("Colorless", "XEB2TX5C4XL6", "Production Omnislice UltimateStrike", 49, 16112059)]
+    public Task GenerateChoices_V0111ColorlessVectors(
+        string kind, string seed, string expectedChoices, int expectedDraws, int expectedNext) =>
+        GenerateChoices_MatchesNativePoolOrderAndRng(kind, seed, expectedChoices, expectedDraws, expectedNext);
+
     [Theory]
     [InlineData("Attack", "HSP7P798XTVC", "Dash DaggerThrow FlickFlack", 22, 2124664562)]
     [InlineData("Attack", "XEB2TX5C4XL6", "EchoingSlash Ricochet Skewer", 22, 2071359471)]
@@ -46,8 +55,6 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
     [InlineData("Skill", "XEB2TX5C4XL6", "Malaise Expertise Prepared", 38, 1519507862)]
     [InlineData("Power", "HSP7P798XTVC", "WellLaidPlans InfiniteBlades ToolsOfTheTrade", 15, 1438873863)]
     [InlineData("Power", "XEB2TX5C4XL6", "Footwork ToolsOfTheTrade MasterPlanner", 15, 1855981314)]
-    [InlineData("Colorless", "HSP7P798XTVC", "UltimateStrike Impatience UltimateDefend", 49, 714604651)]
-    [InlineData("Colorless", "XEB2TX5C4XL6", "Production Omnislice UltimateStrike", 49, 16112059)]
     public async Task GenerateChoices_MatchesNativePoolOrderAndRng(
         string kind, string seed, string expectedChoices, int expectedDraws, int expectedNext)
     {

@@ -609,7 +609,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             throw new InvalidOperationException("Card is not upgraded.");
         }
 
-        CardModel lowerLevel = CreateCanonicalReplay(CurrentUpgradeLevel - 1);
+        // Native DowngradeInternal always returns to level 0; identical to one step for single-level cards (#927).
+        CardModel lowerLevel = CreateCanonicalReplay(0);
         CardModel currentLevel = CreateCanonicalReplay(CurrentUpgradeLevel);
         Dictionary<FieldInfo, object> lowerNumeric = lowerLevel.CaptureUpgradeNumericState();
         Dictionary<FieldInfo, object> currentNumeric = currentLevel.CaptureUpgradeNumericState();
@@ -635,7 +636,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                 SubtractNumeric(runtimeValue, upgradeDelta, field.FieldType));
         }
 
-        CurrentUpgradeLevel--;
+        CurrentUpgradeLevel = 0;
         SetEffectiveKeywords(restoredKeywords);
     }
 

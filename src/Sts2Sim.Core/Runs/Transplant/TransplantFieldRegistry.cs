@@ -21,6 +21,7 @@ public static class TransplantFieldRegistry
         "EmberTea._combatsLeft", "FakeHappyFlower._turnsSeen", "FakeVenerableTeaSet._isArmed",
         "FurCoat._actIndex", "FurCoat._markedCoordinates", "GalacticDust._starsSpent",
         "Girya._timesLifted", "HappyFlower._turnCounter", "IronClub._cardsPlayed",
+        "BathRobes._wasUsed",
         "JossPaper._cardsExhausted", "LastingCandy._combatRewardsSeen", "LizardTail._wasUsed",
         "MawBank._hasItemBeenBought", "Nunchaku._attacksPlayed", "PaelsTooth._removedCards",
         "PaelsWing._rewardsSacrificed", "Pendulum._turnCounter", "PenNib._attacksPlayed",

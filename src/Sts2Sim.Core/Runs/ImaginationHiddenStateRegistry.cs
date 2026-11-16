@@ -94,6 +94,7 @@ internal static class ImaginationHiddenStateRegistry
         Event("JungleMazeAdventure", V, "Displayed event gold DynamicVars.", "_soloGold _joinForcesGold");
         Event("LostWisp", V, "Displayed event gold DynamicVar.", "_gold");
         Event("LuminousChoir", V, "Displayed tribute cost and enabled option.", "_cost");
+        Event("MuseumOfTorture", V, "Null until DISPLAY opens; then the offered relic is shown on that page (roll deferred, #927).", "_offeredRelic");
         Event("PunchOff", V, reward, "_combatRewards");
         Event("RanwidTheElder", V, "Offered potion and relic are exposed by the current event page.", "<PotionOffered>k__BackingField <RelicOffered>k__BackingField");
         Event("RelicTrader", V, "Current trade offer exposes both relic columns.", "<OwnedRelics>k__BackingField <NewRelics>k__BackingField");
@@ -103,6 +104,7 @@ internal static class ImaginationHiddenStateRegistry
         Event("SunkenStatue", V, "Displayed event gold DynamicVar.", "_gold");
         Event("SunkenTreasury", V, "Displayed event gold DynamicVars.", "_smallChestGold _largeChestGold");
         Event("TabletOfTruth", V, history, "_decipherCount _currentCost");
+        Event("ThermaeNonupeipe", V, "Drink relic is named and hovered on the first page.", "_drinkRelic");
         Event("TheFutureOfPotions", V, "Each rolled card type is shown in its POTION option description.", "_cardTypes");
         Event("TheLanternKey", V, reward, "_combatRewards");
         Event("ThisOrThat", V, "Displayed event gold DynamicVar.", "_gold");

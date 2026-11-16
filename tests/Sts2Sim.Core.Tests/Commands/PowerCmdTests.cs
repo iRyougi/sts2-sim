@@ -83,16 +83,19 @@ public class PowerCmdTests
         Assert.Contains(power, target.Powers);
     }
 
-    [Fact]
-    public async Task Apply_NewPlayerDebuff_SetsSkipNextDurationTick()
+    [Theory]
+    [InlineData(CombatSide.Enemy, true)]
+    [InlineData(CombatSide.Player, false)]
+    public async Task Apply_NewPlayerDebuff_SetsSkipNextDurationTick(CombatSide currentSide, bool expectedSkip)
     {
-        var combatState = new FakeCombatState(new FakeRunState());
+        // v0.113.1 PowerCmd.Apply (#942): only an enemy-turn debuff on the player skips the next tick.
+        var combatState = new FakeCombatState(new FakeRunState()) { CurrentSide = currentSide };
         Creature target = Creature.CreateStandaloneForTests(30, 30);
 
         DebuffPower? power = await PowerCmd.Apply<DebuffPower>(combatState, target, 1m, null, null);
 
         Assert.NotNull(power);
-        Assert.True(power!.SkipNextDurationTick);
+        Assert.Equal(expectedSkip, power!.SkipNextDurationTick);
     }
 
     [Fact]
@@ -188,7 +191,7 @@ public class PowerCmdTests
     [Fact]
     public async Task TickDownDuration_SkipFlagConsumesFirstTick_ThenRemovesAtZero()
     {
-        var combatState = new FakeCombatState(new FakeRunState());
+        var combatState = new FakeCombatState(new FakeRunState()) { CurrentSide = CombatSide.Enemy };
         Creature target = Creature.CreateStandaloneForTests(30, 30);
         DebuffPower power = (await PowerCmd.Apply<DebuffPower>(combatState, target, 1m, null, null))!;
 

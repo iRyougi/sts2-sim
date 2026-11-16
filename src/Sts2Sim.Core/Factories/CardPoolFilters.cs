@@ -7,14 +7,16 @@ namespace Sts2Sim.Core.Factories;
 /// <summary>Canonical eligibility filters for card pools shared by rewards, merchants, and effects.</summary>
 public static class CardPoolFilters
 {
-    // v0.111.0 EventCardPool.GenerateAllCards, excluding the ten cards whose
+    // v0.113.1 EventCardPool.GenerateAllCards (adds DingyDagger/MightyShield/MightyWeapon, #927; GodByrd
+    // belongs to #928), excluding the ten cards whose
     // VisualCardPool is explicitly overridden to a character pool. Event and Token
     // pools are visually colorless even when CardModel.IsColorless is false.
     private static readonly HashSet<Type> VisuallyColorlessEventCards =
     [
         typeof(Abundance), typeof(Apotheosis), typeof(Apparition), typeof(BrightestFlame),
-        typeof(ByrdSwoop), typeof(Enlightenment), typeof(Exterminate), typeof(FeedingFrenzy),
-        typeof(MadScience), typeof(Maul), typeof(Metamorphosis), typeof(NeowsFury),
+        typeof(ByrdSwoop), typeof(DingyDagger), typeof(Enlightenment), typeof(Exterminate), typeof(FeedingFrenzy),
+        typeof(MadScience), typeof(Maul), typeof(Metamorphosis), typeof(MightyShield), typeof(MightyWeapon),
+        typeof(NeowsFury),
         typeof(Peck), typeof(Relax), typeof(Squash), typeof(ToricToughness),
         typeof(Wish), typeof(Whistle),
     ];

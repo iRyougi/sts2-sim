@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Gold;
 using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Hooks;
@@ -219,8 +220,9 @@ public sealed class MerchantRoom : AbstractRoom
             ValidatePurchase(entry, player, inventory.Relics);
             int price = entry.Price;
 
+            // MerchantRelicEntry.OnTryPurchaseInternal: gold is spent before the relic is obtained (#943).
+            await PlayerCmd.LoseGold(price, player, GoldLossType.Spent);
             await RelicCmd.Obtain(entry.Relic, player);
-            await PlayerCmd.LoseGold(price, player);
             entry.MarkPurchased();
             RefillIfNeeded(entry, player, inventory);
             await Hook.AfterItemPurchased(player.RunState, player, entry, price);

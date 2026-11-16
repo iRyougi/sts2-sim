@@ -34,8 +34,9 @@ public sealed class GloryEventTests : IDisposable
     public void Dispose() => ModelDb.ResetForTests();
 
     [Fact]
-    public void Act3EventPool_ContainsExactlyTheSevenCanonicalEvents()
+    public void Act3EventPool_ContainsExactlyTheNineCanonicalEvents()
     {
+        // v0.113.1 Glory.AllEvents: two new events and TinkerTime/Trial swapped (#927).
         Assert.Equal(
             new[]
             {
@@ -44,11 +45,13 @@ public sealed class GloryEventTests : IDisposable
                 typeof(HungryForMushrooms),
                 typeof(Reflections),
                 typeof(RoundTeaParty),
-                typeof(Trial),
+                typeof(ShrineOfTheWarlord),
+                typeof(ThermaeNonupeipe),
                 typeof(TinkerTime),
+                typeof(Trial),
             },
             Act3EventPool.All);
-        Assert.Equal(7, Act3EventPool.All.Distinct().Count());
+        Assert.Equal(9, Act3EventPool.All.Distinct().Count());
     }
 
     [Theory]

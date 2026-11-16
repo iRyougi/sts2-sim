@@ -99,7 +99,7 @@ public class StrengthAndVulnerableTests
     public async Task VulnerablePower_NewPlayerDebuffSkipsFirstEnemyTurnEndThenTicksDown()
     {
         var target = Creature.CreateStandaloneForTests(30, 30);
-        var combatState = new FakeCombatState(new FakeRunState(), target);
+        var combatState = new FakeCombatState(new FakeRunState(), target) { CurrentSide = CombatSide.Enemy };
         target.CombatState = combatState;
         VulnerablePower power = (await PowerCmd.Apply<VulnerablePower>(combatState, target, 2m, null, null))!;
 

@@ -16,6 +16,7 @@ internal static class TransplantSavedProperties
         new Dictionary<string, Binding>(StringComparer.Ordinal)
         {
             ["SeaGlass.CharacterId"] = new("_characterId", "model_ids"),
+            ["BathRobes.WasUsed"] = new("_wasUsed", "bools"),
             ["BoneTea.CombatsLeft"] = new("_combatsLeft", "ints"),
             ["BookOfFiveRings.CardsAdded"] = new("_cardsAdded", "ints"),
             ["DustyTome.AncientCard"] = new("_ancientCard", "model_ids"),

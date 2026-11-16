@@ -107,7 +107,8 @@ public static class PowerCmd
         {
             power.ApplyInternal(target, modifiedAmount);
             RecordPowerReceived(combatState, power, applier);
-            if (target.Side == CombatSide.Player && power.Type == PowerType.Debuff)
+            // v0.113.1: only debuffs applied to the player during the enemy turn skip the next tick (#942).
+            if (target.Side == CombatSide.Player && combatState.CurrentSide == CombatSide.Enemy && power.Type == PowerType.Debuff)
             {
                 power.SkipNextDurationTick = true;
             }

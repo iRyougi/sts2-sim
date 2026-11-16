@@ -23,7 +23,7 @@ public sealed class DoubleBossRunTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
     }
 
-    [Fact]
+    [Fact(Skip = "v0.111.0 archived run; v0.113.1 act event pools (#927) change the up-front room-generation RNG; same-version reference pending #930")]
     public void ArchivedUnderdocksRuns_FirstBossIsWaterfallGiant()
     {
         // Independent F17 run_history observations; do not derive expected boss from the pool.

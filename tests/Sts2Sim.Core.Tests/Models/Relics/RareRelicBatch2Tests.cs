@@ -365,12 +365,12 @@ public sealed class RareRelicBatch2Tests : IDisposable
             player.PlayerCombatState!.Hand.Cards.Where(card => card.IsColorless).ToArray();
         Assert.Equal(2, generated.Length);
         Assert.Equal(2, generated.Select(card => card.GetType()).Distinct().Count());
-        // Native GetDistinctForCombat shuffles all 50 eligible colorless cards (49 draws).
-        Assert.Equal(49, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        // Native GetDistinctForCombat shuffles all 51 eligible colorless cards (50 draws; v0.113.1 adds MyShinies, #927).
+        Assert.Equal(50, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
 
         await room.Engine.EndPlayerTurnAsync();
 
-        Assert.Equal(49, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
+        Assert.Equal(50, room.Engine.State.RunState.Rng.CombatCardGeneration.Counter);
     }
 
     [Fact]

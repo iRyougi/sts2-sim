@@ -121,7 +121,7 @@ public abstract class EventModel : AbstractModel
     /// <remarks>偏离 #288：真实游戏的 <c>IsShared</c> 未移植。它的用途全在多人——<c>EventSynchronizer</c>
     /// 的共享推进，以及 <c>NEventLayout</c>/<c>NEventRoom</c> 的标签与选项锁定，全部由
     /// 这些用途都由多人模式判断控制。本模拟器只跑单人，所以不保留没有读取方的元数据。
-    /// 事件池归属与它无关：那来自显式的 18 项 <c>ModelDb.AllSharedEvents</c>，本地镜像在
+    /// 事件池归属与它无关：那来自显式的 19 项（v0.113.1） <c>ModelDb.AllSharedEvents</c>，本地镜像在
     /// <see cref="Rooms.SharedEventPool"/>。</remarks>
     public virtual bool CanAppearNaturally => true;
     public virtual EventLayoutType LayoutType => EventLayoutType.Default;

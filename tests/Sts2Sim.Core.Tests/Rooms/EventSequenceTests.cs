@@ -105,7 +105,7 @@ public sealed class EventSequenceTests : IDisposable
             Assert.Equal(counter, runState.Rng.GetRng(type).Counter);
         }
     }
-    [Fact]
+    [Fact(Skip = "v0.111.0 archived run; v0.113.1 shared event pool adds MuseumOfTorture (#927), changing the act event shuffle; same-version reference pending #930")]
     public async Task Archived8F9CPYQ6QYEN_FirstHiveEventIsTheFutureOfPotions()
     {
         // Archive F18 is Pael and F21 is TheFutureOfPotions. The potion pair

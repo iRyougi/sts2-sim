@@ -16,7 +16,7 @@ public sealed class GloryBossOrderReferenceTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
     }
 
-    [Fact]
+    [Fact(Skip = "v0.111.0 archived run; v0.113.1 act event pools (#927) change the up-front room-generation RNG; same-version reference pending #930")]
     public void ArchivedA10SilentRun_GloryBossesAreQueenThenTestSubject()
     {
         const string seed = "8F9CPYQ6QYEN";

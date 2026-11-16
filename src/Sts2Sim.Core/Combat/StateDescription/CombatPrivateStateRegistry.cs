@@ -32,6 +32,7 @@ internal static class CombatPrivateStateRegistry
         "HappyFlower._turnCounter", "JossPaper._cardsExhausted", "JossPaper._etherealCount",
         "Kunai._attacksThisTurn", "Kusarigama._attacksThisTurn", "LavaLamp._tookDamageThisCombat",
         "LetterOpener._skillsThisTurn", "LizardTail._wasUsed", "MiniRegent._triggeredThisTurn",
+        "BathRobes._wasUsed",
         "Nunchaku._attacksPlayed", "Orichalcum._shouldTrigger",
         "OrnamentalFan._attacksThisTurn",
         "Pendulum._turnCounter", "PenNib._attacksPlayed", "Permafrost._triggeredThisCombat",
@@ -292,6 +293,9 @@ internal static class CombatPrivateStateRegistry
         "LeadingStrike._damage", "MementoMori._damage",
         "PhantomBlades._amount", "Prepared._cards", "Reflex._cards", "Tactician._energy",
         "UpMySleeve._cards",
+        // v0.113.1 event/colorless card literals (#927), fixed by model ID and upgrade level.
+        "DingyDagger._damage", "MightyShield._block", "MightyWeapon._damage",
+        "MyShinies._damage", "MyShinies._goldPerHit",
         "TheBomb._damage", "ThinkingAhead._draw", "ThrummingHatchet._damage",
         "ToricToughness._block", "Venerate._starsGranted", "MadScience._type",
         "PhantasmalGardener.<CurrentScale>k__BackingField",

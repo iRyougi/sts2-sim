@@ -63,6 +63,7 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("LostWisp")]
     [InlineData("LuminousChoir")]
     [InlineData("MorphicGrove")]
+    [InlineData("MuseumOfTorture")]
     [InlineData("Neow")]
     [InlineData("Nonupeipe")]
     [InlineData("Orobas")]
@@ -76,6 +77,7 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("RoundTeaParty")]
     [InlineData("SapphireSeed")]
     [InlineData("SelfHelpBook")]
+    [InlineData("ShrineOfTheWarlord")]
     [InlineData("SlipperyBridge")]
     [InlineData("SpiralingWhirlpool")]
     [InlineData("SpiritGrafter")]
@@ -90,6 +92,7 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("TheFutureOfPotions")]
     [InlineData("TheLanternKey")]
     [InlineData("TheLegendsWereTrue")]
+    [InlineData("ThermaeNonupeipe")]
     [InlineData("ThisOrThat")]
     [InlineData("TinkerTime")]
     [InlineData("TrashHeap")]
@@ -97,6 +100,7 @@ public sealed class EventVisibleStateTests : IDisposable
     [InlineData("UnrestSite")]
     [InlineData("Vakuu")]
     [InlineData("WarHistorianRepy")]
+    [InlineData("WaterfallOfObviousSecrets")]
     [InlineData("WaterloggedScriptorium")]
     [InlineData("WelcomeToWongos")]
     [InlineData("Wellspring")]
@@ -426,6 +430,9 @@ public sealed class EventVisibleStateTests : IDisposable
             "Wellspring" => ("BOTTLE", "PotionCount", "1"),
             "WoodCarvings" => ("BIRD", "TransformCount", "1"),
             "ZenWeaver" => ("BREATHING_TECHNIQUES", "BreathingTechniquesCost", "25"),
+            // v0.113.1 (#927) displayed constants.
+            "ShrineOfTheWarlord" => ("TAKE_WINGS", "CurseCount", "1"),
+            "ThermaeNonupeipe" => ("THERMAL_BATHS", "Gold", "88"),
             _ => null,
         };
         if (example is { } expected)
@@ -494,7 +501,8 @@ public sealed class EventVisibleStateTests : IDisposable
         else if (!ev.IsFinished && ev.CurrentOptions.Count > 0 && !ev.IsAwaitingForcedCombat && !ev.HasPendingRewardOffers)
         {
             // Empty continuation pages have no extra numeric semantics in the approved source table.
-            string[] emptyKeys = ["ACCEPT", "REJECT", "FIGHT", "CONTINUE_FIGHT", "PROCEED", "GIVE_UP", "LEAVE", "EXIT_BATHS"];
+            string[] emptyKeys = ["ACCEPT", "REJECT", "FIGHT", "CONTINUE_FIGHT", "PROCEED", "GIVE_UP", "LEAVE", "EXIT_BATHS",
+                "ENTER", "CONTINUE"]; // v0.113.1 Waterfall/Museum page navigation (#927)
             Assert.All(snapshot.Metadata.DisplayOptions.Where(o => o.IsEnabled && !emptyKeys.Contains(o.OptionKey)), row =>
                 Assert.True(row.Values.Length + row.Contents.Length > 0, $"{ev.Id}/{row.OptionKey}: current displayed semantics missing."));
         }
@@ -505,8 +513,8 @@ public sealed class EventVisibleStateTests : IDisposable
         if (scenario == "Inventory")
         {
             Type[] events = ContentRegistry.AllTypes.Where(t => typeof(EventModel).IsAssignableFrom(t) && !t.IsAbstract).ToArray();
-            Assert.Equal(65, events.Length);
-            Assert.Equal(57, events.Count(t => !typeof(AncientEventModel).IsAssignableFrom(t)));
+            Assert.Equal(69, events.Length);
+            Assert.Equal(61, events.Count(t => !typeof(AncientEventModel).IsAssignableFrom(t)));
             Assert.Equal(8, events.Count(t => typeof(AncientEventModel).IsAssignableFrom(t)));
             Assert.False(typeof(EventModel).IsAssignableFrom(typeof(ForcedCombatOutcome)));
             Assert.Equal(new ForcedCombatOutcome(true, false), new ForcedCombatOutcome(Victory: true, TimedOut: false));

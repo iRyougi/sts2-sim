@@ -37,18 +37,18 @@ public sealed class SharedEventIntegrationTests : IDisposable
         Assert.Equal(new[]
         {
             typeof(BrainLeech), typeof(CrystalSphere), typeof(DollRoom), typeof(FakeMerchant),
-            typeof(PotionCourier), typeof(RanwidTheElder), typeof(RelicTrader), typeof(RoomFullOfCheese),
+            typeof(MuseumOfTorture), typeof(PotionCourier), typeof(RanwidTheElder), typeof(RelicTrader), typeof(RoomFullOfCheese),
             typeof(SelfHelpBook), typeof(SlipperyBridge), typeof(StoneOfAllTime), typeof(Symbiote),
             typeof(TeaMaster), typeof(TheFutureOfPotions), typeof(TheLegendsWereTrue), typeof(ThisOrThat),
             typeof(WarHistorianRepy), typeof(WelcomeToWongos),
         }, SharedEventPool.All);
-        Assert.Equal(18, SharedEventPool.All.Distinct().Count());
+        Assert.Equal(19, SharedEventPool.All.Distinct().Count()); // v0.113.1 adds MuseumOfTorture (#927)
     }
 
     [Theory]
-    [InlineData(typeof(Overgrowth), 13, 31)]
-    [InlineData(typeof(Hive), 10, 28)]
-    [InlineData(typeof(Glory), 7, 25)]
+    [InlineData(typeof(Overgrowth), 13, 32)]
+    [InlineData(typeof(Hive), 10, 29)]
+    [InlineData(typeof(Glory), 9, 28)]
     public void EffectivePool_PutsOwnEventsBeforeShared(Type actType, int ownCount, int total)
     {
         var act = (ActDefinition)Activator.CreateInstance(actType)!;
