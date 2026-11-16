@@ -910,13 +910,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         try
         {
             observer?.CardPlayStarted(this, target);
-            return await PlayAfterObserverStartedAsync(
+            CardPlay? firstPlay = await PlayAfterObserverStartedAsync(
                 combatState,
                 target,
                 isAutoPlay,
                 spendResources,
-                prepaidXCapture,
-                observer);
+                prepaidXCapture);
+            observer?.CardPlayFinished(this, target, firstPlay);
+            return firstPlay;
         }
         catch
         {
@@ -931,8 +932,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         Creature? target,
         bool isAutoPlay,
         bool spendResources,
-        PrepaidXCapture? prepaidXCapture,
-        ICombatObserver? observer)
+        PrepaidXCapture? prepaidXCapture)
     {
         Player originalOwner = Owner;
 
@@ -984,6 +984,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             target,
             out List<AbstractModel> playCountModifiers);
         await Hook.AfterModifyingCardPlayCount(combatState, this, playCountModifiers);
+        if (Owner.Creature.IsDead)
+        {
+            return null;
+        }
+
         CardPlay? firstPlay = null;
         playerCombatState.CardOrPotionEffectDepth++;
         try
@@ -1013,14 +1018,29 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                 await Hook.BeforeCardPlayed(combatState, cardPlay);
                 playerCombatState.RecordCardPlayStarted(cardPlay);
                 await OnPlay(cardPlay);
+                if (Owner.Creature.IsDead)
+                {
+                    return firstPlay;
+                }
+
                 foreach (EnchantmentModel enchantment in _enchantments.ToArray())
                 {
                     await enchantment.OnPlay(this, cardPlay);
+                    if (Owner.Creature.IsDead)
+                    {
+                        return firstPlay;
+                    }
+
                     enchantment.InvokeExecutionFinished();
                 }
                 if (_affliction is not null)
                 {
                     await _affliction.OnPlay(cardPlay);
+                    if (Owner.Creature.IsDead)
+                    {
+                        return firstPlay;
+                    }
+
                     _affliction.InvokeExecutionFinished();
                 }
                 playerCombatState.RecordCardPlayed(this, isAutoPlay);
@@ -1031,7 +1051,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                 await Hook.AfterCardPlayed(combatState, cardPlay);
                 if (Owner.Creature.IsDead)
                 {
-                    break;
+                    return firstPlay;
                 }
             }
         }
@@ -1077,7 +1097,6 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         _localEnergyModifiers.RemoveAll(modifier => modifier.ClearsAfterPlay);
         ClearTemporaryStarCostOverrideThisTurn();
 
-        observer?.CardPlayFinished(this, target, firstPlay);
         return firstPlay;
     }
 

@@ -21,6 +21,7 @@ internal sealed class CombatRecordingObserver : ICombatObserver
     private readonly Stack<PotionActionContext> _potionActions = [];
     private bool _combatStarted;
     private bool _turnStarted;
+    private bool _turnStartedBeforePreparation;
     private ActionSnapshot? _finalCombatState;
 
     public CombatRecordingObserver(
@@ -50,9 +51,20 @@ internal sealed class CombatRecordingObserver : ICombatObserver
         EnsureCombatStarted();
         if (_turnStarted)
         {
+            if (_turnStartedBeforePreparation)
+            {
+                _turnStartedBeforePreparation = false;
+                return;
+            }
+
             throw new InvalidOperationException("A recorded player turn is already active.");
         }
 
+        StartRecordedTurn(state);
+    }
+
+    private void StartRecordedTurn(CombatState state)
+    {
         _recorder.RecordTurnStart(state);
         _turnStarted = true;
         foreach (CardModel card in _pendingDraws)
@@ -79,8 +91,19 @@ internal sealed class CombatRecordingObserver : ICombatObserver
 
     public void CardPlayStarted(CardModel card, Creature? target)
     {
-        EnsureTurnStarted();
         ArgumentNullException.ThrowIfNull(card);
+        EnsureCombatStarted();
+        CombatState state = _room.Engine.State;
+        if (!_turnStarted && state.CurrentSide == CombatSide.Player &&
+            _player.PlayerCombatState?.Phase == PlayerTurnPhase.Start)
+        {
+            // Hand-draw hooks can autoplay before PlayerTurnPrepared. Keep their
+            // snapshots and pending draws in this turn without changing engine order.
+            StartRecordedTurn(state);
+            _turnStartedBeforePreparation = true;
+        }
+
+        EnsureTurnStarted();
         bool hasOwner = _cardActions.Count > 0 ||
                         _potionActions.Count > 0 ||
                         _enemyActions.Count > 0;
@@ -188,6 +211,7 @@ internal sealed class CombatRecordingObserver : ICombatObserver
             SnapshotFactory.SnapshotPlayer(_player),
             SnapshotEnemies());
         _turnStarted = false;
+        _turnStartedBeforePreparation = false;
     }
 
     public void PotionUseStarted(PotionModel potion, Creature? target)

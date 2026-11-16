@@ -73,12 +73,13 @@ file sealed class CombatReportingMayhemRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Common;
 
-    public override Task BeforeCombatStart() => PowerCmd.Apply<MayhemPower>(
-        Owner.Creature.CombatState!,
-        Owner.Creature,
-        1m,
-        Owner.Creature,
-        cardSource: null);
+    public override async Task BeforeCombatStart()
+    {
+        await PowerCmd.Apply<MayhemPower>(
+            Owner.Creature.CombatState!, Owner.Creature, 1m, Owner.Creature, cardSource: null);
+        await PowerCmd.Apply<HellraiserPower>(
+            Owner.Creature.CombatState!, Owner.Creature, 1m, Owner.Creature, cardSource: null);
+    }
 }
 
 file sealed class CombatReportingStartTurnLethalRelic : RelicModel
@@ -520,14 +521,43 @@ public sealed class CombatDetailRecordingTests : IDisposable
         RunCapture capture = await RunOnceAsync(
             useDriver,
             recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
-            configureDeck: ConfigureMayhemDeck,
-            configureCombat: ConfigureMayhemCombat,
+            configureDeck: player =>
+            {
+                ConfigureMayhemDeck(player);
+                AddToDeck<StrikeIronclad>(player);
+            },
+            configureCombat: player =>
+            {
+                CardModel[] dazed = player.PlayerCombatState!.DrawPile.Cards.OfType<Dazed>().ToArray();
+                PlaceDrawOrder(player, dazed.Take(1)
+                    .Concat(player.PlayerCombatState.DrawPile.Cards.OfType<StrikeIronclad>())
+                    .Concat(dazed.Skip(1).Take(3))
+                    .Concat(player.PlayerCombatState.DrawPile.Cards.OfType<StrikeRegent>())
+                    .Concat(dazed.Skip(4))
+                    .ToArray());
+            },
             decisionSource: useDriver ? new EndTurnDecisionSource() : null,
             addMayhemRelic: true,
             monsterFactory: () => (MonsterModel)ModelDb.Monster<CombatReportingLethalMonster>().MutableClone());
 
         CombatLog log = Assert.Single(capture.CombatLogs).Value;
-        PlayCardAction autoplay = Assert.Single(log.Turns[0].Actions.OfType<PlayCardAction>());
+        TurnRecord firstTurn = Assert.Single(log.Turns);
+        PlayCardAction[] autoplays = firstTurn.Actions.OfType<PlayCardAction>().ToArray();
+        Assert.Equal(new[] { ModelDb.GetId<StrikeIronclad>().ToString(), ModelDb.GetId<StrikeRegent>().ToString() },
+            autoplays.Select(action => action.Card));
+        Assert.True(firstTurn.Draws.Select(draw => draw.Card).SequenceEqual(new[]
+        {
+            ModelDb.GetId<Dazed>().ToString(), ModelDb.GetId<StrikeIronclad>().ToString(),
+            ModelDb.GetId<Dazed>().ToString(), ModelDb.GetId<Dazed>().ToString(), ModelDb.GetId<Dazed>().ToString(),
+        }), $"seed=task-7-combat-reporting, floor=1, turn=1, useDriver={useDriver}: pending hand draws must be recorded once in engine order");
+        Assert.Equal(100, Assert.Single(firstTurn.EnemiesPre).Hp);
+        Assert.All(autoplays, action =>
+        {
+            Assert.Equal(0, action.EnergyCost);
+            Assert.Equal(1, action.PlayCount);
+            Assert.Equal(6, Assert.Single(action.DamageDealt).Amount);
+        });
+        PlayCardAction autoplay = autoplays[1];
         Assert.Equal(ModelDb.GetId<StrikeRegent>().ToString(), autoplay.Card);
         Assert.Equal(0, autoplay.EnergyCost);
         Assert.Equal(1, autoplay.PlayCount);

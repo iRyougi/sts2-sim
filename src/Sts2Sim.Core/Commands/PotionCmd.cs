@@ -162,8 +162,11 @@ public static class PotionCmd
             {
                 if (effectState is not null) effectState.CardOrPotionEffectDepth--;
             }
-            await Hook.AfterPotionUsed(player.RunState, potion, player);
-            if (combatState is not null) await CardPileCmd.CheckForEmptyHand(combatState, player);
+            if (!potion.Owner.Creature.IsDead)
+            {
+                await Hook.AfterPotionUsed(player.RunState, potion, player);
+                if (combatState is not null) await CardPileCmd.CheckForEmptyHand(combatState, player);
+            }
             observer?.PotionUseFinished(potion, target);
         }
         catch
