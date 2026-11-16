@@ -69,6 +69,8 @@ public static class TransplantFieldRegistry
         "Disintegration.<PowerAmount>k__BackingField",
         "Wuppy._combatWuppy",
         "TheShot._cardsExhaustedByFlorescence",
+        "Bounce._lastFinishedPlayerTurn",
+        "YahPower._triggeredThisTurn",
     ];
 
     public static IReadOnlyDictionary<string, (TransplantFieldClass Class, string Reason)> Fields => _fields;

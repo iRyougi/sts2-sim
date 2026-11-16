@@ -114,6 +114,9 @@ internal static class CombatPrivateStateRegistry
         // #929 G1: Fool arrow/shot state
         "ImpaledPower._arrowSources", "ImpaledPower._hitCounter",
         "TheShot._cardsExhaustedByFlorescence",
+        // #929 G2: Bounce last-turn state and YahPower turn trigger flag
+        "Bounce._lastFinishedPlayerTurn",
+        "YahPower._triggeredThisTurn",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =
@@ -173,6 +176,7 @@ internal static class CombatPrivateStateRegistry
         "SoulboundPower._isAddingSoul",
         "AimPower._commandToModify", "AimPower._amountWhenAttackStarted",
         "StretchPower._cardPlay", "StretchPower._amountWhenCardStarted", "StretchPower._gaveBonusBlock",
+        "QuietusPower._commandToModify",
     ];
 
     private static readonly HashSet<string> DerivedFields =

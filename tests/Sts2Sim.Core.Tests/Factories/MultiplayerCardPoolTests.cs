@@ -19,6 +19,7 @@ public sealed class MultiplayerCardPoolTests : IDisposable
         "Midnight", "Mimic", "Outrage", "Plot", "Rally", "Sneaky", "TagTeam", "Tank", "TheBall", "Tutor",
         "EnergySurge", "Ignition", "Hibernate", "ImitationLearning", "OneForAll",
         "Cacophony", "GlimpseBeyond", "LegionOfBone", "Soulbound", "Underworld",
+        "CoveringFire", "Yoga",
     };
 
     public MultiplayerCardPoolTests()
