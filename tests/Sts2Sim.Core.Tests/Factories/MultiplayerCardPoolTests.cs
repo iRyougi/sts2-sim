@@ -20,6 +20,7 @@ public sealed class MultiplayerCardPoolTests : IDisposable
         "EnergySurge", "Ignition", "Hibernate", "ImitationLearning", "OneForAll",
         "Cacophony", "GlimpseBeyond", "LegionOfBone", "Soulbound", "Underworld",
         "CoveringFire", "Yoga",
+        "Ensemble",
     };
 
     public MultiplayerCardPoolTests()

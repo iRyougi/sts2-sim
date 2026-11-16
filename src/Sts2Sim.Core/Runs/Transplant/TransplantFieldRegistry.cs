@@ -71,6 +71,9 @@ public static class TransplantFieldRegistry
         "TheShot._cardsExhaustedByFlorescence",
         "Bounce._lastFinishedPlayerTurn",
         "YahPower._triggeredThisTurn",
+        "EncorePower._cardsBeingPlayed",
+        "EncorePower._numberOfCardsPlayedSinceApplied",
+        "LullabyPower._proccdThisTurn",
     ];
 
     public static IReadOnlyDictionary<string, (TransplantFieldClass Class, string Reason)> Fields => _fields;

@@ -154,6 +154,11 @@ public sealed class PlayerCombatState
     public int FirstChoPlayOrdinalThisTurn { get; private set; }
     public int FirstKiPlayOrdinalThisTurn { get; private set; }
 
+    /// <summary>本回合已开始的含对应旋律标签出牌次数（含自动出牌与重放，用于 LostLute / Motif）。</summary>
+    public int WahStartedThisTurn { get; private set; }
+    public int ChoStartedThisTurn { get; private set; }
+    public int KiStartedThisTurn { get; private set; }
+
     /// <summary>本回合已完成的含对应旋律标签出牌次数（含自动出牌与重放）。</summary>
     public int WahFinishedThisTurn { get; private set; }
     public int ChoFinishedThisTurn { get; private set; }
@@ -170,12 +175,27 @@ public sealed class PlayerCombatState
             FirstInSeriesCardPlaysStartedThisTurn++;
         if (ReferenceEquals(cardPlay.Player, _player))
         {
-            if (FirstWahPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Wah))
-                FirstWahPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
-            if (FirstChoPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Cho))
-                FirstChoPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
-            if (FirstKiPlayOrdinalThisTurn == 0 && cardPlay.Card.Tags.Contains(CardTag.Ki))
-                FirstKiPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            bool hasWah = cardPlay.Card.Tags.Contains(CardTag.Wah);
+            bool hasCho = cardPlay.Card.Tags.Contains(CardTag.Cho);
+            bool hasKi = cardPlay.Card.Tags.Contains(CardTag.Ki);
+            if (hasWah)
+            {
+                WahStartedThisTurn++;
+                if (FirstWahPlayOrdinalThisTurn == 0)
+                    FirstWahPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            }
+            if (hasCho)
+            {
+                ChoStartedThisTurn++;
+                if (FirstChoPlayOrdinalThisTurn == 0)
+                    FirstChoPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            }
+            if (hasKi)
+            {
+                KiStartedThisTurn++;
+                if (FirstKiPlayOrdinalThisTurn == 0)
+                    FirstKiPlayOrdinalThisTurn = cardPlay.PlayOrdinal;
+            }
         }
     }
 
@@ -299,6 +319,9 @@ public sealed class PlayerCombatState
     /// <summary>在 <c>AfterSideTurnEnd</c> 派发之后、换边或进入下一回合前清零本回合旋律统计，保证回合结束钩子可见。</summary>
     internal void ResetMelodyTurnCounters()
     {
+        WahStartedThisTurn = 0;
+        ChoStartedThisTurn = 0;
+        KiStartedThisTurn = 0;
         FirstWahPlayOrdinalThisTurn = 0;
         FirstChoPlayOrdinalThisTurn = 0;
         FirstKiPlayOrdinalThisTurn = 0;
@@ -333,6 +356,9 @@ public sealed class PlayerCombatState
             ZeroCostAttacksStartedThisTurn = ZeroCostAttacksStartedThisTurn,
             FirstInSeriesCardPlaysStartedThisTurn = FirstInSeriesCardPlaysStartedThisTurn,
             CardPlaysStartedThisTurn = CardPlaysStartedThisTurn,
+            WahStartedThisTurn = WahStartedThisTurn,
+            ChoStartedThisTurn = ChoStartedThisTurn,
+            KiStartedThisTurn = KiStartedThisTurn,
             FirstWahPlayOrdinalThisTurn = FirstWahPlayOrdinalThisTurn,
             FirstChoPlayOrdinalThisTurn = FirstChoPlayOrdinalThisTurn,
             FirstKiPlayOrdinalThisTurn = FirstKiPlayOrdinalThisTurn,

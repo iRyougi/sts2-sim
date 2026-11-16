@@ -117,6 +117,9 @@ internal static class CombatPrivateStateRegistry
         // #929 G2: Bounce last-turn state and YahPower turn trigger flag
         "Bounce._lastFinishedPlayerTurn",
         "YahPower._triggeredThisTurn",
+        // #929 G3: EncorePower and LullabyPower state
+        "EncorePower._cardsBeingPlayed", "EncorePower._numberOfCardsPlayedSinceApplied",
+        "LullabyPower._proccdThisTurn",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =

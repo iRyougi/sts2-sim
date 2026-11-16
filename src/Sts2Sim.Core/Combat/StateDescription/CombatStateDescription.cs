@@ -232,6 +232,9 @@ public static class CombatStateDescription
         builder.Append(combat.AttackCardsStartedThisTurn);
         builder.Append(combat.ZeroCostAttacksStartedThisTurn);
         builder.Append(combat.FirstInSeriesCardPlaysStartedThisTurn);
+        builder.Append(combat.WahStartedThisTurn);
+        builder.Append(combat.ChoStartedThisTurn);
+        builder.Append(combat.KiStartedThisTurn);
         builder.Append(combat.FirstWahPlayOrdinalThisTurn);
         builder.Append(combat.FirstChoPlayOrdinalThisTurn);
         builder.Append(combat.FirstKiPlayOrdinalThisTurn);
