@@ -68,7 +68,7 @@ file sealed class LanternKeyCombatDecisionSource : IRunDecisionSource
 public sealed class HiveEventTests : IDisposable
 {
     private static readonly string[] NativeFullUnlockColorOrder =
-        ["NECROBINDER", "IRONCLAD", "REGENT", "SILENT", "DEFECT"];
+        ["NECROBINDER", "IRONCLAD", "REGENT", "FOOL", "SILENT", "DEFECT"];
     private static readonly Type[] ExpectedPool =
     {
         typeof(Amalgamator), typeof(Bugslayer), typeof(ColorfulPhilosophers), typeof(ColossalFlower),
@@ -147,11 +147,12 @@ public sealed class HiveEventTests : IDisposable
             ModelDb.AllCharacters.Where(character => character.IsPlayable)
                 .Select(character => character.Id.Entry)
                 .OrderBy(id => id, StringComparer.Ordinal));
-        // Five unlocked characters give Regent four other colors; this seed removes Defect.
-        Assert.Equal(NativeFullUnlockColorOrder.Where(id => id is not ("REGENT" or "DEFECT")),
-            ev.CurrentOptions.Select(candidate => candidate.Key));
+        // Six unlocked characters give Regent five other colors; two RNG draws remove two. The fixed seed
+        // pins the exact removal result (native order NECROBINDER, IRONCLAD, FOOL, SILENT, DEFECT).
+        string[] actualKeys = ev.CurrentOptions.Select(candidate => candidate.Key).ToArray();
+        Assert.Equal(["NECROBINDER", "IRONCLAD", "SILENT"], actualKeys); // the two draws remove FOOL and DEFECT
         EventOption option = ev.CurrentOptions[^1];
-        Assert.Equal(1, ev.Rng.Counter);
+        Assert.Equal(2, ev.Rng.Counter);
 
         int rewardsBefore = player.PlayerRng.Rewards.Counter;
         await ev.ChooseOption(option);
@@ -166,7 +167,8 @@ public sealed class HiveEventTests : IDisposable
             offered.Select(set => Assert.Single(set.Card.Options.Select(card => card.Rarity).Distinct())));
         Assert.All(offered, set => Assert.Equal(3, set.Card.Options.Count));
         Assert.Equal(18, player.PlayerRng.Rewards.Counter - rewardsBefore);
-        var silentCards = ModelDb.Character<Silent>().CardPool.AllCards.Select(card => card.Id).ToHashSet();
+        var chosenCharacter = ModelDb.AllCharacters.Single(character => character.Id.Entry == option.Key);
+        var chosenCards = chosenCharacter.CardPool.AllCards.Select(card => card.Id).ToHashSet();
         foreach (RewardsSet rewardSet in offered)
         {
             CardReward cardReward = rewardSet.Card;
@@ -176,7 +178,7 @@ public sealed class HiveEventTests : IDisposable
             Assert.All(cardReward.Options, card =>
             {
                 Assert.Equal(rarity, card.Rarity);
-                Assert.Contains(card.Id, silentCards);
+                Assert.Contains(card.Id, chosenCards);
             });
         }
         Assert.True(ev.IsFinished);
@@ -652,7 +654,7 @@ public sealed class HiveEventTests : IDisposable
             run.AdvanceToNextAct();
             var ev = Begin<ColorfulPhilosophers>(run, player);
             int before = player.PlayerRng.Rewards.Counter;
-            string[] colors = ["NECROBINDER", "IRONCLAD", "SILENT", "DEFECT"];
+            string[] colors = ["NECROBINDER", "IRONCLAD", "FOOL", "SILENT", "DEFECT"];
             string[] keys = ev.CurrentOptions.Select(candidate => candidate.Key).ToArray();
             Assert.Equal(3, keys.Length);
             Assert.Equal(colors.Where(keys.Contains), keys);

@@ -15,6 +15,7 @@ public sealed class StatusCardPool : CardPoolModel
         typeof(FranticEscape),
         typeof(Infection),
         typeof(Wither),
+        typeof(Sadness),
         typeof(Slimed),
         typeof(Soot),
         typeof(Toxic),

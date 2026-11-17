@@ -114,7 +114,8 @@ public abstract class AncientEventModel : EventModel
             Abundance or Apotheosis or Corruption or ForbiddenGrimoire or Protector or Quadcast
                 or TheSealedThrone => 1,
             Apparition or BiasedCognition or BrightestFlame or Maul or NeowsFury or Relax
-                or Whistle or Wish or WraithForm or Break or Suppress or MeteorShower => 0,
+                or Whistle or Wish or WraithForm or Break or Suppress or MeteorShower
+                or DivineShot => 0,
             _ => throw new InvalidOperationException($"Unaudited Ancient card preview: {canonical.Id.Entry}."),
         };
         VisibleContent baseline = VisibleContentProjection.ForCard(canonical);

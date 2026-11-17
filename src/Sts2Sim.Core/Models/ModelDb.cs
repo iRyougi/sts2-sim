@@ -134,11 +134,11 @@ public static class ModelDb
         Orb<PlasmaOrb>(),
     ];
 
-    /// <summary>Native character order, omitting characters whose content has not been ported.</summary>
+    /// <summary>Native character order across all ported playable characters.</summary>
     public static IEnumerable<CharacterModel> AllCharacters => _contentById.Values
         .OfType<CharacterModel>()
         .OrderBy(character => Array.IndexOf(
-            ["Ironclad", "Silent", "Regent", "Necrobinder", "Defect"],
+            ["Ironclad", "Silent", "Regent", "Necrobinder", "Defect", "Fool"],
             character.GetType().Name) is int index && index >= 0 ? index : int.MaxValue)
         .ThenBy(character => character.GetType().FullName, StringComparer.Ordinal);
 

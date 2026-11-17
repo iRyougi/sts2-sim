@@ -31,7 +31,7 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 | | |
 |---|---|
 | Game baseline | STS2 v0.113.1 public beta (release commit `d09d48e5`, `main_assembly_hash 358281912`) |
-| Characters | Defect, Ironclad, Necrobinder, Regent, Silent |
+| Characters | Defect, Fool, Ironclad, Necrobinder, Regent, Silent |
 | Acts | Overgrowth, Underdocks, Hive, Glory |
 | Multiplayer | Not supported |
 | Dread mode | Not supported yet; may be adapted later |

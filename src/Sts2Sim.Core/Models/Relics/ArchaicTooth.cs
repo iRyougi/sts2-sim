@@ -14,6 +14,7 @@ public sealed class ArchaicTooth : RelicModel
             [ModelDb.Card<Unleash>().Id] = ModelDb.Card<Protector>(),
             [ModelDb.Card<FallingStar>().Id] = ModelDb.Card<MeteorShower>(),
             [ModelDb.Card<Dualcast>().Id] = ModelDb.Card<Quadcast>(),
+            [ModelDb.Card<FoolishShot>().Id] = ModelDb.Card<DivineShot>(),
         };
 
     public static IReadOnlyList<CardModel> TranscendenceCards => TranscendenceUpgrades.Values.ToList();

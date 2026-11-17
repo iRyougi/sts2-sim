@@ -396,6 +396,12 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 await room.Engine.PlayCardAsync(player, mythic, null);
                 CombatState mythicClone = state.Clone();
                 Assert.Equal(1, Assert.Single(mythicClone.Players).Creature.GetPower<MythicFormPower>()?.UpgradedCount);
+                // Regression (#929 SimFuzz): a cloned combat runs on CombatRunStateSnapshot, not Runs.RunState;
+                // BeforeHandDraw must not hard-cast player.RunState and must still generate a Tarot card.
+                Player mythicClonePlayer = Assert.Single(mythicClone.Players);
+                int cloneHandBeforeDraw = mythicClonePlayer.PlayerCombatState!.Hand.Cards.Count;
+                await mythicClonePlayer.Creature.GetPower<MythicFormPower>()!.BeforeHandDraw(mythicClonePlayer);
+                Assert.Equal(cloneHandBeforeDraw + 1, mythicClonePlayer.PlayerCombatState.Hand.Cards.Count);
 
                 // Simpleton autoplays lowest-cost playable card (DefendFool 1-cost over Timber 3-cost) before turn end.
                 foreach (CardModel c in pcs.Hand.Cards.ToList())

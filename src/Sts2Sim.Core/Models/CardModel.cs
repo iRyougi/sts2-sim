@@ -990,7 +990,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     /// <summary>原版 v0.113.1 <c>IsAllowedInRun</c>：单人局排除仅多人卡（模拟器只有单人；Blitz 模式不在范围，
     /// SingleplayerOnly 在单人局恒允许）。</summary>
-    public bool IsAllowedInRun(Runs.RunState runState)
+    public bool IsAllowedInRun(Runs.IRunState runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
         return runState.Players.Count > 1 || !IsMultiplayerOnly;

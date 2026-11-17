@@ -31,7 +31,7 @@
 | | |
 |---|---|
 | 游戏基线 | STS2 v0.113.1 public-beta（release commit `d09d48e5`，`main_assembly_hash 358281912`） |
-| 角色 | Defect, Ironclad, Necrobinder, Regent, Silent |
+| 角色 | Defect, Fool, Ironclad, Necrobinder, Regent, Silent |
 | 幕 | Overgrowth、Underdocks、Hive、Glory |
 | 多人模式 | 不支持 |
 | 恐惧模式（Dread） | 暂不支持，后续可能适配 |

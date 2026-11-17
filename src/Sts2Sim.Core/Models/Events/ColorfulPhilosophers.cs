@@ -17,7 +17,7 @@ namespace Sts2Sim.Core.Models.Events;
 public sealed class ColorfulPhilosophers : EventModel
 {
     public override bool IsAllowed(IRunState runState) =>
-        ModelDb.All<CharacterModel>().Count(character => character.IsPlayable) > 1;
+        runState.Players.All(player => player.UnlockState.CharacterCardPools.Count(pool => pool is not FoolCardPool) > 1);
 
     protected override VisibleDecisionMetadata BuildVisibleState() => new(
         [VisibleValue.Int("StatueCount", 3)],
@@ -63,8 +63,9 @@ public sealed class ColorfulPhilosophers : EventModel
         "NECROBINDER" => 0,
         "IRONCLAD" => 1,
         "REGENT" => 2,
-        "SILENT" => 3,
-        "DEFECT" => 4,
-        _ => 5,
+        "FOOL" => 3,
+        "SILENT" => 4,
+        "DEFECT" => 5,
+        _ => 6,
     };
 }

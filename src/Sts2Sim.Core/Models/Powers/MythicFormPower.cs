@@ -31,7 +31,7 @@ public sealed class MythicFormPower : PowerModel
         for (int i = 0; i < Amount; i++)
         {
             CardModel? canonical = player.RunState.Rng.CombatCardSelection.NextItem(
-                TarotCards.All.Where(c => c.IsAllowedInRun((Runs.RunState)player.RunState)));
+                TarotCards.All.Where(c => c.IsAllowedInRun(player.RunState)));
             if (canonical is null)
                 continue;
 
