@@ -169,6 +169,10 @@ public static partial class VisibleContentProjection
             case Disintegration disintegration:
                 values.Add(VisibleValue.Int("DisintegrationPower", disintegration.PowerAmount));
                 break;
+            case ShowOff showOff:
+                values.Add(VisibleValue.Int("AimPower", showOff.CurrentAim));
+                values.Add(VisibleValue.Int("ShowOffPower", card.IsUpgraded ? 3 : 2));
+                break;
         }
         var children = card.Enchantments.Select(ForEnchantment).ToImmutableArray();
         if (card.Affliction is { } affliction)

@@ -123,6 +123,9 @@ internal static class CombatPrivateStateRegistry
         // #929 G4: EnnuiPower and MythicFormPower state
         "EnnuiPower._sadnessAmount",
         "MythicFormPower._upgradedCount",
+        // #929 G5: ShowOff persistent scaling and ShowOffPower bound instance
+        "ShowOff._currentAim", "ShowOff._increasedAim",
+        "ShowOffPower._showOffInstance",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =

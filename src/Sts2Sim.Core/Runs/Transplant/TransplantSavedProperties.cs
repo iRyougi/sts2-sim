@@ -63,6 +63,8 @@ internal static class TransplantSavedProperties
             ["SpoilsMap.SpoilsActIndex"] = new("<SpoilsActIndex>k__BackingField", "ints"),
             ["MadScience.TinkerTimeType"] = new("_type", "ints"),
             ["MadScience.TinkerTimeRider"] = new("<Rider>k__BackingField", "ints"),
+            ["ShowOff.CurrentAim"] = new("_currentAim", "ints"),
+            ["ShowOff.IncreasedAim"] = new("_increasedAim", "ints"),
         };
 
     public static IReadOnlyDictionary<string, JsonElement> Export(AbstractModel model, string path)

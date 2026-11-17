@@ -36,6 +36,7 @@ public static class TransplantFieldRegistry
         "SilverCrucible.<TreasureRoomsEntered>k__BackingField",
         "WingedBoots.<TimesUsed>k__BackingField", "SpoilsMap.<SpoilsActIndex>k__BackingField",
         "MadScience.<Rider>k__BackingField",
+        "ShowOff._currentAim", "ShowOff._increasedAim",
     ];
     private static readonly HashSet<string> NativeBoundaryResetFields =
     [
@@ -79,6 +80,7 @@ public static class TransplantFieldRegistry
         "LullabyPower._proccdThisTurn",
         "EnnuiPower._sadnessAmount",
         "MythicFormPower._upgradedCount",
+        "ShowOffPower._showOffInstance",
     ];
 
     public static IReadOnlyDictionary<string, (TransplantFieldClass Class, string Reason)> Fields => _fields;

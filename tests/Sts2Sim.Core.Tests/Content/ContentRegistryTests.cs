@@ -25,10 +25,10 @@ public sealed class ContentRegistryTests : IDisposable
 
         CardModel[] cards = ModelDb.All<CardModel>().ToArray();
         // Defect adds 91 pool cards and Fuel, a generated token; Necrobinder adds 91 pool cards plus the
-        // Soul and SweepingGaze tokens; Fool G1 adds 6, G2 adds 35, G3 adds 31, G4 adds 42 (22 Tarot tokens + 20 pool).
-        Assert.Equal(714, cards.Length);
-        Assert.Equal(663, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
-        Assert.Equal(597, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        // Soul and SweepingGaze tokens; Fool G1-G5 add 115 cards total (+1 ShowOff in G5).
+        Assert.Equal(715, cards.Length);
+        Assert.Equal(664, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
+        Assert.Equal(598, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(66, cards.Count(card => card.IsColorless));
         Assert.Equal(34, cards.Count(card => card.Rarity == CardRarity.Token));
         Assert.Equal(17, cards.Count(card => card.Rarity == CardRarity.Status));
