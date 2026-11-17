@@ -347,6 +347,25 @@ public sealed class EventVisibleStateTests : IDisposable
             Assert.Contains(VisibleValue.Int("StarCost", 3), preview.Values);
             Assert.Contains(VisibleValue.Scope("Role", "AncientCard"), preview.Values);
             Assert.Equal(beforePreview, Snapshot(regent.Run));
+            // Every Ancient-rarity card of every character (incl. Fool DivineShot/LostLute) must have an audited
+            // preview; an unaudited card throws "Unaudited Ancient card preview" through the Darv option path (#929).
+            foreach (CardModel ancient in ModelDb.AllCharacters.SelectMany(c => c.CardPool.AllCards)
+                         .Where(card => card.Rarity == CardRarity.Ancient))
+            {
+                var ancientTome = (DustyTome)ModelDb.Relic<DustyTome>().MutableClone();
+                ancientTome.AncientCard = ancient.Id;
+                var ancientOffer = (EventOption)typeof(AncientEventModel).GetMethod("RelicOption",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                    binder: null, types: [typeof(RelicModel), typeof(string)], modifiers: null)!
+                    .Invoke(regent.Event, [ancientTome, "DustyTome"])!;
+                VisibleContent ancientPreview = Assert.Single(ancientOffer.OfferedContent!.Children,
+                    child => child.ContentId == ancient.Id.Entry);
+                if (ancient is LostLute)
+                {
+                    // DustyTome previews the upgraded card (UpgradeLevel 1); LostLute.OnUpgrade is EnergyCost -1: 3 -> 2.
+                    Assert.Contains(VisibleValue.Int("EnergyCost", 2), ancientPreview.Values);
+                }
+            }
         }
         // Each offered branch is executed once on a fresh control/observed pair. Further pages
         // are followed without combat simulation; forced combat/reward boundaries remain explicit.

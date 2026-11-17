@@ -43,6 +43,7 @@ public sealed class TouchOfOrobas : RelicModel
         if (id == ModelDb.Relic<DivineRight>().Id) return ModelDb.Relic<DivineDestiny>();
         if (id == ModelDb.Relic<BoundPhylactery>().Id) return ModelDb.Relic<PhylacteryUnbound>();
         if (id == ModelDb.Relic<CrackedCore>().Id) return ModelDb.Relic<InfusedCore>();
+        if (id == ModelDb.Relic<SongBow>().Id) return ModelDb.Relic<Storyteller>();
         return ModelDb.Relic<Circlet>();
     }
 

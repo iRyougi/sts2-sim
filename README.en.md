@@ -26,7 +26,7 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 - **A port of the game logic, not a re-design.** Game rules are ported from the game's own code as literally as practical, so behaviour can be checked method by method. Doc comments cite the original type they come from (for example `MegaCrit.Sts2.Core.Commands.CardCmd`).
 - **Seed-exact RNG.** The random number generator and seed derivation follow the game, with the goal that the same seed and the same choices reproduce the same run as the game client, draw for draw.
 - **Cloneable.** Combat state can be cloned (`CombatState.Clone()`) for search; RNG streams (`Rng`, `RunRngSet`, `PlayerRngSet`) can be copied exactly (`CloneExact`) or with fresh randomness (`CloneReseeded`) for sampling. Deep cloning of a whole run (`RunState`) is not supported yet.
-- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of the four existing characters in game v0.113.1 (public beta) and all encounters and events of the four acts are ported; the new character Fool and a few other items are not implemented yet (see below).
+- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of all six characters in game v0.113.1 (public beta) and all encounters and events of the four acts are ported; remaining omissions are listed below.
 
 | | |
 |---|---|
@@ -50,7 +50,6 @@ There are two RNG modes, and they are deliberately separate APIs:
 The following can be met in a single-player run but are missing or incomplete:
 
 - The victory event after the final boss (TheArchitect) is not modelled; the simulator declares the win when the final boss dies.
-- **The new character Fool is not ported yet** (cards, relics, potions, the arrow and melody mechanics); it is planned for v0.113.1.1. Other characters can still obtain Fool cards through cross-colour sources such as Kaleidoscope, PrismaticGem, Splash, Orobas and ColorfulPhilosophers; when one of these triggers, the simulator draws only from the existing characters' pools, so the rest of the run will differ from the game.
 
 Multiplayer-only content, and content that exists in the game but cannot be obtained, is out of scope.
 
@@ -116,7 +115,7 @@ Issues and pull requests may be written in English or Chinese. For day-to-day di
 This simulator was developed by the following people. The public history starts at the first export, so earlier commits are not visible here:
 
 - **[@iRyougi](https://github.com/iRyougi)**: maintainer; core port, RNG and seeding, map and run flow, comparison tooling.
-- **[@ltlly](https://github.com/ltlly)**: ported Ironclad and Defect (including orbs); many fidelity fixes across damage and death resolution, generated-card creators, hook order, transforms and rewards, and monster move graphs.
+- **[@ltlly](https://github.com/ltlly)**: ported Ironclad, Defect (including orbs) and the Fool; many fidelity fixes across damage and death resolution, generated-card creators, hook order, transforms and rewards, and monster move graphs.
 - **[@s1f102500012](https://github.com/s1f102500012)**: end-of-turn card order and ethereal exhaust, shuffle order of same-ID cards, draws and shuffles after combat ends, v0.111.0 card values, the PunchOff event; ported Necrobinder (including the Osty summon and two-phase HP loss).
 - **[@Charlie-chulong](https://github.com/Charlie-chulong)**: pet system (Byrdpip, Pael's Legion), MysteriousKnight and Lantern Key combat, monster move IDs and monster RNG seeding.
 

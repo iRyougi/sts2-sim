@@ -126,6 +126,8 @@ internal static class CombatPrivateStateRegistry
         // #929 G5: ShowOff persistent scaling and ShowOffPower bound instance
         "ShowOff._currentAim", "ShowOff._increasedAim",
         "ShowOffPower._showOffInstance",
+        // #929 G7: ConductorsBaton turn trigger flag
+        "ConductorsBaton._triggeredThisTurn",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =

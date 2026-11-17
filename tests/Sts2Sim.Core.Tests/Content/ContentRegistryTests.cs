@@ -68,8 +68,8 @@ public sealed class ContentRegistryTests : IDisposable
 
         RelicModel[] relics = ModelDb.All<RelicModel>().ToArray();
         // Exact reflection-registration baseline includes Ring of the Snake, Hive, Glory, Shovel, Girya, Task 3a
-        // relics, the eight Necrobinder relics, five Orobas upgraded starters, and SongBow (#963).
-        Assert.Equal(307, relics.Length);
+        // relics, the eight Necrobinder relics, five Orobas upgraded starters, and Fool's 8 pool + Storyteller (#969).
+        Assert.Equal(315, relics.Length);
         Assert.Equal(
             145,
             relics.Count(relic =>
@@ -206,11 +206,11 @@ public sealed class ContentRegistryTests : IDisposable
         // 基线 50，两侧各自新增后合并：
         // +3 偏离 #299 的猎手专属药水 PoisonPotion(C) / CunningPotion(U) / GhostInAJar(R)；
         // +1 暗港的 GlowwaterPotion(Event)。
-        // +3 亡灵契约师专属药水 PotionOfDoom(C) / BoneBrew(U) / PotOfGhouls(R)。
-        Assert.Equal(64, potions.Length);
-        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Common));
-        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Uncommon));
-        Assert.Equal(20, potions.Count(potion => potion.Rarity == PotionRarity.Rare));
+        // +3 Fool 专属药水 PrecisionPotion(C) / BottledSong(U) / CrystallineEuphoria(R)。
+        Assert.Equal(67, potions.Length);
+        Assert.Equal(21, potions.Count(potion => potion.Rarity == PotionRarity.Common));
+        Assert.Equal(21, potions.Count(potion => potion.Rarity == PotionRarity.Uncommon));
+        Assert.Equal(21, potions.Count(potion => potion.Rarity == PotionRarity.Rare));
         Assert.Equal(3, potions.Count(potion => potion.Rarity == PotionRarity.Event));
         Assert.IsType<GlowwaterPotion>(ModelDb.Potion<GlowwaterPotion>());
     }

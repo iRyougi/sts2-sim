@@ -121,6 +121,12 @@ public static class TransplantFieldRegistry
                 if (type.Name == "SpoilsMap" && field.Name == "<SpoilsCoord>k__BackingField")
                     (fieldClass, reason) = (TransplantFieldClass.Snapshot,
                         "Host exports the unsaved live coordinate explicitly at combat entry.");
+                // Native ConductorsBaton has no combat-start or combat-end hook: only BeforeSideTurnStart for the
+                // owner's side clears the flag, which runs at the first player turn of the next combat before any
+                // card can be played.
+                if (type.Name == "ConductorsBaton" && field.Name == "_triggeredThisTurn")
+                    (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
+                        "Native has no combat boundary hook; BeforeSideTurnStart at the next combat's first player turn clears it before any card play.");
                 // Native Fetch queries this combat's CardPlayFinished history. These simulator
                 // caches are cleared when the next combat's card copies are created.
                 if (type.Name == "Fetch" && field.Name is

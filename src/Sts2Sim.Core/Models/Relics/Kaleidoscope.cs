@@ -22,7 +22,7 @@ public sealed class Kaleidoscope : RelicModel
     /// 故按权威源码忠实实现——用 <c>PlayerRng.NonCombatGeneration</c> 打乱"非本角色的卡池"取前 3 个，
     /// 每池各抽 1 张。此前是"从本角色卡池再抽 3 张"，且 RNG 流走的是 <c>PlayerRng.Rewards</c>。
     ///
-    /// 当前五个可玩角色均已注册，每份奖励从四个他系池洗牌后取三个。
+    /// 当前六个可玩角色均已注册（#929 起含 Fool），每份奖励从五个他系池洗牌后取三个。
     /// #296 的 09a2 离线回放中 57 局 Niche 账本一致，但 53 局的卡牌候选内容仍不同（#303）；
     /// #303 恢复原版 StableShuffle 的卡池预排序，并补齐单池生成的 NoCardPoolModifications；
     /// 抽取一致不能证明完整奖励等价。</summary>

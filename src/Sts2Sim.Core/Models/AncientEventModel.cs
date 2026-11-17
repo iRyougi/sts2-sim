@@ -111,7 +111,7 @@ public abstract class AncientEventModel : EventModel
         // Read displayed identity/cost classifications; do not execute Upgrade or Enchant.
         int upgradeCostReduction = canonical switch
         {
-            Abundance or Apotheosis or Corruption or ForbiddenGrimoire or Protector or Quadcast
+            Abundance or Apotheosis or Corruption or ForbiddenGrimoire or LostLute or Protector or Quadcast
                 or TheSealedThrone => 1,
             Apparition or BiasedCognition or BrightestFlame or Maul or NeowsFury or Relax
                 or Whistle or Wish or WraithForm or Break or Suppress or MeteorShower

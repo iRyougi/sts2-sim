@@ -45,7 +45,7 @@ public sealed class KaleidoscopeTests : IDisposable
 
         // v0.113.1 sorts other pools by ModelId before NonCombatGeneration shuffling.
         // Historical native rows above remain version-isolated until #930.
-        // All five character pools are registered: each choice draws from three of the other four.
+        // All six character pools are registered (Fool since #929): each choice draws from three of the other five.
         List<CardPoolModel> otherPools = player.UnlockState.CharacterCardPools
             .Where(pool => pool.GetType() != player.Character.CardPool.GetType())
             .ToList();
@@ -64,7 +64,7 @@ public sealed class KaleidoscopeTests : IDisposable
 
         await RelicCmd.Obtain(ModelDb.Relic<Kaleidoscope>(), player);
 
-        // v0.113.1 (#946): each of the two four-pool shuffles consumes one parent draw (child-RNG seed).
+        // v0.113.1 (#946): each of the two five-pool shuffles consumes one parent draw (child-RNG seed).
         Assert.True(player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore == 2,
             $"seed={seed}, obtain: NonCombatGeneration delta={player.PlayerRng.NonCombatGeneration.Counter - nicheCounterBefore}, expected=2");
         Assert.True(player.PlayerRng.Rewards.Counter - rewardsCounterBefore == 18,

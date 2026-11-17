@@ -6,7 +6,7 @@ namespace Sts2Sim.Core.Content;
 
 /// <summary>
 /// Decision-time exclusions for cross-character effects that still need end-to-end parity evidence.
-/// All five playable character card pools are registered. <c>Kaleidoscope</c> uses the other four:
+/// All six playable character card pools are registered (Fool joined in #929 G6/G7). <c>Kaleidoscope</c> uses the other five:
 /// the #296 replay found identical Niche ledgers in 57/57 archived runs, but different card reward
 /// candidates in 53/57 (#303). <c>Splash</c> also uses other-character pools and was not retested in #296;
 /// its separate free-play deviation #97 remains. Both stay excluded from default decisions until
