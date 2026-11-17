@@ -22,6 +22,9 @@ public sealed class ArtOfWar : RelicModel
         if (cardPlay.Player == Owner &&
             cardPlay.Card.Type == CardType.Attack)
         {
+            // Source guards on AnyAttacksPlayedLastTurn, which AfterEnergyReset clears every turn after the
+            // first, so it is false whenever a card is played; the guard is therefore not reproduced here.
+            Status = RelicStatus.Normal;
             _attackPlayedThisTurn = true;
         }
 
@@ -43,6 +46,11 @@ public sealed class ArtOfWar : RelicModel
 
     public override Task AfterEnergyReset(Player player)
     {
+        if (player == Owner)
+        {
+            Status = RelicStatus.Active;
+        }
+
         if (player == Owner &&
             player.PlayerCombatState?.TurnNumber >= 1 &&
             _previousTurnHadNoAttack)
@@ -55,6 +63,7 @@ public sealed class ArtOfWar : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _attackPlayedThisTurn = false;
         _previousTurnHadNoAttack = false;
         return Task.CompletedTask;

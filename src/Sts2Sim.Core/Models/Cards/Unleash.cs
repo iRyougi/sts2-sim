@@ -8,6 +8,8 @@ public sealed class Unleash : CardModel, ICardChoiceBaseValueProvider, ICardDama
 {
     private const decimal ExtraDamage = 1m;
 
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Basic;

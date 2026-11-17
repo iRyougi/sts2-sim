@@ -6,6 +6,9 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class HeavenlyDrill : GeneratedCardModel
 {
+    // 原版比较 DynamicVars.Energy.IntValue（EnergyVar(4)，升级不变）；OnPlay 在这里用字面量 4。
+    protected override bool ShouldGlowGoldInternal => Owner.PlayerCombatState!.Energy >= 4;
+
     protected override GeneratedCardSpec Spec { get; } = new(
         0, 0, CardType.Attack, CardRarity.Rare, TargetType.AnyEnemy,
         false, true, false, Array.Empty<CardKeyword>(),

@@ -10,11 +10,16 @@ public sealed class VenerableTeaSet : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Common;
 
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() =>
+        Status = _isArmed ? RelicStatus.Active : RelicStatus.Normal;
+
     public override Task AfterRoomEntered(AbstractRoom room)
     {
         if (room is RestSiteRoom)
         {
             _isArmed = true;
+            Status = RelicStatus.Active;
         }
 
         return Task.CompletedTask;
@@ -25,6 +30,7 @@ public sealed class VenerableTeaSet : RelicModel
         if (_isArmed && ReferenceEquals(player, Owner))
         {
             _isArmed = false;
+            Status = RelicStatus.Normal;
             player.PlayerCombatState!.GainEnergy(2m);
         }
 

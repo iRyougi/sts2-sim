@@ -16,6 +16,8 @@ public sealed class KiHop : CardModel, ICardChoiceBaseValueProvider, ICardDamage
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage, Cards: Cards);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
+    protected override bool ShouldGlowGoldInternal => CombatState?.HittableEnemies.Any(ArrowCmd.CreatureIsImpaledByArrow) ?? false;
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

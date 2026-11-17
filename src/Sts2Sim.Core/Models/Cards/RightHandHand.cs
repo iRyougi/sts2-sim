@@ -9,6 +9,8 @@ public sealed class RightHandHand : CardModel, ICardChoiceBaseValueProvider, ICa
 {
     private const int EnergyThreshold = 2;
 
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

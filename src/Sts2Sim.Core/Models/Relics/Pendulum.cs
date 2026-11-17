@@ -7,6 +7,8 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class Pendulum : RelicModel
 {
+    private const int TurnsThreshold = 3; // DynamicVar "Turns"
+
     private int _turnCounter;
 
     public override RelicRarity Rarity => RelicRarity.Common;
@@ -22,6 +24,9 @@ public sealed class Pendulum : RelicModel
         }
 
         _turnCounter++;
+        // Source (BeforeHandDraw): TurnsSeen = (TurnsSeen + 1) % Turns; Status = TurnsSeen == Turns - 1 ? Active : Normal.
+        // This counter resets to 0 right below instead of wrapping, so apply the modulo here.
+        Status = _turnCounter % TurnsThreshold == TurnsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
         if (_turnCounter < 3)
         {
             return;
@@ -33,6 +38,12 @@ public sealed class Pendulum : RelicModel
             1,
             Owner,
             fromHandDraw: false);
+    }
+
+    public override Task AfterCombatEnd()
+    {
+        Status = RelicStatus.Normal;
+        return Task.CompletedTask;
     }
 
     internal override void AppendCombatStateDescription(

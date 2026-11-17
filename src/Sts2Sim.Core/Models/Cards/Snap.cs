@@ -7,6 +7,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// 不带保留的牌使其获得保留。</summary>
 public sealed class Snap : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Common;

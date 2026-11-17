@@ -29,6 +29,7 @@ public sealed class RedSkull : RelicModel
     public override Task AfterCombatEnd()
     {
         _strengthApplied = false;
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 
@@ -38,6 +39,7 @@ public sealed class RedSkull : RelicModel
         if (creature.CombatState is not { } combatState)
             return;
         bool aboveHalf = creature.CurrentHp > creature.MaxHp * 0.5m;
+        Status = !aboveHalf ? RelicStatus.Active : RelicStatus.Normal;
         if (aboveHalf && _strengthApplied)
         {
             await PowerCmd.Apply<StrengthPower>(combatState, creature, -3m, creature, null);

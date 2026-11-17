@@ -21,6 +21,8 @@ public sealed class HeavyShot : CardModel, ICardChoiceBaseValueProvider, ICardDa
 
     public decimal ModifyAimAmount(decimal originalAmount) => originalAmount * AimMultiplier;
 
+    protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.FoolArrows;
 using Sts2Sim.Core.Models.Powers;
 
@@ -17,6 +18,8 @@ public sealed class EpicRetrieval : CardModel, ICardChoiceBaseValueProvider, ICa
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage, Energy: Energy);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
+    protected override bool ShouldGlowGoldInternal => CombatState?.HittableEnemies.Any(NextHitWillDislodgeArrowFrom) ?? false;
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);
@@ -29,5 +32,15 @@ public sealed class EpicRetrieval : CardModel, ICardChoiceBaseValueProvider, ICa
         {
             await PlayerCmd.GainEnergy(Energy, Owner);
         }
+    }
+
+    private bool NextHitWillDislodgeArrowFrom(Creature creature)
+    {
+        ImpaledPower? impaledPower = creature.Powers.OfType<ImpaledPower>().FirstOrDefault(p => ReferenceEquals(p.Applier, Owner.Creature));
+        if (impaledPower == null)
+        {
+            return false;
+        }
+        return impaledPower.HitCounter == 1;
     }
 }

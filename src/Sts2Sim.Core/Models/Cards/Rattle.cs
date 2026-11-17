@@ -8,6 +8,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// （在这次攻击开始前计算）；Osty 不在时无效果。</summary>
 public sealed class Rattle : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

@@ -82,6 +82,7 @@ public static class RelicCmd
             !relic.Owner.Relics.Contains(relic))
             throw new InvalidOperationException("Only an owned, unmelted wax relic can melt.");
         relic.IsMelted = true;
+        relic.Status = Entities.Relics.RelicStatus.Disabled;
         await relic.AfterRemoved();
     }
 }

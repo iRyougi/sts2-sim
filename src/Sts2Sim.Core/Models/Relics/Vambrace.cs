@@ -14,6 +14,7 @@ public sealed class Vambrace : RelicModel
     public override Task BeforeCombatStart()
     {
         _triggeredThisCombat = false;
+        Status = RelicStatus.Active;
         return Task.CompletedTask;
     }
 
@@ -38,8 +39,24 @@ public sealed class Vambrace : RelicModel
         return 2m;
     }
 
+    // Source Vambrace.AfterModifyingBlockAmount (Status part only). Hook.AfterModifyingBlockAmount only reaches
+    // modifiers whose multiplicative factor != 1, like the source. The consume logic stays in the multiplicative slice.
+    public override Task AfterModifyingBlockAmount(
+        decimal modifiedAmount,
+        CardModel? cardSource,
+        CardPlay? cardPlay)
+    {
+        if (modifiedAmount > 0m && cardSource is not null)
+        {
+            Status = RelicStatus.Normal;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _triggeredThisCombat = false;
         return Task.CompletedTask;
     }

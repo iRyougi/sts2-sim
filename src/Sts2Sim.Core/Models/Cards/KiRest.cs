@@ -7,6 +7,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>下回合获得能量；若本回合打出过 Wah 或 Cho 则保留手牌（原版 <c>KiRest</c>）。</summary>
 public sealed class KiRest : CardModel, ICardChoiceBaseValueProvider
 {
+    protected override bool ShouldGlowGoldInternal => MelodyCmd.PlayedWahThisTurn(Owner) || MelodyCmd.PlayedChoThisTurn(Owner);
+
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.Self;

@@ -176,6 +176,8 @@ internal static class TransplantSavedProperties
                 throw new TransplantMappingException($"{path}.Props.{key}", "Unknown outer property.");
             ApplySavedProperties(model, value, $"{path}.Props.props");
         }
+        // Native [SavedProperty] setters recompute RelicModel.Status on load; the field writes above bypass them.
+        (model as RelicModel)?.RefreshStatusAfterLoad();
         if (model is SpoilsMap && !sawSpoilsCoord)
             throw new TransplantMappingException($"{path}.Props.spoils_coord",
                 "Missing native cross-room coordinate.");

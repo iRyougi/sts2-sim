@@ -22,6 +22,18 @@ public sealed class Nail : CardModel, ICardChoiceBaseValueProvider, ICardDamageV
         return true;
     }
 
+    protected override bool ShouldGlowGoldInternal
+    {
+        get
+        {
+            if (CombatState == null)
+            {
+                return false;
+            }
+            return CombatState.HittableEnemies.Any(ArrowCmd.CreatureIsImpaledByArrow);
+        }
+    }
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

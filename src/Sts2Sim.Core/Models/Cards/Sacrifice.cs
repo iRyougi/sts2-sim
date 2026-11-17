@@ -8,6 +8,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// 再击杀 Osty，最后获得格挡（Move，受敏捷等修正）。Osty 不在时无效果。</summary>
 public sealed class Sacrifice : CardModel, ICardChoiceBaseValueProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Skill;
 
     public override CardRarity Rarity => CardRarity.Rare;

@@ -16,6 +16,8 @@ public sealed class ChoFirm : CardModel, ICardChoiceBaseValueProvider
     private decimal Block => IsUpgraded ? 8m : 6m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block);
 
+    protected override bool ShouldGlowGoldInternal => ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         int gains = ArrowCmd.PlayerHasAnyArrows(Owner) ? 2 : 1;

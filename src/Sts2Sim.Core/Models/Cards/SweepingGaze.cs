@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>SentryModePower 生成的 Token：0 费、虚无、消耗，由 Osty 随机攻击一名敌人 10（升级 15）；Osty 不在时无效果。</summary>
 public sealed class SweepingGaze : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Token;

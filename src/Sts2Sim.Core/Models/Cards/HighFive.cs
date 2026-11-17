@@ -9,6 +9,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// 再给攻击后仍可命中的每个敌人施加 2（升级 3）易伤。</summary>
 public sealed class HighFive : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

@@ -7,6 +7,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>本回合打出过 Wah 或 Ki 时减费 2，并获得两次格挡（原版 <c>ChoLimbs</c>）。</summary>
 public sealed class ChoLimbs : CardModel, ICardChoiceBaseValueProvider
 {
+    protected override bool ShouldGlowGoldInternal => MelodyCmd.PlayedWahThisTurn(Owner) || MelodyCmd.PlayedKiThisTurn(Owner);
+
     public override bool GainsBlock => true;
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Uncommon;

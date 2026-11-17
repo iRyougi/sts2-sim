@@ -21,6 +21,7 @@ public sealed class RippleBasin : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _attackPlayedThisTurn = false;
+            Status = RelicStatus.Active;
         }
 
         return Task.CompletedTask;
@@ -32,6 +33,7 @@ public sealed class RippleBasin : RelicModel
             cardPlay.Card.Type == CardType.Attack)
         {
             _attackPlayedThisTurn = true;
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -47,6 +49,7 @@ public sealed class RippleBasin : RelicModel
             return Task.CompletedTask;
         }
 
+        Status = RelicStatus.Normal;
         return CreatureCmd.GainBlock(
             Owner.Creature.CombatState!,
             Owner.Creature,
@@ -58,6 +61,7 @@ public sealed class RippleBasin : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _attackPlayedThisTurn = false;
         return Task.CompletedTask;
     }

@@ -12,12 +12,18 @@ public sealed class PenNib : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() =>
+        Status = _attacksPlayed % 10 == 9 ? RelicStatus.Active : RelicStatus.Normal;
+
     public override Task BeforeCardPlayed(CardPlay cardPlay)
     {
         if (cardPlay.Player == Owner &&
             cardPlay.Card.Type == CardType.Attack)
         {
             _attacksPlayed++;
+            // PenNib.UpdateDisplay via the AttacksPlayed setter (value % 10); IsActivating is animation only.
+            Status = _attacksPlayed % 10 == 9 ? RelicStatus.Active : RelicStatus.Normal;
             if (_attacksPlayed % 10 == 0)
             {
                 _doubleDamagePlay = cardPlay;

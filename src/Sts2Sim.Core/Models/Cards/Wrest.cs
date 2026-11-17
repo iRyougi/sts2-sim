@@ -14,6 +14,18 @@ public sealed class Wrest : CardModel, ICardChoiceBaseValueProvider
 
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Cards: Cards);
 
+    protected override bool ShouldGlowGoldInternal
+    {
+        get
+        {
+            if (CombatState == null)
+            {
+                return false;
+            }
+            return CombatState.HittableEnemies.Any(c => ArrowCmd.CreatureIsImpaledByPlayersArrow(c, Owner));
+        }
+    }
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

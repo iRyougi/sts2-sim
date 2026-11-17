@@ -16,6 +16,8 @@ public sealed class MelodicShot : CardModel, ICardChoiceBaseValueProvider, ICard
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
+    protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

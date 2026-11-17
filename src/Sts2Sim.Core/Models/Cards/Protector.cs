@@ -8,6 +8,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// BeforeAttack 前后不变，这里在攻击前算好。</summary>
 public sealed class Protector : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Ancient;

@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>本回合每打出一种不同旋律减费 2 的高伤终曲（原版 <c>Coda</c>）。</summary>
 public sealed class Coda : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowGoldInternal => MelodyCmd.MelodiesThisTurn(Owner) > 0;
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.AnyEnemy;

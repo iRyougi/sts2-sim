@@ -26,6 +26,8 @@ public sealed class RainbowRing : RelicModel
             _playedSkill = false;
             _playedPower = false;
             _triggeredThisTurn = false;
+            // Source ActivationCountThisTurn setter: Status = count > 0 ? Active : Normal.
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -59,6 +61,7 @@ public sealed class RainbowRing : RelicModel
         }
 
         _triggeredThisTurn = true;
+        Status = RelicStatus.Active;
         var combatState = Owner.Creature.CombatState!;
         await PowerCmd.Apply<StrengthPower>(combatState, Owner.Creature, 1m, Owner.Creature, null);
         await PowerCmd.Apply<DexterityPower>(combatState, Owner.Creature, 1m, Owner.Creature, null);
@@ -70,6 +73,7 @@ public sealed class RainbowRing : RelicModel
         _playedSkill = false;
         _playedPower = false;
         _triggeredThisTurn = false;
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 

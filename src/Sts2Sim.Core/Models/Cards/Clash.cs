@@ -11,6 +11,8 @@ public sealed class Clash : CardModel, ICardDamageVariableProvider
         return true;
     }
 
+    protected override bool ShouldGlowGoldInternal => IsPlayable;
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Event;
     public override TargetType TargetType => TargetType.AnyEnemy;

@@ -23,6 +23,8 @@ public sealed class RapidShot : CardModel, ICardChoiceBaseValueProvider, ICardDa
         return true;
     }
 
+    protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

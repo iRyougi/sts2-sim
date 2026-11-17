@@ -10,6 +10,8 @@ public sealed class DeathsDoor : CardModel, ICardChoiceBaseValueProvider
 {
     private const int Repeat = 2;
 
+    protected override bool ShouldGlowGoldInternal => WasDoomAppliedThisTurn;
+
     public override CardType Type => CardType.Skill;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

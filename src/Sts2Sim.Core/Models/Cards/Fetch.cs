@@ -17,6 +17,10 @@ public sealed class Fetch : CardModel, ICardChoiceBaseValueProvider, ICardDamage
     private CombatSide _finishedSide;
     private int?[]? _finishedTurnNumbers;
 
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
+    protected override bool ShouldGlowGoldInternal => !HasBeenPlayedThisTurn;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

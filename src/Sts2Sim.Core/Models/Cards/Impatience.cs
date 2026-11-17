@@ -8,6 +8,8 @@ public sealed class Impatience : CardModel
 {
     private int _draw = 2;
 
+    protected override bool ShouldGlowGoldInternal => Owner.PlayerCombatState!.Hand.Cards.All(c => c.Type != CardType.Attack);
+
     public override CardType Type => CardType.Skill;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

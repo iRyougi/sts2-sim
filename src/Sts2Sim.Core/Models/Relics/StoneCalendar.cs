@@ -19,6 +19,11 @@ public sealed class StoneCalendar : RelicModel
     {
         _shouldTriggerThisTurn = participants.Contains(Owner.Creature) &&
             Owner.PlayerCombatState is { TurnNumber: 7 };
+        if (_shouldTriggerThisTurn)
+        {
+            Status = RelicStatus.Active;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -26,6 +31,12 @@ public sealed class StoneCalendar : RelicModel
         CombatSide side,
         IEnumerable<Creature> participants)
     {
+        // Source sets Normal for every owner side-turn end, before the DamageTurn check.
+        if (participants.Contains(Owner.Creature))
+        {
+            Status = RelicStatus.Normal;
+        }
+
         if (!_shouldTriggerThisTurn || !participants.Contains(Owner.Creature))
         {
             return;
@@ -45,6 +56,7 @@ public sealed class StoneCalendar : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _shouldTriggerThisTurn = false;
         return Task.CompletedTask;
     }
@@ -54,6 +66,7 @@ public sealed class StoneCalendar : RelicModel
         if (room is CombatRoom)
         {
             _shouldTriggerThisTurn = false;
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;

@@ -18,13 +18,24 @@ public sealed class EmotionChip : RelicModel
     {
         if (Owner.Creature.CombatState?.IsLiveCombat() == true &&
             target == Owner.Creature && result.UnblockedDamage > 0)
+        {
+            Status = RelicStatus.Active;
             Flash();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public override Task AfterCombatEnd()
+    {
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 
     public override async Task AfterPlayerTurnStart(Player player)
     {
         if (player != Owner) return;
+        Status = RelicStatus.Normal;
         CombatState state = (CombatState)Owner.Creature.CombatState!;
         bool lostHpInPreviousTurn = state.DamageHistory.Entries.Any(entry =>
             entry.Receiver == Owner.Creature &&

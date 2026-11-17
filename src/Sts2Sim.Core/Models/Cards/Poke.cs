@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>原版 <c>Poke</c>：Osty 对目标造成 6（升级 9）伤害；Osty 不在时无效果。</summary>
 public sealed class Poke : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Common;

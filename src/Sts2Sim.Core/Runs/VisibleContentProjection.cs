@@ -2,6 +2,8 @@ using Sts2Sim.Core.Models.Afflictions;
 using System.Collections.Immutable;
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models.Enchantments;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -85,7 +87,9 @@ public static partial class VisibleContentProjection
             _ => null
         };
         var states = new List<string> { relic.IsWax ? "wax" : "not-wax", relic.IsMelted ? "melted" : "not-melted" };
-        if (relic is VenerableTeaSet or FakeVenerableTeaSet) states.Add(Read<bool>(relic, "_isArmed") ? "active" : "normal");
+        // RelicModel.Status (NRelicInventoryHolder pulse). Tea sets keep their historical explicit "normal" value.
+        if (relic is VenerableTeaSet or FakeVenerableTeaSet) states.Add(relic.Status == RelicStatus.Active ? "active" : "normal");
+        else if (relic.Status == RelicStatus.Active) states.Add("active");
         if (relic.IsUsedUp || relic.IsMelted || relic is PumpkinCandle { KindleCount: <= 0 }) states.Add("disabled");
         return new(relic.Id.Entry) { CounterVisible = relic is GalacticDust or IronClub or WongosMysteryTicket ? null : amount.HasValue, CounterAmount = amount, VisibleStates = states.ToArray() };
     }
@@ -173,6 +177,15 @@ public static partial class VisibleContentProjection
                 values.Add(VisibleValue.Int("AimPower", showOff.CurrentAim));
                 values.Add(VisibleValue.Int("ShowOffPower", card.IsUpgraded ? 3 : 2));
                 break;
+        }
+        // Hand glow as the player sees it (NHandCardHolder.ShouldGlowGold / ShouldGlowRed): gold needs
+        // CanPlay() and the play phase, red only the play phase; UpdateCard computes neither unless
+        // CombatManager.IsInProgress. Cards outside a live hand get no glow values.
+        if (card.HasOwner && card.Pile?.Type == PileType.Hand && card.Owner.PlayerCombatState is { } glowCombat)
+        {
+            bool glowActive = glowCombat.Phase == PlayerTurnPhase.Play && card.Owner.Creature.CombatState?.IsLiveCombat() == true;
+            values.Add(VisibleValue.Int("GlowGold", glowActive && card.CanPlay(out _) && card.ShouldGlowGold ? 1 : 0));
+            values.Add(VisibleValue.Int("GlowRed", glowActive && card.ShouldGlowRed ? 1 : 0));
         }
         var children = card.Enchantments.Select(ForEnchantment).ToImmutableArray();
         if (card.Affliction is { } affliction)

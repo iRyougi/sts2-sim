@@ -7,6 +7,13 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class EvilEye : CardModel, ICardChoiceBaseValueProvider
 {
+    // 原版 WasCardExhaustedThisTurn 查 CardExhaustedEntry(HappenedThisTurn && Actor == Owner.Creature)；
+    // 与 OnPlay 一致，用 SemanticHistory 的等价计数。
+    protected override bool ShouldGlowGoldInternal => WasCardExhaustedThisTurn;
+
+    private bool WasCardExhaustedThisTurn =>
+        CombatState is CombatState concrete && concrete.CountCardsExhaustedThisTurn(Owner) > 0;
+
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)_block);
 
     private decimal _block = 8m;

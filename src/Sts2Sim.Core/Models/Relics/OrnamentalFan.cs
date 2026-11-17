@@ -9,7 +9,17 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class OrnamentalFan : RelicModel
 {
+    private const int AttacksThreshold = 3; // CardsVar(3)
+
     private int _attacksThisTurn;
+
+    // OrnamentalFan.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = Owner.Creature.CombatState?.IsLiveCombat() != true
+            ? RelicStatus.Normal
+            : _attacksThisTurn % AttacksThreshold == AttacksThreshold - 1
+                ? RelicStatus.Active
+                : RelicStatus.Normal;
 
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
@@ -20,6 +30,8 @@ public sealed class OrnamentalFan : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _attacksThisTurn = 0;
+            UpdateStatus();
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -34,6 +46,7 @@ public sealed class OrnamentalFan : RelicModel
         }
 
         _attacksThisTurn++;
+        UpdateStatus();
         if (_attacksThisTurn % 3 != 0)
         {
             return;
@@ -50,6 +63,8 @@ public sealed class OrnamentalFan : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        // Source: IsActivating = false -> UpdateDisplay, with CombatManager.IsInProgress already false here -> Normal.
+        Status = RelicStatus.Normal;
         _attacksThisTurn = 0;
         return Task.CompletedTask;
     }

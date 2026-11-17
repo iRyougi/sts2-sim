@@ -5,6 +5,11 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class PactsEnd : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowGoldInternal => CanDealDamage;
+
+    // 原版 CardPile.GetCards(Owner, Exhaust).Count() >= DynamicVars.Cards.IntValue（3）；与 OnPlay 一致。
+    private bool CanDealDamage => Owner.PlayerCombatState!.ExhaustPile.Cards.Count >= 3;
+
     public bool TryGetThrashDamageVariable(out decimal amount)
     {
         amount = _damage;

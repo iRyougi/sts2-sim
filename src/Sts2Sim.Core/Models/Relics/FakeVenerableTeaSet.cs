@@ -10,6 +10,10 @@ public sealed class FakeVenerableTeaSet : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Event;
 
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() =>
+        Status = _isArmed ? RelicStatus.Active : RelicStatus.Normal;
+
     public override int MerchantCost => 50;
 
     public bool IsArmed => _isArmed;
@@ -19,6 +23,8 @@ public sealed class FakeVenerableTeaSet : RelicModel
         if (room is RestSiteRoom)
         {
             _isArmed = true;
+            // Source GainEnergyInNextCombat setter: Status = value ? Active : Normal (only on change; _isArmed <=> Active).
+            Status = RelicStatus.Active;
         }
 
         return Task.CompletedTask;
@@ -30,6 +36,7 @@ public sealed class FakeVenerableTeaSet : RelicModel
         {
             _isArmed = false;
             player.PlayerCombatState!.GainEnergy(1m);
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;

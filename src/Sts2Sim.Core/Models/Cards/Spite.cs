@@ -11,6 +11,13 @@ public sealed class Spite : CardModel, ICardChoiceBaseValueProvider, ICardDamage
 {
     private decimal _damage = 5m;
     private int _repeat = 2;
+    protected override bool ShouldGlowGoldInternal => LostHpThisTurn;
+
+    private bool LostHpThisTurn => CombatState!.DamageHistory.Entries.Any(entry =>
+        entry.HappenedThisTurn(CombatState) &&
+        ReferenceEquals(entry.Receiver, Owner.Creature) &&
+        entry.Result.UnblockedDamage > 0m);
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.AnyEnemy;

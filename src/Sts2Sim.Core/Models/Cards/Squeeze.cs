@@ -7,6 +7,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// Osty 攻击牌的张数；Osty 不在时无效果。</summary>
 public sealed class Squeeze : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Rare;

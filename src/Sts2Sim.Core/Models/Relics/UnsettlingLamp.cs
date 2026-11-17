@@ -16,6 +16,7 @@ public sealed class UnsettlingLamp : RelicModel
     public override Task BeforeCombatStart()
     {
         Reset();
+        Status = RelicStatus.Active;
         return Task.CompletedTask;
     }
 
@@ -65,6 +66,7 @@ public sealed class UnsettlingLamp : RelicModel
         if (!_finished && ReferenceEquals(_triggeringCard, cardPlay.Card))
         {
             _finished = true;
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -73,6 +75,7 @@ public sealed class UnsettlingLamp : RelicModel
     public override Task AfterCombatEnd()
     {
         Reset();
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 

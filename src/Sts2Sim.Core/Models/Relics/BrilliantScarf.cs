@@ -27,8 +27,10 @@ public sealed class BrilliantScarf : RelicModel
         card.CombatState is Combat.CombatState { } combat && combat.IsLiveCombat() &&
         card.Owner.Creature == Owner.Creature && _cardsPlayed == CardsThreshold - 1 &&
         card.Pile?.Type is PileType.Hand or PileType.Play;
-    public override Task AfterCardPlayed(CardPlay cardPlay) { if (cardPlay.Card.Owner == Owner && !cardPlay.IsAutoPlay) _cardsPlayed++; return Task.CompletedTask; }
-    public override Task BeforeSideTurnStart(Combat.CombatSide side, IReadOnlyList<Entities.Creatures.Creature> participants) { if (participants.Contains(Owner.Creature)) _cardsPlayed = 0; return Task.CompletedTask; }
-    public override Task AfterCombatEnd() { _cardsPlayed = 0; return Task.CompletedTask; }
+    // Source UpdateDisplay (called from the CardsPlayedThisTurn setter); InvokeDisplayAmountChanged is UI only.
+    private void UpdateStatus() => Status = _cardsPlayed == CardsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
+    public override Task AfterCardPlayed(CardPlay cardPlay) { if (cardPlay.Card.Owner == Owner && !cardPlay.IsAutoPlay) { _cardsPlayed++; UpdateStatus(); } return Task.CompletedTask; }
+    public override Task BeforeSideTurnStart(Combat.CombatSide side, IReadOnlyList<Entities.Creatures.Creature> participants) { if (participants.Contains(Owner.Creature)) { _cardsPlayed = 0; UpdateStatus(); } return Task.CompletedTask; }
+    public override Task AfterCombatEnd() { _cardsPlayed = 0; UpdateStatus(); return Task.CompletedTask; }
     internal override void AppendCombatStateDescription(ref Combat.StateDescription.CombatStateDescriptionBuilder builder, Combat.StateDescription.CombatStateDescriptionContext context) => builder.Append(_cardsPlayed);
 }

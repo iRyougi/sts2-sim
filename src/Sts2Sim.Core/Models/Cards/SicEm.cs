@@ -8,6 +8,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// 3（升级 4）层 <see cref="SicEmPower"/>。</summary>
 public sealed class SicEm : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

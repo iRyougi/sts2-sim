@@ -12,6 +12,8 @@ public sealed class Recall : CardModel, ICardChoiceBaseValueProvider
 
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
+    protected override bool ShouldGlowGoldInternal => CombatState?.HittableEnemies.Any(c => ArrowCmd.CreatureIsImpaledByPlayersArrow(c, Owner)) ?? false;
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

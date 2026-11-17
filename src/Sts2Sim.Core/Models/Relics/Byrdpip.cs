@@ -28,10 +28,16 @@ public sealed class Byrdpip : RelicModel
         {
             AssertMutable();
             _swoopsPlayed = value;
+            // Source UpdateDisplay (called from the SwoopsPlayed setter); InvokeDisplayAmountChanged is UI only.
+            Status = _swoopsPlayed >= PlaysToEvolve ? RelicStatus.Active : RelicStatus.Normal;
         }
     }
 
     public override RelicRarity Rarity => RelicRarity.Event;
+
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() =>
+        Status = _swoopsPlayed >= PlaysToEvolve ? RelicStatus.Active : RelicStatus.Normal;
     public override bool AddsPet => true;
     public override bool HasUponPickupEffect => true;
 

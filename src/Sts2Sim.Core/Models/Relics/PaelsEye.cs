@@ -16,10 +16,30 @@ public sealed class PaelsEye : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Ancient;
 
+    public override Task BeforeCardPlayed(CardPlay cardPlay)
+    {
+        if (Owner.Creature.CombatState?.IsLiveCombat() == true &&
+            !_usedThisCombat &&
+            !cardPlay.IsAutoPlay &&
+            cardPlay.Card.Owner == Owner)
+        {
+            Status = RelicStatus.Normal;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public override Task AfterSideTurnStart(
         CombatSide side,
         IReadOnlyList<Creature> participants)
     {
+        // Source: the whole body (Status and WasOwnerPartOfLastPlayerTurn) is guarded by side == owner side
+        // and !UsedThisCombat; the existing field update below is kept as is, only Status is added here.
+        if (side == Owner.Creature.Side && !_usedThisCombat)
+        {
+            Status = participants.Contains(Owner.Creature) ? RelicStatus.Active : RelicStatus.Normal;
+        }
+
         if (side == CombatSide.Player)
         {
             _wasOwnerPartOfLastPlayerTurn = participants.Contains(Owner.Creature);
@@ -60,6 +80,7 @@ public sealed class PaelsEye : RelicModel
     {
         if (player == Owner)
         {
+            Status = RelicStatus.Normal;
             _usedThisCombat = true;
             _eligibleForExtraTurn = false;
         }
@@ -69,6 +90,7 @@ public sealed class PaelsEye : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _usedThisCombat = false;
         _wasOwnerPartOfLastPlayerTurn = true;
         _eligibleForExtraTurn = false;

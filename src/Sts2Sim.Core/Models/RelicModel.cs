@@ -30,6 +30,19 @@ public abstract class RelicModel : AbstractModel, ICombatStateDescriptionContrib
 
     private bool _isWax;
     private bool _isMelted;
+    private RelicStatus _status;
+
+    /// <summary>逐字移植 <c>RelicModel.Status</c>（v0.113.1）：界面上的遗物状态提示，只由遗物自己的可见状态与公开规则决定，
+    /// 不读任何 RNG。随 <c>MemberwiseClone</c> 复制。偏离：源码的 <c>StatusChanged</c> 事件只驱动界面，这里不移植。</summary>
+    public RelicStatus Status
+    {
+        get => _status;
+        protected internal set
+        {
+            AssertMutable();
+            _status = value;
+        }
+    }
 
     public bool IsWax
     {
@@ -124,6 +137,12 @@ public abstract class RelicModel : AbstractModel, ICombatStateDescriptionContrib
     public Player Owner { get; private set; } = null!;
 
     public override bool ShouldReceiveCombatHooks => true;
+
+    /// <summary>读档后重算 <see cref="Status"/>：源码里带 <c>[SavedProperty]</c> 的 setter 在加载时会跑并顺带设置 Status，
+    /// 而模拟器的移植/幕入口快照恢复直接写字段（<c>TransplantSavedProperties.Apply</c>）。只给 setter 会设 Status 的遗物覆写。</summary>
+    internal virtual void RefreshStatusAfterLoad()
+    {
+    }
 
     public void AssignOwner(Player owner)
     {

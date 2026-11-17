@@ -9,7 +9,15 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class Kunai : RelicModel
 {
+    private const int AttacksThreshold = 3; // CardsVar(3)
+
     private int _attacksThisTurn;
+
+    // Kunai.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _attacksThisTurn % AttacksThreshold == AttacksThreshold - 1
+            ? RelicStatus.Active
+            : RelicStatus.Normal;
 
     public override RelicRarity Rarity => RelicRarity.Rare;
 
@@ -20,6 +28,8 @@ public sealed class Kunai : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _attacksThisTurn = 0;
+            UpdateStatus();
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -34,6 +44,7 @@ public sealed class Kunai : RelicModel
         }
 
         _attacksThisTurn++;
+        UpdateStatus();
         if (_attacksThisTurn % 3 != 0)
         {
             return;
@@ -49,7 +60,9 @@ public sealed class Kunai : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _attacksThisTurn = 0;
+        UpdateStatus();
         return Task.CompletedTask;
     }
 

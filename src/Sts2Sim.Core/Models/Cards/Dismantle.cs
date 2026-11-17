@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class Dismantle : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowGoldInternal => CombatState?.HittableEnemies.Any(e => e.HasPower<VulnerablePower>()) ?? false;
+
     public bool TryGetThrashDamageVariable(out decimal amount)
     {
         amount = _damage;

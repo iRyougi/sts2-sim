@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class BubbleBubble : CardModel
 {
+    protected override bool ShouldGlowGoldInternal => CombatState?.HittableEnemies.Any(e => e.HasPower<PoisonPower>()) ?? false;
+
     private decimal Poison => IsUpgraded ? 12m : 9m;
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Uncommon;

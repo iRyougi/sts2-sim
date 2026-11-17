@@ -5,9 +5,15 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class Nunchaku : RelicModel
 {
+    private const int AttacksThreshold = 10; // CardsVar(10)
+
     private int _attacksPlayed;
 
     public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() =>
+        Status = _attacksPlayed % AttacksThreshold == AttacksThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
 
     public override Task AfterCardPlayed(CardPlay cardPlay)
     {
@@ -18,6 +24,8 @@ public sealed class Nunchaku : RelicModel
         }
 
         _attacksPlayed++;
+        // Nunchaku.UpdateDisplay via the AttacksPlayed setter (IsActivating is animation only).
+        Status = _attacksPlayed % AttacksThreshold == AttacksThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
         if (_attacksPlayed % 10 != 0)
         {
             return Task.CompletedTask;

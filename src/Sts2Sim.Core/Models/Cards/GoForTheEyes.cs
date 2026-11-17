@@ -9,6 +9,21 @@ public sealed class GoForTheEyes : CardModel, ICardChoiceBaseValueProvider, ICar
 {
     private decimal _damage = 3m;
     private decimal _weak = 1m;
+    protected override bool ShouldGlowGoldInternal
+    {
+        get
+        {
+            if (CombatState == null)
+            {
+                return false;
+            }
+
+            // 原版 MonsterModel.IntendsToAttack：NextMove.Intents 含 Attack 或 DeathBlow。
+            return CombatState.HittableEnemies.Any(e => e.Monster?.NextMove?.Intents.Any(intent =>
+                intent.IntentType is IntentType.Attack or IntentType.DeathBlow) ?? false);
+        }
+    }
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Common;
     public override TargetType TargetType => TargetType.AnyEnemy;

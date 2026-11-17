@@ -9,13 +9,23 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class LetterOpener : RelicModel
 {
+    private const int SkillsThreshold = 3; // CardsVar(3)
+
     private int _skillsThisTurn;
+
+    // LetterOpener.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _skillsThisTurn % SkillsThreshold == SkillsThreshold - 1
+            ? RelicStatus.Active
+            : RelicStatus.Normal;
 
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
     public override Task BeforeCombatStart()
     {
         _skillsThisTurn = 0;
+        UpdateStatus();
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 
@@ -27,6 +37,8 @@ public sealed class LetterOpener : RelicModel
             Owner.PlayerCombatState?.TurnNumber != 1)
         {
             _skillsThisTurn = 0;
+            UpdateStatus();
+            Status = RelicStatus.Normal;
         }
 
         return Task.CompletedTask;
@@ -41,6 +53,7 @@ public sealed class LetterOpener : RelicModel
         }
 
         _skillsThisTurn++;
+        UpdateStatus();
         if (_skillsThisTurn % 3 != 0)
         {
             return;
@@ -55,6 +68,13 @@ public sealed class LetterOpener : RelicModel
             Owner.Creature,
             null,
             cardPlay);
+    }
+
+    public override Task AfterCombatEnd()
+    {
+        // Source also sets IsActivating = false first (animation flag; its UpdateDisplay result is overwritten here).
+        Status = RelicStatus.Normal;
+        return Task.CompletedTask;
     }
 
     internal override void AppendCombatStateDescription(

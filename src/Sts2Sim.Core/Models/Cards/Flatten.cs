@@ -9,6 +9,10 @@ namespace Sts2Sim.Core.Models.Cards;
 /// （原版 <c>EnergyCost.SetThisTurn(0)</c>：回合结束才清除，打出后不清除）。Osty 不在时无效果。</summary>
 public sealed class Flatten : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowGoldInternal => HasOstyAttackedThisTurn;
+
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Common;

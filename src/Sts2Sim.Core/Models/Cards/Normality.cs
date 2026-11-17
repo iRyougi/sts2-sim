@@ -4,6 +4,10 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class Normality : CardModel
 {
+    protected override bool ShouldGlowRedInternal => ShouldPreventCardPlay;
+
+    private bool ShouldPreventCardPlay => Owner.PlayerCombatState!.CardPlaysStartedThisTurn >= 3;
+
     public override CardType Type => CardType.Curse;
     public override CardRarity Rarity => CardRarity.Curse;
     public override TargetType TargetType => TargetType.None;

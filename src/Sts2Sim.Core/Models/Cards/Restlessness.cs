@@ -9,6 +9,11 @@ public sealed class Restlessness : CardModel
     private int _draw = 2;
     private decimal _energy = 2m;
 
+    protected override bool ShouldGlowGoldInternal => IsOnlyCardInHand;
+
+    // 原版 IsOnlyCardInHand（含 this 在手牌里的情形）；OnPlay 因 this 已离开手牌而另写，见其注释。
+    private bool IsOnlyCardInHand => !Owner.PlayerCombatState!.Hand.Cards.Except(new CardModel[] { this }).Any();
+
     public override CardType Type => CardType.Skill;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

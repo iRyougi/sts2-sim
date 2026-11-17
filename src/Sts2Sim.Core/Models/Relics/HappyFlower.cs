@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class HappyFlower : RelicModel
 {
+    private const int TurnsThreshold = 3; // DynamicVar "Turns"
+
     private int _turnCounter;
 
     public override RelicRarity Rarity => RelicRarity.Common;
@@ -20,6 +22,8 @@ public sealed class HappyFlower : RelicModel
         }
 
         _turnCounter++;
+        // Source: TurnsSeen = (TurnsSeen + 1) % Turns; Status = TurnsSeen == Turns - 1 ? Active : Normal.
+        Status = _turnCounter == TurnsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
         if (_turnCounter < 3)
         {
             return Task.CompletedTask;
@@ -27,6 +31,12 @@ public sealed class HappyFlower : RelicModel
 
         _turnCounter = 0;
         Owner.PlayerCombatState!.GainEnergy(1m);
+        return Task.CompletedTask;
+    }
+
+    public override Task AfterCombatEnd()
+    {
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 

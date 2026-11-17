@@ -4,6 +4,8 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class Enthralled : CardModel
 {
+    protected override bool ShouldGlowRedInternal => true;
+
     public override CardType Type => CardType.Curse;
     public override CardRarity Rarity => CardRarity.Curse;
     public override TargetType TargetType => TargetType.None;

@@ -7,9 +7,18 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class TuningFork : RelicModel
 {
+    private const int SkillsThreshold = 10; // CardsVar(10)
+
     private int _skillsPlayed;
 
+    // TuningFork.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _skillsPlayed == SkillsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
+
     public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() => UpdateStatus();
 
     public override async Task AfterCardPlayed(CardPlay cardPlay)
     {
@@ -20,12 +29,14 @@ public sealed class TuningFork : RelicModel
         }
 
         _skillsPlayed++;
+        UpdateStatus();
         if (_skillsPlayed < 10)
         {
             return;
         }
 
         _skillsPlayed %= 10;
+        UpdateStatus();
         await CreatureCmd.GainBlock(
             Owner.Creature.CombatState!,
             Owner.Creature,

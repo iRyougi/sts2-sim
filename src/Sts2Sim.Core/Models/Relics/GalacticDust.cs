@@ -7,9 +7,18 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class GalacticDust : RelicModel
 {
+    private const int StarsThreshold = 10; // StarsVar(10)
+
     private int _starsSpent;
 
+    // GalacticDust.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _starsSpent == StarsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
+
     public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() => UpdateStatus();
 
     public override async Task AfterStarsSpent(int amount, Player spender)
     {
@@ -19,6 +28,7 @@ public sealed class GalacticDust : RelicModel
         }
 
         _starsSpent += amount;
+        UpdateStatus();
         int triggers = _starsSpent / 10;
         if (triggers == 0)
         {
@@ -26,6 +36,7 @@ public sealed class GalacticDust : RelicModel
         }
 
         _starsSpent %= 10;
+        UpdateStatus();
         await CreatureCmd.GainBlock(
             Owner.Creature.CombatState!,
             Owner.Creature,

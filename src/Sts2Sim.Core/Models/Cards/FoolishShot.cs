@@ -16,6 +16,8 @@ public sealed class FoolishShot : CardModel, ICardChoiceBaseValueProvider
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Shoot];
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)_damage);
 
+    protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

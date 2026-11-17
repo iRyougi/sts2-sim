@@ -16,6 +16,7 @@ public sealed class BurningSticks : RelicModel
         if (room is CombatRoom)
         {
             _wasUsedThisCombat = false;
+            Status = RelicStatus.Active;
         }
 
         return Task.CompletedTask;
@@ -32,11 +33,13 @@ public sealed class BurningSticks : RelicModel
         _wasUsedThisCombat = true;
         CardModel copy = (CardModel)card.MutableClone();
         await CardPileCmd.Generate(card.CombatState!, copy, PileType.Hand);
+        Status = RelicStatus.Normal;
     }
 
     public override Task AfterCombatEnd()
     {
         _wasUsedThisCombat = false;
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 

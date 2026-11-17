@@ -6,6 +6,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>群体 Wah 攻击；若本回合打出过 Cho 或 Ki 则命中两次（原版 <c>WahBlast</c>）。</summary>
 public sealed class WahBlast : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowGoldInternal => MelodyCmd.PlayedChoThisTurn(Owner) || MelodyCmd.PlayedKiThisTurn(Owner);
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.AllEnemies;

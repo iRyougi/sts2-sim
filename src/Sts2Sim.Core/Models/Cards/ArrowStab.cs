@@ -14,6 +14,8 @@ public sealed class ArrowStab : CardModel, ICardChoiceBaseValueProvider, ICardDa
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
+    protected override bool ShouldGlowGoldInternal => ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

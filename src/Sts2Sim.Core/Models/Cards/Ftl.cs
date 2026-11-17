@@ -7,6 +7,11 @@ public sealed class Ftl : CardModel, ICardChoiceBaseValueProvider, ICardDamageVa
 {
     private decimal _damage = 5m;
     private int _playMax = 3;
+    // 原版 CanDrawCard：本回合本玩家 CardPlaysFinished 数 < PlayMax；与 OnPlay 一致，用 CardsPlayedThisTurn（偏离 #106）。
+    protected override bool ShouldGlowGoldInternal => CanDrawCard;
+
+    private bool CanDrawCard => Owner.PlayerCombatState!.CardsPlayedThisTurn < _playMax;
+
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.AnyEnemy;

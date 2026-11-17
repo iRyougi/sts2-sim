@@ -98,7 +98,7 @@ public static class ItemEffectProbe
     private static readonly ImmutableHashSet<string> NotHooks =
     [
         "AfterCloned", "AfterRemoved", "DeepCloneFields", "AppendCombatStateDescription",
-        "RestoreCombatCloneReferencesFrom", "IsAllowed", "IsAllowedAtNeow",
+        "RestoreCombatCloneReferencesFrom", "IsAllowed", "IsAllowedAtNeow", "RefreshStatusAfterLoad",
     ];
 
     /// <summary>Registered relic/potion IDs, ordinal; a version update changes these lists and therefore the schema.</summary>

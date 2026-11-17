@@ -6,6 +6,13 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class ForgottenRitual : CardModel, ICardChoiceBaseValueProvider
 {
+    // 原版 WasCardExhaustedThisTurn 查 CardExhaustedEntry(HappenedThisTurn && Actor == Owner.Creature)；
+    // 与 OnPlay 一致，用 SemanticHistory 的等价计数。
+    protected override bool ShouldGlowGoldInternal => WasCardExhaustedThisTurn;
+
+    private bool WasCardExhaustedThisTurn =>
+        CombatState is CombatState concrete && concrete.CountCardsExhaustedThisTurn(Owner) > 0;
+
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Energy: _energy);
 
     private int _energy = 3;

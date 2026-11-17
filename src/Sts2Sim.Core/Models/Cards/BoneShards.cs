@@ -8,6 +8,8 @@ namespace Sts2Sim.Core.Models.Cards;
 /// 随后若 Osty 仍存活则击杀它；Osty 不在时整张牌无效果。</summary>
 public sealed class BoneShards : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
+    protected override bool ShouldGlowRedInternal => Owner.IsOstyMissing;
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

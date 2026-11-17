@@ -10,7 +10,7 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class PaelsLegion : RelicModel
 {
-    // Deviation #216 is presentation-only: skin, status display, and pet animations are omitted.
+    // Deviation #216 is presentation-only: skin and pet animations are omitted (RelicStatus is ported).
     // The pet creature, summon timing, block multiplier, and cooldown follow native behavior.
     private int _cooldown;
     private CardPlay? _affectedCardPlay;
@@ -55,6 +55,7 @@ public sealed class PaelsLegion : RelicModel
         {
             _affectedCardPlay = null;
             _cooldown = 2;
+            Status = RelicStatus.Normal;
         }
         return Task.CompletedTask;
     }
@@ -64,12 +65,17 @@ public sealed class PaelsLegion : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _cooldown--;
+            if (_cooldown <= 0)
+            {
+                Status = RelicStatus.Active;
+            }
         }
         return Task.CompletedTask;
     }
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _cooldown = 0;
         _affectedCardPlay = null;
         return Task.CompletedTask;

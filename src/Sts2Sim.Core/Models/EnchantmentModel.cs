@@ -39,6 +39,12 @@ public abstract class EnchantmentModel : AbstractModel, ICombatStateDescriptionC
 
     public virtual bool GainsBlock => false;
 
+    /// <summary>逐字移植 <c>EnchantmentModel.ShouldGlowGold</c>（v0.113.1 没有附魔覆写它）。</summary>
+    public virtual bool ShouldGlowGold => false;
+
+    /// <summary>逐字移植 <c>EnchantmentModel.ShouldGlowRed</c>（v0.113.1 没有附魔覆写它）。</summary>
+    public virtual bool ShouldGlowRed => false;
+
     public void AssignMagnitude(decimal magnitude)
     {
         AssertMutable();

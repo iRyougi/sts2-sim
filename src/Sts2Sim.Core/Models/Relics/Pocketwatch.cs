@@ -37,6 +37,7 @@ public sealed class Pocketwatch : RelicModel
         {
             int current = Math.Min(PackedCountMask, CardsPlayedThisTurn + 1);
             _cardsPlayedThisTurn = PackCounts(current, CardsPlayedPreviousTurn);
+            RefreshCounter();
         }
 
         return Task.CompletedTask;
@@ -74,6 +75,7 @@ public sealed class Pocketwatch : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _cardsPlayedThisTurn = PackCounts(current: 0, previous: CardsPlayedThisTurn);
+            RefreshCounter();
         }
 
         return Task.CompletedTask;
@@ -83,6 +85,7 @@ public sealed class Pocketwatch : RelicModel
     {
         _cardsPlayedThisTurn = 0;
         _shouldDrawExtra = false;
+        Status = RelicStatus.Normal;
         return Task.CompletedTask;
     }
 
@@ -94,6 +97,10 @@ public sealed class Pocketwatch : RelicModel
         builder.Append(CardsPlayedPreviousTurn);
         builder.Append(_shouldDrawExtra);
     }
+
+    // Source RefreshCounter (InvokeDisplayAmountChanged is UI only); threshold = DynamicVar "CardThreshold" 3.
+    private void RefreshCounter() =>
+        Status = CardsPlayedThisTurn <= CardPlayThreshold ? RelicStatus.Active : RelicStatus.Normal;
 
     private static int PackCounts(int current, int previous) =>
         (previous & PackedCountMask) << 16 | current & PackedCountMask;

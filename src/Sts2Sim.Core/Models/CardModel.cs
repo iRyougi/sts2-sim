@@ -48,6 +48,19 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     protected virtual bool IsPlayable => true;
 
+    /// <summary>逐字移植 <c>CardModel.ShouldGlowGold</c>（v0.113.1）：牌自身条件，否则看附魔。手牌里实际显示还要满足
+    /// <c>NHandCardHolder</c> 的门（可打出且处于出牌阶段），见 <c>VisibleContentProjection.ForCard</c>。</summary>
+    public bool ShouldGlowGold => ShouldGlowGoldInternal || _enchantments.Any(enchantment => enchantment.ShouldGlowGold);
+
+    /// <summary>逐字移植 <c>CardModel.ShouldGlowRed</c>（v0.113.1）。</summary>
+    public bool ShouldGlowRed => ShouldGlowRedInternal || _enchantments.Any(enchantment => enchantment.ShouldGlowRed);
+
+    /// <summary>逐字移植 <c>CardModel.ShouldGlowGoldInternal</c>：子类覆写，只许读玩家可见的状态。</summary>
+    protected virtual bool ShouldGlowGoldInternal => false;
+
+    /// <summary>逐字移植 <c>CardModel.ShouldGlowRedInternal</c>。</summary>
+    protected virtual bool ShouldGlowRedInternal => false;
+
     protected virtual bool IsXEnergyCost => false;
 
     protected virtual bool IsXStarCost => false;

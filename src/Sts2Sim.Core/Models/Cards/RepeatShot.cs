@@ -24,6 +24,8 @@ public sealed class RepeatShot : CardModel, ICardChoiceBaseValueProvider, ICardD
         return true;
     }
 
+    protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         ArgumentNullException.ThrowIfNull(cardPlay.Target);

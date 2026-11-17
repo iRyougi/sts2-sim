@@ -13,7 +13,15 @@ public sealed class JossPaper : RelicModel
     private int _cardsExhausted;
     private int _etherealCount;
 
+    // Source CardsExhausted setter: Status = CardsExhausted == ExhaustAmount - 1 ? Active : Normal
+    // (IsActivating / DoActivateVisuals is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _cardsExhausted == ExhaustsPerDraw - 1 ? RelicStatus.Active : RelicStatus.Normal;
+
     public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    /// <summary>Source [SavedProperty] setter recompute on load (field restore bypasses the setter).</summary>
+    internal override void RefreshStatusAfterLoad() => UpdateStatus();
 
     public override async Task AfterCardExhausted(CardModel card, bool causedByEthereal)
     {
@@ -29,6 +37,7 @@ public sealed class JossPaper : RelicModel
         }
 
         _cardsExhausted++;
+        UpdateStatus();
         await DrawIfThresholdMet();
     }
 
@@ -42,6 +51,7 @@ public sealed class JossPaper : RelicModel
         }
 
         _cardsExhausted += _etherealCount;
+        UpdateStatus();
         _etherealCount = 0;
         await DrawIfThresholdMet();
     }
@@ -61,6 +71,7 @@ public sealed class JossPaper : RelicModel
 
         int drawCount = _cardsExhausted / ExhaustsPerDraw;
         _cardsExhausted %= ExhaustsPerDraw;
+        UpdateStatus();
         await CardPileCmd.Draw(
             Owner.Creature.CombatState!,
             drawCount,

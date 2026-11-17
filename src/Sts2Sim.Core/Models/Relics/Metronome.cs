@@ -9,13 +9,24 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class Metronome : RelicModel
 {
+    private const int OrbCount = 7; // DynamicVar "OrbCount"
+
     private int _orbsChanneled;
+
+    // Metronome.UpdateDisplay (IsActivating is a 1s animation flag; always false at a decision point).
+    private void UpdateStatus() =>
+        Status = _orbsChanneled == OrbCount - 1 ? RelicStatus.Active : RelicStatus.Normal;
 
     public override RelicRarity Rarity => RelicRarity.Rare;
 
     public override Task AfterRoomEntered(AbstractRoom room)
     {
-        if (room is CombatRoom) _orbsChanneled = 0;
+        if (room is CombatRoom)
+        {
+            _orbsChanneled = 0;
+            UpdateStatus();
+        }
+
         return Task.CompletedTask;
     }
 
@@ -23,6 +34,7 @@ public sealed class Metronome : RelicModel
     {
         if (player != Owner) return;
         _orbsChanneled++;
+        UpdateStatus();
         if (_orbsChanneled != 7) return;
         Flash();
         await CreatureCmd.Damage(Owner.Creature.CombatState!,
@@ -32,7 +44,9 @@ public sealed class Metronome : RelicModel
 
     public override Task AfterCombatEnd()
     {
+        Status = RelicStatus.Normal;
         _orbsChanneled = 0;
+        UpdateStatus();
         return Task.CompletedTask;
     }
 
