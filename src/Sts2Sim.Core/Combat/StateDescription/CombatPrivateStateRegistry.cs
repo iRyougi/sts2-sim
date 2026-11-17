@@ -120,6 +120,9 @@ internal static class CombatPrivateStateRegistry
         // #929 G3: EncorePower and LullabyPower state
         "EncorePower._cardsBeingPlayed", "EncorePower._numberOfCardsPlayedSinceApplied",
         "LullabyPower._proccdThisTurn",
+        // #929 G4: EnnuiPower and MythicFormPower state
+        "EnnuiPower._sadnessAmount",
+        "MythicFormPower._upgradedCount",
     ];
 
     private static readonly IReadOnlyDictionary<string, string> IgnoredFields =

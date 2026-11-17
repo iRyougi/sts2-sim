@@ -154,6 +154,9 @@ public sealed class PlayerCombatState
     public int FirstChoPlayOrdinalThisTurn { get; private set; }
     public int FirstKiPlayOrdinalThisTurn { get; private set; }
 
+    /// <summary>本场战斗由当前玩家作为生成者生成的 Sadness 次数（原版 <c>Anguish</c> 查询 <c>CardGeneratedEntry</c> 的窄化计数）。</summary>
+    public int SadnessGeneratedThisCombat { get; private set; }
+
     /// <summary>本回合已开始的含对应旋律标签出牌次数（含自动出牌与重放，用于 LostLute / Motif）。</summary>
     public int WahStartedThisTurn { get; private set; }
     public int ChoStartedThisTurn { get; private set; }
@@ -259,6 +262,18 @@ public sealed class PlayerCombatState
         CardsGeneratedThisCombat--;
     }
 
+    public void RecordSadnessGenerated() => SadnessGeneratedThisCombat++;
+
+    internal void RollbackSadnessGenerated()
+    {
+        if (SadnessGeneratedThisCombat <= 0)
+        {
+            throw new InvalidOperationException("No generated-Sadness record is available to roll back.");
+        }
+
+        SadnessGeneratedThisCombat--;
+    }
+
 
     public void AddPetInternal(Creature pet)
     {
@@ -357,6 +372,7 @@ public sealed class PlayerCombatState
             CardsDiscardedThisTurn = CardsDiscardedThisTurn,
             CardsPlayedThisCombat = CardsPlayedThisCombat,
             CardsGeneratedThisCombat = CardsGeneratedThisCombat,
+            SadnessGeneratedThisCombat = SadnessGeneratedThisCombat,
             CardsDrawnThisCombat = CardsDrawnThisCombat,
             CardsPlayedThisTurn = CardsPlayedThisTurn,
             ManualCardsPlayedThisTurn = ManualCardsPlayedThisTurn,

@@ -224,6 +224,7 @@ public static class CombatStateDescription
         builder.Append(combat.CardsDiscardedThisTurn);
         builder.Append(combat.CardsPlayedThisCombat);
         builder.Append(combat.CardsGeneratedThisCombat);
+        builder.Append(combat.SadnessGeneratedThisCombat);
         builder.Append(combat.CardsDrawnThisCombat);
         builder.Append(combat.CardsPlayedThisTurn);
         builder.Append(combat.ManualCardsPlayedThisTurn);

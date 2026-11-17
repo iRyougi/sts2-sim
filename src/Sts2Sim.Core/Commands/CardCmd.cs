@@ -533,6 +533,10 @@ public static class CardCmd
             ?? throw new InvalidOperationException("Combat transformations require player combat state.");
         // Native Transform records CardGenerated before AfterCardEnteredCombat observes the replacement.
         generationState.RecordCardGenerated();
+        if (replacement is Models.Cards.Sadness)
+        {
+            generationState.RecordSadnessGenerated();
+        }
         try
         {
             await CardPileCmd.EnterCombatAtIndex(combatState, replacement, pileType, index);
@@ -540,6 +544,10 @@ public static class CardCmd
         catch
         {
             generationState.RollbackCardGenerated();
+            if (replacement is Models.Cards.Sadness)
+            {
+                generationState.RollbackSadnessGenerated();
+            }
             throw;
         }
     }

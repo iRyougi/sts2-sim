@@ -74,12 +74,25 @@ public sealed class FoolMelodyCardsTests : IDisposable
                 Assert.Equal(1, player.Creature.GetPower<FreeCardPower>()?.Amount ?? 0);
 
                 // FreeCardPower makes expensive card cost 0 on Turn 2 and decrements on play.
-                WahBlast blast = AddToPile<WahBlast>(player, PileType.Hand);
-                Assert.Equal(0, blast.EnergyCost);
+                WahBlast blastSingleHit = AddToPile<WahBlast>(player, PileType.Hand);
+                Assert.Equal(0, blastSingleHit.EnergyCost);
                 int energyBefore = pcs.Energy;
-                await room.Engine.PlayCardAsync(player, blast, null);
+                int hpBeforeBlastSingle = enemy.CurrentHp;
+                await room.Engine.PlayCardAsync(player, blastSingleHit, null);
                 Assert.Equal(energyBefore, pcs.Energy);
+                Assert.Equal(14, hpBeforeBlastSingle - enemy.CurrentHp);
                 Assert.Empty(player.Creature.Powers.OfType<FreeCardPower>());
+
+                // WahKi deals 2x2 damage and grants next-turn Energy + Draw; subsequent WahBlast hits twice for 28!
+                int hpBeforeWahKi = enemy.CurrentHp;
+                await room.Engine.PlayCardAsync(player, AddToPile<WahKi>(player, PileType.Hand), enemy);
+                Assert.Equal(4, hpBeforeWahKi - enemy.CurrentHp);
+                Assert.Equal(1, player.Creature.GetPower<EnergyNextTurnPower>()?.Amount ?? 0);
+                Assert.Equal(1, player.Creature.GetPower<DrawCardsNextTurnPower>()?.Amount ?? 0);
+
+                int hpBeforeBlastDouble = enemy.CurrentHp;
+                await room.Engine.PlayCardAsync(player, AddToPile<WahBlast>(player, PileType.Hand), null);
+                Assert.Equal(28, hpBeforeBlastDouble - enemy.CurrentHp);
                 break;
 
             case "cholimbs_coda_cost_reduction_and_kichant":
@@ -114,8 +127,24 @@ public sealed class FoolMelodyCardsTests : IDisposable
                 break;
 
             case "encore_limit_and_turn_end_removal":
-                AddToPile<DefendFool>(player, PileType.Draw);
-                AddToPile<DefendFool>(player, PileType.Draw);
+                foreach (CardModel c in pcs.Hand.Cards.ToList())
+                    CardPileCmd.Remove(c);
+                for (int i = 0; i < 4; i++)
+                    AddToPile<DefendFool>(player, PileType.Draw);
+
+                // WahChoKi grants 9 Block, 9 Damage, draws 1, and completes all 3 melodies for SteadyCadence (10 Damage + 3 Draw).
+                int hpBeforeWahChoKi = enemy.CurrentHp;
+                await room.Engine.PlayCardAsync(player, AddToPile<WahChoKi>(player, PileType.Hand), enemy);
+                Assert.Equal(9, player.Creature.Block);
+                Assert.Equal(9, hpBeforeWahChoKi - enemy.CurrentHp);
+                Assert.Single(pcs.Hand.Cards);
+                Assert.Equal(3, MelodyCmd.MelodiesThisTurn(player));
+
+                int hpBeforeCadence = enemy.CurrentHp;
+                await room.Engine.PlayCardAsync(player, AddToPile<SteadyCadence>(player, PileType.Hand), enemy);
+                Assert.Equal(10, hpBeforeCadence - enemy.CurrentHp);
+                Assert.Equal(4, pcs.Hand.Cards.Count);
+
                 for (int i = 0; i < 6; i++)
                     AddToPile<DefendFool>(player, PileType.Draw);
 
@@ -199,17 +228,22 @@ public sealed class FoolMelodyCardsTests : IDisposable
                 await room.Engine.PlayCardAsync(player, AddToPile<ChoFirm>(player, PileType.Hand), null);
                 Assert.Equal(12, player.Creature.Block - blockBeforeFirm);
 
-                // ChoChorus auto-plays Wah/Ki cards in Hand so all three melodies (Wah, Cho, Ki) are active.
+                // ChoChorus auto-plays WahCho (3 Block + 3 Damage) + KiWhip (5 Damage) -> exact 8 Damage across all 3 melodies.
                 WahCho handWahCho = AddToPile<WahCho>(player, PileType.Hand);
                 AddToPile<KiWhip>(player, PileType.Hand);
                 int enemyBeforeChorus = enemy.CurrentHp;
                 await room.Engine.PlayCardAsync(player, AddToPile<ChoChorus>(player, PileType.Hand), null);
-                Assert.True(enemyBeforeChorus - enemy.CurrentHp >= 3);
+                Assert.Equal(8, enemyBeforeChorus - enemy.CurrentHp);
 
-                // WahSymphony scales with melody cards across combat piles; RhythmStrike hits 1 + MelodiesThisTurn; HarmonicShield scales block.
+                // WahSymphony scales with melody cards across combat piles (ChoBarbs, ChoFirm, WahCho, KiWhip, ChoChorus, WahSymphony = 6 -> 6 + 4*6 = 30).
+                WahSymphony symphony = AddToPile<WahSymphony>(player, PileType.Hand);
+                int melodyCardCount = pcs.AllPiles
+                    .SelectMany(p => p.Cards)
+                    .Count(c => c.Tags.Contains(CardTag.Wah) || c.Tags.Contains(CardTag.Cho) || c.Tags.Contains(CardTag.Ki));
+                Assert.Equal(6, melodyCardCount);
                 int hpBeforeSym = enemy.CurrentHp;
-                await room.Engine.PlayCardAsync(player, AddToPile<WahSymphony>(player, PileType.Hand), null);
-                Assert.True(hpBeforeSym - enemy.CurrentHp > 6);
+                await room.Engine.PlayCardAsync(player, symphony, null);
+                Assert.Equal(30, hpBeforeSym - enemy.CurrentHp);
 
                 int hpBeforeRhythm = enemy.CurrentHp;
                 await room.Engine.PlayCardAsync(player, AddToPile<RhythmStrike>(player, PileType.Hand), enemy);

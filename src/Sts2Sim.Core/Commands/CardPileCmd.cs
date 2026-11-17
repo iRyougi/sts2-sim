@@ -396,8 +396,19 @@ public static class CardPileCmd
                 generationState = card.Owner.PlayerCombatState
                     ?? throw new InvalidOperationException("Generated cards require player combat state.");
                 generationState.RecordCardGenerated();
+                if (card is Models.Cards.Sadness)
+                {
+                    generationState.RecordSadnessGenerated();
+                }
             },
-            () => generationState!.RollbackCardGenerated());
+            () =>
+            {
+                generationState!.RollbackCardGenerated();
+                if (card is Models.Cards.Sadness)
+                {
+                    generationState.RollbackSadnessGenerated();
+                }
+            });
         await Hook.AfterCardGenerated(combatState, card);
         await Hook.AfterCardGeneratedForCombat(combatState, card, card.Owner);
     }
@@ -426,8 +437,19 @@ public static class CardPileCmd
                 generationState = creator.PlayerCombatState
                     ?? throw new InvalidOperationException("Generated cards require player combat state.");
                 generationState.RecordCardGenerated();
+                if (card is Models.Cards.Sadness)
+                {
+                    generationState.RecordSadnessGenerated();
+                }
             },
-            () => generationState?.RollbackCardGenerated());
+            () =>
+            {
+                generationState?.RollbackCardGenerated();
+                if (generationState is not null && card is Models.Cards.Sadness)
+                {
+                    generationState.RollbackSadnessGenerated();
+                }
+            });
         await Hook.AfterCardGenerated(combatState, card, creator);
         await Hook.AfterCardGeneratedForCombat(combatState, card, creator);
     }

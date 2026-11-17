@@ -73,6 +73,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         AddThisCombat,
         AddThisTurn,
         AddUntilPlayed,
+        AddThisTurnOrUntilPlayed,
     }
 
     private readonly record struct LocalEnergyModifier(LocalEnergyModifierKind Kind, int Amount)
@@ -88,7 +89,8 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         public bool ClearsAfterPlay => Kind is
             LocalEnergyModifierKind.FreeUntilPlayed or
             LocalEnergyModifierKind.SetThisTurnOrUntilPlayed or
-            LocalEnergyModifierKind.AddUntilPlayed;
+            LocalEnergyModifierKind.AddUntilPlayed or
+            LocalEnergyModifierKind.AddThisTurnOrUntilPlayed;
 
     }
 
@@ -396,7 +398,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         TemporaryCostOverrideThisTurnOrUntilPlayed = null;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind == LocalEnergyModifierKind.SetThisTurnOrUntilPlayed);
+        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind is
+            LocalEnergyModifierKind.SetThisTurnOrUntilPlayed or
+            LocalEnergyModifierKind.AddThisTurnOrUntilPlayed);
     }
 
     private CardModel? _deckVersion;
@@ -448,6 +452,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         AssertMutable();
         if (amount != 0)
             _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddUntilPlayed, amount));
+    }
+
+    /// <summary>Adds a relative local cost modifier that clears after first play or turn end.</summary>
+    public void AddEnergyCostThisTurnOrUntilPlayed(int amount)
+    {
+        AssertMutable();
+        if (amount != 0)
+            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddThisTurnOrUntilPlayed, amount));
     }
 
     internal void ClearEnergyCostThisTurn()

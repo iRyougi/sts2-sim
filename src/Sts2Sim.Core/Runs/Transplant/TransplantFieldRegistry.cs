@@ -70,10 +70,15 @@ public static class TransplantFieldRegistry
         "Wuppy._combatWuppy",
         "TheShot._cardsExhaustedByFlorescence",
         "Bounce._lastFinishedPlayerTurn",
+    ];
+    private static readonly HashSet<string> CombatOnlyPowerFields =
+    [
         "YahPower._triggeredThisTurn",
         "EncorePower._cardsBeingPlayed",
         "EncorePower._numberOfCardsPlayedSinceApplied",
         "LullabyPower._proccdThisTurn",
+        "EnnuiPower._sadnessAmount",
+        "MythicFormPower._upgradedCount",
     ];
 
     public static IReadOnlyDictionary<string, (TransplantFieldClass Class, string Reason)> Fields => _fields;
@@ -108,6 +113,9 @@ public static class TransplantFieldRegistry
                 if (NativeBoundaryResetFields.Contains($"{type.Name}.{field.Name}"))
                     (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
                         "Native combat-start or combat-end hook resets this field before the next combat.");
+                if (CombatOnlyPowerFields.Contains($"{type.Name}.{field.Name}"))
+                    (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
+                        "Combat-only power instance state (native internal Data or DynamicVar); powers do not persist outside combat.");
                 if (type.Name == "SpoilsMap" && field.Name == "<SpoilsCoord>k__BackingField")
                     (fieldClass, reason) = (TransplantFieldClass.Snapshot,
                         "Host exports the unsaved live coordinate explicitly at combat entry.");

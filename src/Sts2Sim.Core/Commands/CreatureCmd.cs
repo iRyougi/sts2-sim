@@ -563,18 +563,35 @@ public static class CreatureCmd
             await Hook.AfterCurrentHpChanged(combatState.RunState, combatState, creature, amount);
     }
 
-    /// <summary>Sets current HP directly for effects such as Fur Coat that do not deal damage.</summary>
+    /// <summary>Sets current HP directly for effects such as Fur Coat that do not deal damage,
+    /// running the death pipeline when HP drops to zero.</summary>
     public static async Task SetCurrentHp(Creature creature, decimal amount)
     {
         ArgumentNullException.ThrowIfNull(creature);
         decimal previous = creature.CurrentHp;
         creature.SetCurrentHpInternal(amount);
+        IRunState? runState = creature.Player?.RunState ?? creature.CombatState?.RunState;
         if (amount != previous)
         {
-            IRunState runState = creature.Player?.RunState ?? creature.CombatState?.RunState
-                ?? throw new InvalidOperationException("Creature has no run state for HP-change hooks.");
-            await Hook.AfterCurrentHpChanged(runState, creature.CombatState,
-                creature, amount - previous);
+            await Hook.AfterCurrentHpChanged(
+                runState ?? throw new InvalidOperationException("Creature has no run state for HP-change hooks."),
+                creature.CombatState,
+                creature,
+                amount - previous);
+        }
+
+        if (creature.IsDead &&
+            (creature.CombatState is { } combatState ? combatState.IsLiveCombat() : creature.IsPlayer))
+        {
+            await ResolvePotentialDeath(
+                runState ?? throw new InvalidOperationException("Creature has no run state for death resolution."),
+                creature.CombatState,
+                creature,
+                new DamageResult(creature, ValueProp.Unblockable | ValueProp.Unpowered)
+                {
+                    UnblockedDamage = 0,
+                    WasTargetKilled = true,
+                });
         }
     }
 

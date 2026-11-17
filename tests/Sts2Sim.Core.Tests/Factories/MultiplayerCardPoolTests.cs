@@ -21,6 +21,7 @@ public sealed class MultiplayerCardPoolTests : IDisposable
         "Cacophony", "GlimpseBeyond", "LegionOfBone", "Soulbound", "Underworld",
         "CoveringFire", "Yoga",
         "Ensemble",
+        "Compost", "Enrapture", "SelfDeprecate",
     };
 
     public MultiplayerCardPoolTests()
