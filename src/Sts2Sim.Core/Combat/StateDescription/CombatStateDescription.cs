@@ -203,11 +203,49 @@ public static class CombatStateDescription
         CombatState state,
         Player player)
     {
+        AppendPlayerHeaderAndState(
+            ref builder,
+            state,
+            player,
+            includeDominanceMeasuredResources: true);
+        AppendPile(ref builder, player.Deck, state);
+        foreach (CardPile pile in player.PlayerCombatState!.AllPiles)
+        {
+            AppendPile(ref builder, pile, state);
+        }
+
+        builder.Append(player.PotionSlots.Count);
+        foreach (PotionModel? potion in player.PotionSlots)
+        {
+            builder.Append(potion is not null);
+            if (potion is not null)
+            {
+                builder.Append(potion.Id);
+            }
+        }
+
+        builder.Append(player.Relics.Count);
+        foreach (RelicModel relic in player.Relics)
+        {
+            AppendModel(ref builder, state, relic);
+        }
+    }
+
+    public static void AppendPlayerHeaderAndState(
+        ref CombatStateDescriptionBuilder builder,
+        CombatState state,
+        Player player,
+        bool includeDominanceMeasuredResources)
+    {
         builder.Append(player.Character.Id);
-        builder.Append(player.Creature.CurrentHp);
-        builder.Append(player.Creature.MaxHp);
-        builder.Append(player.Creature.Block);
-        builder.Append(player.Creature.CumulativeHpLost);
+        if (includeDominanceMeasuredResources)
+        {
+            builder.Append(player.Creature.CurrentHp);
+            builder.Append(player.Creature.MaxHp);
+            builder.Append(player.Creature.Block);
+            builder.Append(player.Creature.CumulativeHpLost);
+        }
+
         builder.Append(player.Gold);
         builder.Append(player.HasEventPet());
         builder.Append(player.BaseOrbSlotCount);
@@ -215,8 +253,12 @@ public static class CombatStateDescription
         PlayerCombatState combat = player.PlayerCombatState!;
         builder.Append(combat.TurnNumber);
         builder.Append((int)combat.Phase);
-        builder.Append(combat.Energy);
-        builder.Append(combat.Stars);
+        if (includeDominanceMeasuredResources)
+        {
+            builder.Append(combat.Energy);
+            builder.Append(combat.Stars);
+        }
+
         builder.Append(combat.StarsGainedThisTurn);
         builder.Append(combat.SkillCardsPlayedThisTurn);
         builder.Append(combat.AttackCardsPlayedThisTurn);
@@ -274,27 +316,6 @@ public static class CombatStateDescription
                     break;
             }
             AppendModel(ref builder, state, orb);
-        }
-        AppendPile(ref builder, player.Deck, state);
-        foreach (CardPile pile in combat.AllPiles)
-        {
-            AppendPile(ref builder, pile, state);
-        }
-
-        builder.Append(player.PotionSlots.Count);
-        foreach (PotionModel? potion in player.PotionSlots)
-        {
-            builder.Append(potion is not null);
-            if (potion is not null)
-            {
-                builder.Append(potion.Id);
-            }
-        }
-
-        builder.Append(player.Relics.Count);
-        foreach (RelicModel relic in player.Relics)
-        {
-            AppendModel(ref builder, state, relic);
         }
     }
 
