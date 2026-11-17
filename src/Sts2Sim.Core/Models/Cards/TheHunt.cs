@@ -46,7 +46,7 @@ public sealed class TheHunt : CardModel, ICardDamageVariableProvider
                     RoomType.Boss => CardRarityOddsType.BossEncounter,
                     _ => CardRarityOddsType.RegularEncounter,
                 };
-                room.QueueExtraReward(Owner, new CardReward(Owner, oddsType));
+                room.QueueExtraReward(Owner, new CardReward(Owner, oddsType, isFromCombat: false));
             }
             await PowerCmd.Apply<TheHuntPower>(CombatState!, Owner.Creature, 1m, Owner.Creature, this);
         }

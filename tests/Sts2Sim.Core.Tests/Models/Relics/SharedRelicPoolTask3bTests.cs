@@ -4,6 +4,7 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
@@ -143,6 +144,117 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             Assert.True(candy.IsAllowed(run));
             foreach (int floor in Enumerable.Range(0, 41)) run.AddVisitedMapCoord(new MapCoord(floor, 0));
             Assert.False(candy.IsAllowed(run));
+
+            // #962: Silent A10 sequential mode — ordinary combat card reward receives Lasting Candy's bonus Power (4 options),
+            // while extra card rewards from TheHunt, PrayerWheel, and WhiteStar stay at 3 options without IsFromCombat.
+            var silentRun = new RunState(
+                "task3b-lasting-candy-silent-a10",
+                [new Overgrowth(), new Hive()],
+                ascensionLevel: 10);
+            Player silent = Player.CreateForNewRun(ModelDb.Character<Silent>(), silentRun);
+            silentRun.AddPlayer(silent);
+            Assert.False(silent.PlayerRng.UsesSemanticKeys);
+            await RelicCmd.Obtain(canonical, silent);
+            var silentCandy = Assert.Single(silent.Relics.OfType<LastingCandy>());
+
+            CombatRoom firstRoom = NewCombat();
+            silentRun.PushRoom(firstRoom);
+            await firstRoom.Enter(silentRun);
+            await CreatureCmd.Damage(firstRoom.Engine.State, firstRoom.Engine.State.Enemies.ToArray(), 9999m,
+                ValueProp.Unpowered, silent.Creature, null, null);
+            Assert.True(firstRoom.Engine.CheckWinCondition());
+            await firstRoom.ResolveOutcomeAsync();
+            Assert.Equal(3, Assert.Single(firstRoom.GeneratedRewards).Card.Options.Count);
+            Assert.Equal(1, silentCandy.CombatRewardsSeen);
+            await firstRoom.Exit(silentRun);
+            silentRun.PopCurrentRoom();
+
+            RunState legacyFlagRun = silentRun.CloneExact();
+            RunState prayerRun = silentRun.CloneExact();
+            RunState starRun = silentRun.CloneExact();
+
+            CombatRoom huntRoom = NewCombat();
+            silentRun.PushRoom(huntRoom);
+            await huntRoom.Enter(silentRun);
+            Creature huntTarget = Assert.Single(huntRoom.Engine.State.HittableEnemies);
+            huntTarget.LoseHpInternal(huntTarget.CurrentHp - 10, ValueProp.Unpowered);
+            var huntCard = (TheHunt)ModelDb.Card<TheHunt>().MutableClone();
+            huntCard.AssignOwner(silent);
+            CardPileCmd.Add(huntCard, PileType.Hand);
+            silent.PlayerCombatState!.Energy = 3;
+            await huntRoom.Engine.PlayCardAsync(silent, huntCard, huntTarget);
+            Assert.True(huntRoom.Engine.CheckWinCondition());
+
+            Player legacyPlayer = Assert.Single(legacyFlagRun.Players);
+            CombatRoom legacyRoom = NewCombat();
+            legacyFlagRun.PushRoom(legacyRoom);
+            await legacyRoom.Enter(legacyFlagRun);
+            legacyRoom.QueueExtraReward(legacyPlayer, new CardReward(legacyPlayer, CardRarityOddsType.RegularEncounter, isFromCombat: true));
+            await CreatureCmd.Damage(legacyRoom.Engine.State, legacyRoom.Engine.State.Enemies.ToArray(), 9999m,
+                ValueProp.Unpowered, legacyPlayer.Creature, null, null);
+            Assert.True(legacyRoom.Engine.CheckWinCondition());
+
+            Assert.Equal(legacyPlayer.PlayerRng.Rewards.Counter, silent.PlayerRng.Rewards.Counter);
+            await huntRoom.ResolveOutcomeAsync();
+            await legacyRoom.ResolveOutcomeAsync();
+
+            RewardsSet huntRewards = Assert.Single(huntRoom.GeneratedRewards);
+            RewardsSet legacyRewards = Assert.Single(legacyRoom.GeneratedRewards);
+            Assert.Equal(4, huntRewards.Card.Options.Count);
+            Assert.Equal(CardType.Power, huntRewards.Card.Options.Last().Type);
+            Assert.Equal(
+                legacyRewards.Card.Options.Select(card => (card.Id, card.IsUpgraded)),
+                huntRewards.Card.Options.Select(card => (card.Id, card.IsUpgraded)));
+            CardReward huntExtra = Assert.IsType<CardReward>(Assert.Single(huntRewards.ExtraRewards));
+            CardReward legacyExtra = Assert.IsType<CardReward>(Assert.Single(legacyRewards.ExtraRewards));
+            Assert.Equal(3, huntExtra.Options.Count);
+            Assert.Equal(4, legacyExtra.Options.Count);
+            Assert.Equal(CardType.Power, legacyExtra.Options.Last().Type);
+            Assert.Equal(
+                legacyExtra.Options.Take(3).Select(card => (card.Id, card.IsUpgraded)),
+                huntExtra.Options.Select(card => (card.Id, card.IsUpgraded)));
+            Assert.Equal(3, legacyPlayer.PlayerRng.Rewards.Counter - silent.PlayerRng.Rewards.Counter);
+            Assert.Equal(2, silentCandy.CombatRewardsSeen);
+            RunState huntRewardClone = silentRun.CloneExact();
+            Assert.Equal(3, Assert.IsType<CardReward>(Assert.Single(Assert.IsType<CombatRoom>(huntRewardClone.CurrentRoom).GeneratedRewards[0].ExtraRewards)).Options.Count);
+            await huntRoom.Exit(silentRun);
+            silentRun.PopCurrentRoom();
+            await legacyRoom.Exit(legacyFlagRun);
+            legacyFlagRun.PopCurrentRoom();
+
+            Player prayerPlayer = Assert.Single(prayerRun.Players);
+            await RelicCmd.Obtain(ModelDb.Relic<PrayerWheel>(), prayerPlayer);
+            CombatRoom prayerRoom = NewCombat();
+            prayerRun.PushRoom(prayerRoom);
+            await prayerRoom.Enter(prayerRun);
+            await CreatureCmd.Damage(prayerRoom.Engine.State, prayerRoom.Engine.State.Enemies.ToArray(), 9999m,
+                ValueProp.Unpowered, prayerPlayer.Creature, null, null);
+            Assert.True(prayerRoom.Engine.CheckWinCondition());
+            await prayerRoom.ResolveOutcomeAsync();
+            RewardsSet prayerRewards = Assert.Single(prayerRoom.GeneratedRewards);
+            Assert.Equal(4, prayerRewards.Card.Options.Count);
+            Assert.Equal(CardType.Power, prayerRewards.Card.Options.Last().Type);
+            Assert.Equal(3, Assert.IsType<CardReward>(Assert.Single(prayerRewards.ExtraRewards)).Options.Count);
+            await prayerRoom.Exit(prayerRun);
+            prayerRun.PopCurrentRoom();
+
+            Player starPlayer = Assert.Single(starRun.Players);
+            await RelicCmd.Obtain(ModelDb.Relic<WhiteStar>(), starPlayer);
+            var starRoom = new CombatRoom(() => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), RoomType.Elite);
+            starRun.PushRoom(starRoom);
+            await starRoom.Enter(starRun);
+            await CreatureCmd.Damage(starRoom.Engine.State, starRoom.Engine.State.Enemies.ToArray(), 9999m,
+                ValueProp.Unpowered, starPlayer.Creature, null, null);
+            Assert.True(starRoom.Engine.CheckWinCondition());
+            await starRoom.ResolveOutcomeAsync();
+            RewardsSet starRewards = Assert.Single(starRoom.GeneratedRewards);
+            Assert.Equal(4, starRewards.Card.Options.Count);
+            Assert.Equal(CardType.Power, starRewards.Card.Options.Last().Type);
+            CardReward starExtra = Assert.IsType<CardReward>(Assert.Single(starRewards.ExtraRewards));
+            Assert.Equal(3, starExtra.Options.Count);
+            Assert.All(starExtra.Options, card => Assert.Equal(CardRarity.Rare, card.Rarity));
+            await starRoom.Exit(starRun);
+            starRun.PopCurrentRoom();
         }
         else if (relicType == typeof(MiniatureTent))
             await VerifyRestFlow(canonical);

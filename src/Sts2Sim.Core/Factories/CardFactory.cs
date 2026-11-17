@@ -210,10 +210,15 @@ public static class CardFactory
     }
 
     /// <summary>Creates distinct mutable reward options using rarity odds, card selection, then one upgrade roll per option.</summary>
-    public static IReadOnlyList<CardModel> CreateForReward(Player player, int optionCount, CardRarityOddsType oddsType)
+    public static IReadOnlyList<CardModel> CreateForReward(
+        Player player, int optionCount, CardRarityOddsType oddsType, bool isFromCombat = true)
     {
         var creationOptions = new CardCreationOptions([player.Character.CardPool], CardCreationSource.Encounter, oddsType)
-            .WithFlags(CardCreationFlags.IsCardReward | CardCreationFlags.IsFromCombat);
+            .WithFlags(CardCreationFlags.IsCardReward);
+        if (isFromCombat)
+        {
+            creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
+        }
         var options = new List<CardModel>();
         var selectedCanonicals = new HashSet<CardModel>();
         Random.Rng rng = player.PlayerRng.Rewards;

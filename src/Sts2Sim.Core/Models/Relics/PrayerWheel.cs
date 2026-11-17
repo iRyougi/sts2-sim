@@ -18,7 +18,7 @@ public sealed class PrayerWheel : RelicModel
             return;
         }
 
-        var cards = new CardReward(player, CardRarityOddsType.RegularEncounter);
+        var cards = new CardReward(player, CardRarityOddsType.RegularEncounter, isFromCombat: false);
         cards.Populate(player.RunState);
         rewards.Add(cards);
     }
