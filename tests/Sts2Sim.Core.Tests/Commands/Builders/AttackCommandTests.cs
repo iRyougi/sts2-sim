@@ -76,7 +76,13 @@ public class AttackCommandTests
 
         public bool ContainsCreature(Creature creature) => Creatures.Contains(creature);
 
-        public bool IsLiveCombat() => true;
+        public bool Live { get; set; } = true;
+
+        public bool OverOrEnding { get; set; }
+
+        public bool IsLiveCombat() => Live;
+
+        public bool IsOverOrEnding() => OverOrEnding;
     }
 
     private static (FakeCombatState CombatState, Creature Attacker, FakeMonster Monster) MakeMonsterAttacker()
@@ -93,7 +99,7 @@ public class AttackCommandTests
     [Fact]
     public async Task Execute_FromMonster_TargetsAllOpponents_AndDealsDamage()
     {
-        (FakeCombatState combatState, _, FakeMonster monster) = MakeMonsterAttacker();
+        (FakeCombatState combatState, Creature attacker, FakeMonster monster) = MakeMonsterAttacker();
         Creature target = Creature.CreateStandaloneForTests(30, 30);
         target.CombatState = combatState;
         combatState.AlliesList.Add(target);
@@ -101,6 +107,32 @@ public class AttackCommandTests
         await DamageCmd.Attack(6m).FromMonster(monster).Execute();
 
         Assert.Equal(24, target.CurrentHp);
+
+        foreach (bool live in new[] { true, false })
+        {
+            combatState.Live = live;
+            combatState.OverOrEnding = true;
+            target.SetCurrentHpInternal(30);
+            AttackCommand attack = DamageCmd.Attack(6m).FromMonster(monster);
+            Assert.Same(attack, await attack.Execute());
+            Assert.Empty(attack.Results);
+            Assert.Equal(30, target.CurrentHp);
+        }
+
+        combatState.OverOrEnding = false;
+        target.SetCurrentHpInternal(30);
+        await DamageCmd.Attack(6m).FromMonster(monster).Execute();
+        Assert.Equal(24, target.CurrentHp);
+
+        var missingAttacker = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DamageCmd.Attack(6m).Execute());
+        Assert.Equal("No attacker set.", missingAttacker.Message);
+
+        AttackCommand missingStateAttack = DamageCmd.Attack(6m).FromMonster(monster);
+        attacker.CombatState = null;
+        var missingState = await Assert.ThrowsAsync<InvalidOperationException>(() => missingStateAttack.Execute());
+        attacker.CombatState = combatState;
+        Assert.Equal("Attacker has no combat state.", missingState.Message);
     }
 
     [Fact]

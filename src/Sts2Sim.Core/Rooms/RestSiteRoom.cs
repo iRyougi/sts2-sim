@@ -100,8 +100,16 @@ public sealed class RestSiteRoom : AbstractRoom
         }
     }
 
+    /// <summary>
+    /// Whether the player still has a selectable option. Disabled leftovers do not count (#1011): native
+    /// <c>NRestSiteRoom.AfterSelectingOptionAsync</c> enables Proceed after any successful option, and a disabled
+    /// button cannot be chosen, so with only disabled options left (e.g. MiniatureTent plus a full-HP Wuppy's
+    /// RESTORE, or Smith targets upgraded by a reward taken here) the only player action is leaving. The disabled
+    /// options stay in the snapshot for display until the room is exited.
+    /// </summary>
     public bool HasRemainingDecisions(Player player) =>
-        _remainingDecisions.TryGetValue(player, out List<RestSiteDecision>? remaining) && remaining.Count > 0;
+        _remainingDecisions.TryGetValue(player, out List<RestSiteDecision>? remaining)
+        && remaining.Any(decision => decision.IsEnabled);
 
     internal bool TryOfferRewardsFromCurrentRestSite(IRunState runState, RewardsSet rewards)
     {

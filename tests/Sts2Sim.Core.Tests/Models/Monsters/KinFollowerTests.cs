@@ -2,6 +2,7 @@ namespace Sts2Sim.Core.Tests.Models.Monsters;
 
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.MonsterMoves;
@@ -77,18 +78,31 @@ public sealed class KinFollowerTests : IDisposable
     [Fact]
     public async Task QuickAndBoomerang_DealRealFixedDamageToEveryPlayer()
     {
-        (KinFollower follower, _, IReadOnlyList<Player> players) =
-            await Task20BossTestFixture.CreateSingleCombatAsync<KinFollower>(
+        (var room, IReadOnlyList<Player> players) =
+            await Task20BossTestFixture.CreateCombatAsync(
                 0,
                 "kin-follower-multiplayer",
-                playerCount: 2);
+                playerCount: 2,
+                () => new[]
+                {
+                    ((MonsterModel)ModelDb.Monster<KinFollower>().MutableClone(), (string?)null),
+                    ((MonsterModel)ModelDb.Monster<WanderingGrunt>().MutableClone(), (string?)null),
+                });
+        KinFollower follower = Assert.IsType<KinFollower>(
+            Assert.Single(room.Engine.State.Enemies, enemy => enemy.Monster is KinFollower).Monster);
         int[] hpBefore = players.Select(player => player.Creature.CurrentHp).ToArray();
 
+        Assert.True(room.Engine.IsInProgress);
+        Assert.False(room.Engine.IsOverOrEnding);
+        Assert.Contains(room.Engine.State.Enemies, enemy => enemy.IsAlive && enemy.IsPrimaryEnemy);
         await follower.PerformMove();
         Task20BossTestFixture.RollAfterPerformed(follower);
         Assert.Equal(hpBefore.Select(hp => hp - 5),
             players.Select(player => player.Creature.CurrentHp));
 
+        Assert.True(room.Engine.IsInProgress);
+        Assert.False(room.Engine.IsOverOrEnding);
+        Assert.Contains(room.Engine.State.Enemies, enemy => enemy.IsAlive && enemy.IsPrimaryEnemy);
         await follower.PerformMove();
         Task20BossTestFixture.RollAfterPerformed(follower);
         Assert.Equal(hpBefore.Select(hp => hp - 9),

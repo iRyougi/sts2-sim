@@ -169,7 +169,7 @@ public sealed class AttackCommand
         }
 
         ICombatState combatState = Attacker.CombatState ?? throw new InvalidOperationException("Attacker has no combat state.");
-        if (Attacker.IsDead)
+        if (combatState.IsOverOrEnding() || Attacker.IsDead)
         {
             return this;
         }

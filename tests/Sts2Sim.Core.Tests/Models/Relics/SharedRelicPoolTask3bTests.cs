@@ -390,6 +390,8 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             await RelicCmd.Obtain(ModelDb.Relic<Girya>(), player);
             var girya = Assert.Single(player.Relics.OfType<Girya>());
             if (tent) await RelicCmd.Obtain(tentRelic, player);
+            // #1011: a full-HP Wuppy adds a disabled RESTORE; with the tent it is the only option left at the end.
+            await RelicCmd.Obtain(ModelDb.Relic<Sts2Sim.Core.Models.Relics.Wuppy>(), player);
             var room = new RestSiteRoom();
             run.PushRoom(room);
             await room.EnterInternal(run);
@@ -399,13 +401,16 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             RestChoices.Clear();
             await DrivePrivate(new RunDriver(run, this), "DriveRestSiteAsync", room);
             Assert.Equal(1, girya.TimesLifted);
-            Assert.Equal(tent ? initial.Length - initialSmithCount + 1 : 1, RestChoices.Count);
+            Assert.False(Assert.Single(initial.OfType<RestoreRestSiteOption>()).IsEnabled);
+            Assert.Equal(tent ? initial.Length - initialSmithCount : 1, RestChoices.Count);
             Assert.All(RestChoices, choice => Assert.Contains(initial, item => ReferenceEquals(item, choice)));
             Assert.Single(RestChoices.OfType<LiftRestSiteOption>());
             Assert.Equal(tent ? 1 : 0, RestChoices.OfType<RestSiteDecision.Smith>().Count());
             Assert.Equal(tent ? 1 : 0, player.Deck.Cards.Count(card => card.IsUpgraded));
             Assert.False(room.HasRemainingDecisions(player));
-            Assert.Empty(room.GetAvailableDecisions(run, player));
+            IReadOnlyList<RestSiteDecision> leftover = room.GetAvailableDecisions(run, player);
+            if (tent) Assert.False(Assert.IsType<RestoreRestSiteOption>(Assert.Single(leftover)).IsEnabled);
+            else Assert.Empty(leftover);
             await room.Exit(run);
             Assert.Contains(room.GetAvailableDecisions(run, player), choice => choice is LiftRestSiteOption);
         }
@@ -486,7 +491,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
     }
     public Task<RestSiteDecision> ChooseRestSiteActionAsync(Player player, IReadOnlyList<RestSiteDecision> candidates)
     {
-        RestSiteDecision choice = candidates.OfType<LiftRestSiteOption>().FirstOrDefault() ?? candidates[0];
+        RestSiteDecision choice = candidates.OfType<LiftRestSiteOption>().FirstOrDefault() ?? candidates.First(c => c.IsEnabled);
         Assert.DoesNotContain(RestChoices, previous => ReferenceEquals(previous, choice));
         RestChoices.Add(choice);
         return Task.FromResult(choice);
