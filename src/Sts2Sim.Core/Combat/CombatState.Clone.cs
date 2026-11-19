@@ -1,8 +1,11 @@
+using Sts2Sim.Core.Combat.StateDescription;
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.ValueProps;
@@ -31,18 +34,17 @@ public sealed partial class CombatState
     /// 但各自追加独立的轨迹。它不会退回共享顺序 counter，也不会把搜索分支的记录写回真实战斗。
     /// </para>
     /// <para>
-    /// 刻意<b>不</b>提供 <c>CloneReseeded</c> 对应物（Plan 08b-1 决定）：唯一的潜在消费者是
-    /// 战略层 playout 的确定化采样，而它要到 08d 才存在。在没有真实消费者的情况下，
-    /// 怪物私有 RNG、玩家 RNG、run RNG 三者各自该不该重播种、按什么种子重播种，无法正确决定。
-    /// RngSet 层的能力已经就绪（<see cref="Runs.RunRngSet.CloneReseeded"/>），
-    /// 届时在此之上组装即可，不需要再改接口层。
+    /// 重播种的对应物是 <see cref="CloneForPublicWorld"/>（Plan 08b-1 当时刻意不提供，等真实消费者；
+    /// 消费者现为 Boss 战公开信息搜索，Plan 09-M stupa P4a）。两者是互斥语义、刻意分开的方法名：
+    /// 本方法给完全信息的战斗求解器（AGENTS.md §3 例外①），公开世界克隆给只许用公开信息的推演。
+    /// 不存在"只重播种一部分流"的战斗克隆。
     /// </para>
     /// </remarks>
     public CombatState Clone() => Clone(out _);
 
     public CombatState Clone(out CombatCloneMap map)
     {
-        var runState = new CombatRunStateSnapshot(RunState);
+        var runState = new CombatRunStateSnapshot(RunState, RunState.Rng.CloneExact());
         var cardMap = new Dictionary<CardModel, CardModel>(ReferenceEqualityComparer.Instance);
         var playerMap = new Dictionary<Player, Player>(ReferenceEqualityComparer.Instance);
         foreach (Player player in Players)
@@ -52,6 +54,85 @@ public sealed partial class CombatState
             runState.AddPlayer(clonedPlayer);
         }
 
+        return CloneProjection(runState, playerMap, cardMap, out map);
+    }
+
+    /// <summary>
+    /// 公开信息世界：与本战斗公开状态相同、不共享任何隐藏未来的投影克隆（偏离 #189 在战斗内的组装）。
+    /// 只由公开状态与 <paramref name="worldSeed"/> 决定，不读真实种子、真实 RNG 流、真实抽牌顺序或遗物袋顺序。
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item>run RNG：全新的 <see cref="RunRngSet"/>（种子与全部流都来自世界种子）。</item>
+    /// <item>玩家 RNG：全新的 <see cref="PlayerRngSet"/>，种子独立于 run 种子。</item>
+    /// <item>怪物私有 RNG：按世界种子与 <see cref="Creature.CombatId"/> 重起。</item>
+    /// <item>遗物袋：内容不变，按遗物 ID 排序后重洗。</item>
+    /// <item>抽牌堆：内容不变；先按牌面状态（同状态再按牌组位置）排成与原顺序无关的规范序，再用世界种子洗牌。</item>
+    /// </list>
+    /// 手牌、弃牌、消耗、血量、能力、怪物当前意图等公开状态原样保留。带语义键的 RNG 集合（偏离 #329）不支持。
+    /// 完全相同且都没有牌组对应物的战斗内生成牌之间无法再分先后，它们的相对位置沿用原顺序。
+    /// </remarks>
+    public CombatState CloneForPublicWorld(ulong worldSeed)
+    {
+        if (RunState.Rng.UsesSemanticKeys || Players.Any(player => player.PlayerRng.UsesSemanticKeys))
+            throw new NotSupportedException("A public-information world cannot be built from keyed RNG sets.");
+
+        var runState = new CombatRunStateSnapshot(
+            RunState, new RunRngSet($"PUBLICWORLD{PublicWorldSeed(worldSeed, 0):X16}"));
+        var cardMap = new Dictionary<CardModel, CardModel>(ReferenceEqualityComparer.Instance);
+        var playerMap = new Dictionary<Player, Player>(ReferenceEqualityComparer.Instance);
+        foreach (Player player in Players)
+        {
+            Player clonedPlayer = player.CloneForPublicWorld(
+                runState, cardMap, PublicWorldSeed(worldSeed, 1), new Rng(PublicWorldSeed(worldSeed, 2)));
+            playerMap.Add(player, clonedPlayer);
+            runState.AddPlayer(clonedPlayer);
+        }
+
+        CombatState world = CloneProjection(runState, playerMap, cardMap, out _);
+        foreach (Creature creature in world.EnumerateCloneCreatures())
+            if (creature.Monster is { } monster)
+                monster.Rng = new Rng(PublicWorldSeed(worldSeed, 3) + (creature.CombatId ?? 0));
+
+        ulong pileStream = 4;
+        foreach (Player player in world.Players)
+        {
+            ulong pileSeed = PublicWorldSeed(worldSeed, pileStream++);
+            if (player.PlayerCombatState is not { } combat) continue;
+            List<CardModel> deck = player.Deck.Cards.ToList();
+            List<CardModel> cards = combat.DrawPile.Cards
+                .Select(card =>
+                {
+                    var builder = new CombatStateDescriptionBuilder();
+                    CombatStateDescription.AppendCardState(ref builder, card, world);
+                    return (Card: card, Face: builder.Build(),
+                        DeckIndex: card.DeckVersion is { } deckVersion ? deck.IndexOf(deckVersion) : -1);
+                })
+                .OrderBy(entry => entry.Face.First).ThenBy(entry => entry.Face.Second)
+                .ThenBy(entry => entry.DeckIndex)
+                .Select(entry => entry.Card).ToList();
+            cards.UnstableShuffle(new Rng(pileSeed));
+            // 只换顺序：逐张移到底部，不经过会触发入堆副作用的 AddInternal。
+            foreach (CardModel card in cards) combat.DrawPile.MoveToBottomInternal(card);
+        }
+        return world;
+    }
+
+    /// <summary>SplitMix64(世界种子, 流序号)：一个公开世界里每条隐藏流各自独立的种子。</summary>
+    private static ulong PublicWorldSeed(ulong worldSeed, ulong stream)
+    {
+        ulong z = worldSeed + (stream + 1) * 0x9E3779B97F4A7C15UL;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        return z ^ (z >> 31);
+    }
+
+    private CombatState CloneProjection(
+        CombatRunStateSnapshot runState,
+        Dictionary<Player, Player> playerMap,
+        Dictionary<CardModel, CardModel> cardMap,
+        out CombatCloneMap map)
+    {
         CombatState clone = NewCloneState(runState, projection: true);
         var states = new CloneStates(this, clone);
         var creatures = new Dictionary<Creature, Creature>(ReferenceEqualityComparer.Instance);
@@ -326,7 +407,7 @@ public sealed partial class CombatState
     /// or event sequences. Sharing the current room is deliberate because combat code only reads its identity/type;
     /// cloning the full <see cref="Runs.RunState"/> would duplicate unrelated mutable run machinery.
     /// </summary>
-    private sealed class CombatRunStateSnapshot(IRunState source) : IRunState
+    private sealed class CombatRunStateSnapshot(IRunState source, RunRngSet rng) : IRunState
     {
         private readonly List<Player> _players = new();
         private readonly int _totalFloor = source.TotalFloor;
@@ -338,7 +419,8 @@ public sealed partial class CombatState
             _ => default,
         };
 
-        public RunRngSet Rng { get; } = source.Rng.CloneExact();
+        // 由调用方给定：Clone 传 CloneExact 的副本，CloneForPublicWorld 传全新的集合。
+        public RunRngSet Rng { get; } = rng;
 
         // AscensionManager contains only a readonly level, so it is immutable after construction.
         public AscensionManager Ascension { get; } = source.Ascension;

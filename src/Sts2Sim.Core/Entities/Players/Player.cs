@@ -427,6 +427,16 @@ public sealed class Player
         IDictionary<CardModel, CardModel> cardMap) =>
         CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.Clone());
 
+    /// <summary>公开世界克隆（<c>CombatState.CloneForPublicWorld</c>）：玩家 RNG 由 <paramref name="playerSeed"/>
+    /// 全新播种，遗物袋内容不变、用 <paramref name="relicBagShuffle"/> 重洗。与 <see cref="CloneForCombat"/>
+    /// 是互斥语义，刻意分成两个方法名。</summary>
+    internal Player CloneForPublicWorld(
+        IRunState runState,
+        IDictionary<CardModel, CardModel> cardMap,
+        ulong playerSeed,
+        Rng relicBagShuffle) =>
+        CloneOwnedState(runState, cardMap, new PlayerRngSet(playerSeed), RelicGrabBag.CloneReshuffled(relicBagShuffle));
+
     private Player CloneOwnedState(
         IRunState runState,
         IDictionary<CardModel, CardModel> cardMap,
