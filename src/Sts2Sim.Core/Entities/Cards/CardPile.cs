@@ -20,6 +20,9 @@ public sealed class CardPile(PileType type)
 
     public IReadOnlyList<CardModel> Cards => _cards;
 
+    /// <summary>The same list as <see cref="Cards"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
+    internal List<CardModel> CardList => _cards;
+
     public void AddInternal(CardModel card, int index = -1)
     {
         if (card.Pile != null)

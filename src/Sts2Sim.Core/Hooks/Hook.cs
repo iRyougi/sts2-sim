@@ -528,7 +528,10 @@ public static class Hook
     /// <summary>
     /// 偏离 #28: 游戏原版签名为 (IRunState, ICombatState?),本计划战斗期 hook 只从 ICombatState 派生 IRunState。
     /// </summary>
-    private static IEnumerable<AbstractModel> IterateCombatHookListeners(ICombatState combatState)
+    private static IEnumerable<AbstractModel> IterateCombatHookListeners(ICombatState combatState) =>
+        (combatState as CombatState)?.SnapshotCombatHookListeners() ?? IterateCombatHookListenersOverRun(combatState);
+
+    private static IEnumerable<AbstractModel> IterateCombatHookListenersOverRun(ICombatState combatState)
     {
         if (combatState.IsOverOrEnding() && !combatState.IsStarting())
             yield break;
@@ -541,16 +544,38 @@ public static class Hook
     // Source iterators and materialized arrays remain RAW candidates. Qualification is fresh
     // at each actual dispatch, matching native yield-time Contains without changing capture.
     // Scope B deliberately retains legacy passthrough for five known kinds (see deviations).
-    private static bool IsEligibleHookListener(AbstractModel model) => model switch
+    // Plan 09-O: the same type switch, read from the kind each model carries since construction (no type tests per visit).
+    private static bool IsEligibleHookListener(AbstractModel model)
     {
-        PowerModel power => power.Owner.CombatState is not null
-            && (power.Owner.Player?.IsActiveForHooks ?? true),
-        MonsterModel monster => monster.Creature.CombatState is not null,
-        OrbModel orb => !orb.HasBeenRemovedFromState && orb.Owner.IsActiveForHooks,
-        CardModel or RelicModel or PotionModel or AfflictionModel or EnchantmentModel => true,
-        _ => throw new ArgumentOutOfRangeException(nameof(model), model?.GetType(),
-            "Unsupported hook listener model type."),
-    };
+        switch (model?.HookListenerKind ?? HookOverrideIndex.ListenerKind.Unknown)
+        {
+            case HookOverrideIndex.ListenerKind.Power:
+                PowerModel power = System.Runtime.CompilerServices.Unsafe.As<PowerModel>(model)!;
+                return power.Owner.CombatState is not null && (power.Owner.Player?.IsActiveForHooks ?? true);
+            case HookOverrideIndex.ListenerKind.Monster:
+                return System.Runtime.CompilerServices.Unsafe.As<MonsterModel>(model)!.Creature.CombatState is not null;
+            case HookOverrideIndex.ListenerKind.Orb:
+                OrbModel orb = System.Runtime.CompilerServices.Unsafe.As<OrbModel>(model)!;
+                return !orb.HasBeenRemovedFromState && orb.Owner.IsActiveForHooks;
+            case HookOverrideIndex.ListenerKind.Passive:
+                return true;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(model), model?.GetType(),
+                    "Unsupported hook listener model type.");
+        }
+    }
+
+    /// <summary>
+    /// Plan 09-O: a known listener kind whose type inherits <see cref="AbstractModel"/>'s no-op for this hook is passed over
+    /// without the call. The only observable part of such a visit, the ExecutionFinished notification of an eligible listener
+    /// (diagnostic subscribers only), is still raised; eligibility is a pure read for known kinds.
+    /// </summary>
+    private static bool SkipNoOp(AbstractModel model, HookOverrideIndex.HookSlot slot)
+    {
+        if (!HookOverrideIndex.Skips(model, slot)) return false;
+        if (model.HasExecutionFinishedSubscribers && IsEligibleHookListener(model)) model.InvokeExecutionFinished();
+        return true;
+    }
 
     // Pure type classification for Energy projection. Never read lifecycle getters here:
     // unknown neutral types survive projection until the actual dispatch guard.
@@ -730,6 +755,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.ShouldTakeExtraTurnEarly)) continue;
             if (IsEligibleHookListener(model) && model.ShouldTakeExtraTurnEarly(player))
             {
                 source = model;
@@ -739,6 +765,7 @@ public static class Hook
 
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.ShouldTakeExtraTurn)) continue;
             if (IsEligibleHookListener(model) && model.ShouldTakeExtraTurn(player))
             {
                 source = model;
@@ -807,6 +834,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterSideTurnStart)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterSideTurnStart(side, participants);
             model.InvokeExecutionFinished();
@@ -814,6 +842,7 @@ public static class Hook
 
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterSideTurnStartLate)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterSideTurnStartLate(side, participants);
             model.InvokeExecutionFinished();
@@ -865,6 +894,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if ((combatState as CombatState)?.Observer is null && SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeSideTurnEndVeryEarly)) continue;
             if (!IsEligibleHookListener(model)) continue;
             (combatState as CombatState)?.Observer?.SideTurnEndListener(nameof(BeforeSideTurnEndVeryEarly), model, side, true);
             await model.BeforeSideTurnEndVeryEarly(side, participants);
@@ -880,6 +910,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if ((combatState as CombatState)?.Observer is null && SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeSideTurnEndEarly)) continue;
             if (!IsEligibleHookListener(model)) continue;
             (combatState as CombatState)?.Observer?.SideTurnEndListener(nameof(BeforeSideTurnEndEarly), model, side, true);
             await model.BeforeSideTurnEndEarly(side, participants);
@@ -897,6 +928,7 @@ public static class Hook
         Creature[] participantSnapshot = participants.ToArray();
         foreach (AbstractModel model in listeners)
         {
+            if ((combatState as CombatState)?.Observer is null && SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeSideTurnEnd)) continue;
             if (!IsEligibleHookListener(model)) continue;
             (combatState as CombatState)?.Observer?.SideTurnEndListener(nameof(BeforeSideTurnEnd), model, side, true);
             await model.BeforeSideTurnEnd(side, participantSnapshot);
@@ -915,6 +947,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if ((combatState as CombatState)?.Observer is null && SkipNoOp(model, HookOverrideIndex.HookSlot.AfterSideTurnEnd)) continue;
             if (!IsEligibleHookListener(model)) continue;
             (combatState as CombatState)?.Observer?.SideTurnEndListener(nameof(AfterSideTurnEnd), model, side, true);
             await model.AfterSideTurnEnd(side, participants);
@@ -1408,6 +1441,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeFlush)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.BeforeFlush(player);
             model.InvokeExecutionFinished();
@@ -1415,6 +1449,7 @@ public static class Hook
 
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeFlushLate)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.BeforeFlushLate(player);
             model.InvokeExecutionFinished();
@@ -1525,6 +1560,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeAttack)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.BeforeAttack(command);
             model.InvokeExecutionFinished();
@@ -1535,6 +1571,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterAttack)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterAttack(command);
             model.InvokeExecutionFinished();
@@ -1546,6 +1583,7 @@ public static class Hook
         int hitCount = originalHitCount;
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyAttackHitCount)) continue;
             if (!IsEligibleHookListener(item)) continue;
             hitCount = item.ModifyAttackHitCount(command, hitCount);
         }
@@ -1573,6 +1611,7 @@ public static class Hook
     {
         foreach (AbstractModel model in runState.IterateHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.BeforeDamageReceived)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.BeforeDamageReceived(target, amount, props, dealer, cardSource);
             model.InvokeExecutionFinished();
@@ -1599,6 +1638,7 @@ public static class Hook
     {
         foreach (AbstractModel model in runState.IterateHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterDamageReceived)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterDamageReceived(target, result, props, dealer, cardSource);
             model.InvokeExecutionFinished();
@@ -1611,6 +1651,7 @@ public static class Hook
     {
         foreach (AbstractModel model in runState.IterateHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterCurrentHpChanged)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCurrentHpChanged(creature, delta);
             model.InvokeExecutionFinished();
@@ -1627,6 +1668,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterDamageGiven)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterDamageGiven(dealer, result, props, target, cardSource);
             model.InvokeExecutionFinished();
@@ -1785,6 +1827,7 @@ public static class Hook
         {
             foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
+                if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyDamageAdditive)) continue;
                 if (!IsEligibleHookListener(item)) continue;
                 decimal delta = item.ModifyDamageAdditive(target, result, props, dealer, cardSource, cardPlay);
                 result += delta;
@@ -1799,6 +1842,7 @@ public static class Hook
         {
             foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
+                if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyDamageMultiplicative)) continue;
                 if (!IsEligibleHookListener(item)) continue;
                 decimal factor = item.ModifyDamageMultiplicative(target, result, props, dealer, cardSource, cardPlay);
                 result *= factor;
@@ -1810,6 +1854,7 @@ public static class Hook
 
             foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
+                if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyDamageMultiplicativeLate)) continue;
                 if (!IsEligibleHookListener(item)) continue;
                 decimal factor = item.ModifyDamageMultiplicativeLate(target, result, props, dealer, cardSource, cardPlay);
                 result *= factor;
@@ -1822,6 +1867,7 @@ public static class Hook
             decimal cap = decimal.MaxValue;
             foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
+                if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyDamageCap)) continue;
                 if (!IsEligibleHookListener(item)) continue;
                 decimal itemCap = item.ModifyDamageCap(target, props, dealer, cardSource, cardPlay);
                 if (itemCap < cap)
@@ -1856,10 +1902,11 @@ public static class Hook
         decimal result = amount;
         List<AbstractModel> changed = new();
 
-        void Round(Func<AbstractModel, decimal, decimal> modify)
+        void Round(HookOverrideIndex.HookSlot slot, Func<AbstractModel, decimal, decimal> modify)
         {
             foreach (AbstractModel item in runState.IterateHookListeners(combatState))
             {
+                if (HookOverrideIndex.Skips(item, slot)) continue;
                 if (!IsEligibleHookListener(item)) continue;
                 decimal before = result;
                 result = modify(item, result);
@@ -1872,14 +1919,14 @@ public static class Hook
 
         if (phases.HasFlag(HpLossHookPhase.BeforeOsty))
         {
-            Round((item, value) => item.ModifyHpLostBeforeOsty(target, value, props, dealer, cardSource));
-            Round((item, value) => item.ModifyHpLostBeforeOstyLate(target, value, props, dealer, cardSource));
+            Round(HookOverrideIndex.HookSlot.ModifyHpLostBeforeOsty, (item, value) => item.ModifyHpLostBeforeOsty(target, value, props, dealer, cardSource));
+            Round(HookOverrideIndex.HookSlot.ModifyHpLostBeforeOstyLate, (item, value) => item.ModifyHpLostBeforeOstyLate(target, value, props, dealer, cardSource));
         }
 
         if (phases.HasFlag(HpLossHookPhase.AfterOsty))
         {
-            Round((item, value) => item.ModifyHpLostAfterOsty(target, value, props, dealer, cardSource));
-            Round((item, value) => item.ModifyHpLostAfterOstyLate(target, value, props, dealer, cardSource));
+            Round(HookOverrideIndex.HookSlot.ModifyHpLostAfterOsty, (item, value) => item.ModifyHpLostAfterOsty(target, value, props, dealer, cardSource));
+            Round(HookOverrideIndex.HookSlot.ModifyHpLostAfterOstyLate, (item, value) => item.ModifyHpLostAfterOstyLate(target, value, props, dealer, cardSource));
         }
 
         modifiers = changed;
@@ -1893,7 +1940,8 @@ public static class Hook
         {
             if (!IsEligibleHookListener(model)) continue;
             if (!modifiers.Contains(model)) continue;
-            await model.AfterModifyingHpLostBeforeOsty();
+            if (!HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.AfterModifyingHpLostBeforeOsty))
+                await model.AfterModifyingHpLostBeforeOsty();
             model.InvokeExecutionFinished();
         }
     }
@@ -1905,7 +1953,8 @@ public static class Hook
         {
             if (!IsEligibleHookListener(model)) continue;
             if (!modifiers.Contains(model)) continue;
-            await model.AfterModifyingHpLostAfterOsty();
+            if (!HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.AfterModifyingHpLostAfterOsty))
+                await model.AfterModifyingHpLostAfterOsty();
             model.InvokeExecutionFinished();
         }
     }
@@ -1917,6 +1966,7 @@ public static class Hook
         Creature target = originalTarget;
         foreach (AbstractModel item in combatState.IterateHookListeners())
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyUnblockedDamageTarget)) continue;
             if (!IsEligibleHookListener(item)) continue;
             target = item.ModifyUnblockedDamageTarget(target, amount, props, dealer);
         }
@@ -1931,6 +1981,7 @@ public static class Hook
         Creature? target = null;
         foreach (AbstractModel model in combatState is null ? [] : IterateDirectCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.ModifyPreBlockDamageTarget)) continue;
             if (!IsEligibleHookListener(model)) continue;
             target = model.ModifyPreBlockDamageTarget(originalTarget, target, amount, props, dealer);
         }
@@ -2024,6 +2075,7 @@ public static class Hook
 
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyBlockAdditive)) continue;
             if (!IsEligibleHookListener(item)) continue;
             decimal delta = item.ModifyBlockAdditive(target, result, props, cardSource, cardPlay);
             result += delta;
@@ -2035,6 +2087,7 @@ public static class Hook
 
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyBlockMultiplicative)) continue;
             if (!IsEligibleHookListener(item)) continue;
             decimal factor = item.ModifyBlockMultiplicative(target, result, props, cardSource, cardPlay);
             result *= factor;
@@ -2074,6 +2127,7 @@ public static class Hook
         List<AbstractModel> list = new();
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyPowerAmountGivenAdditive)) continue;
             if (!IsEligibleHookListener(item)) continue;
             decimal delta = item.ModifyPowerAmountGivenAdditive(power, giver, num, target, cardSource);
             num += delta;
@@ -2084,6 +2138,7 @@ public static class Hook
         }
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyPowerAmountGivenMultiplicative)) continue;
             if (!IsEligibleHookListener(item)) continue;
             decimal factor = item.ModifyPowerAmountGivenMultiplicative(power, giver, num, target, cardSource);
             num *= factor;
@@ -2102,6 +2157,7 @@ public static class Hook
         List<AbstractModel> list = new();
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.TryModifyPowerAmountReceived)) continue;
             if (!IsEligibleHookListener(item)) continue;
             if (item.TryModifyPowerAmountReceived(canonicalPower, target, num, giver, out decimal modifiedAmount))
             {
@@ -2123,7 +2179,8 @@ public static class Hook
         {
             if (!IsEligibleHookListener(modifier)) continue;
             if (!recordedModifiers.Contains(modifier)) continue;
-            await modifier.AfterModifyingPowerAmountReceived(modifiedPower);
+            if (!HookOverrideIndex.Skips(modifier, HookOverrideIndex.HookSlot.AfterModifyingPowerAmountReceived))
+                await modifier.AfterModifyingPowerAmountReceived(modifiedPower);
             modifier.InvokeExecutionFinished();
         }
     }
@@ -2132,6 +2189,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.BeforePowerAmountChanged)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.BeforePowerAmountChanged(power, amount, target, applier, cardSource);
             model.InvokeExecutionFinished();
@@ -2143,6 +2201,7 @@ public static class Hook
         (combatState as CombatState)?.Observer?.PowerAmountChanged(power, amount, applier, cardSource);
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterPowerAmountChanged)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterPowerAmountChanged(power, amount, applier, cardSource);
             model.InvokeExecutionFinished();
@@ -2165,6 +2224,7 @@ public static class Hook
     {
         foreach (AbstractModel item in IterateBlockClearListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ShouldClearBlock)) continue;
             if (!IsEligibleHookListener(item)) continue;
             if (!item.ShouldClearBlock(creature))
             {
@@ -2194,6 +2254,7 @@ public static class Hook
     {
         foreach (AbstractModel model in IterateCombatHookListeners(combatState))
         {
+            if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterBlockCleared)) continue;
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterBlockCleared(creature);
             model.InvokeExecutionFinished();
@@ -2217,6 +2278,7 @@ public static class Hook
     {
         foreach (AbstractModel item in IterateCombatHookListeners(combatState))
         {
+            if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ShouldAllowHitting)) continue;
             if (!IsEligibleHookListener(item)) continue;
             if (!item.ShouldAllowHitting(creature))
             {

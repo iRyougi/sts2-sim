@@ -12,6 +12,9 @@ public sealed class OrbQueue(Player owner)
 
     public IReadOnlyList<OrbModel> Orbs => _orbs;
 
+    /// <summary>The same list as <see cref="Orbs"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
+    internal List<OrbModel> OrbList => _orbs;
+
     public int Capacity { get; private set; }
 
     public void Clear()

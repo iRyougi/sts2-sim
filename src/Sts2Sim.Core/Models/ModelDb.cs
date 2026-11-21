@@ -57,8 +57,12 @@ public static class ModelDb
 
     public static ModelId GetId(Type type)
     {
-        return new ModelId(GetCategory(type), GetEntry(type));
+        // A pure function of the type's name and base chain (regex slugs): computed once per type (Plan 09-O).
+        // ModelId is an immutable record compared by value, so handing out one shared instance changes nothing.
+        return IdsByType.GetOrAdd(type, static t => new ModelId(GetCategory(t), GetEntry(t)));
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, ModelId> IdsByType = new();
 
     public static Type GetCategoryType(Type type)
     {

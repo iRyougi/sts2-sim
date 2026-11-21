@@ -563,6 +563,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     public IReadOnlyList<EnchantmentModel> Enchantments => _enchantments;
 
+    /// <summary>The same list as <see cref="Enchantments"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
+    internal List<EnchantmentModel> EnchantmentList => _enchantments;
+
     public AfflictionModel? Affliction => _affliction;
 
     public Player Owner { get; private set; } = null!;

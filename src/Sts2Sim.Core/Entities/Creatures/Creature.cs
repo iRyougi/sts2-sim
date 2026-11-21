@@ -73,6 +73,9 @@ public sealed class Creature
 
     public IReadOnlyList<PowerModel> Powers => _powers;
 
+    /// <summary>The same list as <see cref="Powers"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
+    internal List<PowerModel> PowerList => _powers;
+
     public event Action<Creature>? Died;
 
     public Creature(MonsterModel monster, CombatSide side)

@@ -64,6 +64,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
             throw new DuplicateModelException(type);
         }
         Id = ModelDb.GetId(type);
+        HookSkipBits = Hooks.HookOverrideIndex.SkipBitsOf(type);
+        HookListenerKind = Hooks.HookOverrideIndex.KindOf(type);
         if (GlobalKeywordsRequireHexed && type != typeof(Powers.HexPower) &&
             type != typeof(Powers.PhantomBladesPower) &&
             type.GetMethod(nameof(TryModifyKeywordsInCombat), [typeof(CardModel), typeof(ISet<CardKeyword>)])!
@@ -131,6 +133,17 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     {
         ExecutionFinished = null;
     }
+
+    /// <summary>
+    /// Plan 09-O: per runtime type, fixed at construction (pure functions of the type; clones copy them with every other
+    /// field). <see cref="Hooks.HookOverrideIndex.Skips"/> reads the first, Hook's eligibility switch the second.
+    /// </summary>
+    internal ulong HookSkipBits { get; }
+
+    internal Hooks.HookOverrideIndex.ListenerKind HookListenerKind { get; }
+
+    /// <summary>Whether anything listens to <see cref="ExecutionFinished"/> (Plan 09-O: Hook passes over no-op listeners).</summary>
+    internal bool HasExecutionFinishedSubscribers => ExecutionFinished is not null;
 
     public void InvokeExecutionFinished()
     {

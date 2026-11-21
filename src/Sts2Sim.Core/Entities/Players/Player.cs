@@ -57,6 +57,9 @@ public sealed class Player
 
     public IReadOnlyList<RelicModel> Relics => _relics;
 
+    /// <summary>The same list as <see cref="Relics"/>, for allocation-free enumeration in hook dispatch (Plan 09-O).</summary>
+    internal List<RelicModel> RelicList => _relics;
+
     public bool HasEventPet() =>
         Relics.Any(relic => relic.AddsPet) ||
         Deck.Cards.Any(card => card is Models.Cards.ByrdonisEgg);
@@ -64,6 +67,9 @@ public sealed class Player
     private readonly List<PotionModel?> _potionSlots = new();
 
     public IReadOnlyList<PotionModel?> PotionSlots => _potionSlots;
+
+    /// <summary>The same list as <see cref="PotionSlots"/>, for allocation-free enumeration in hook dispatch (Plan 09-O).</summary>
+    internal List<PotionModel?> PotionSlotList => _potionSlots;
 
     public int MaxPotionCount => _potionSlots.Count;
 

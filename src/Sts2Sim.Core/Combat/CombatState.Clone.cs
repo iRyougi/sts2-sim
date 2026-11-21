@@ -435,19 +435,52 @@ public sealed partial class CombatState
 
         public void AddPlayer(Player player) => _players.Add(player);
 
-        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState)
+        /// <summary>
+        /// Plan 09-O: Hook's combat-dispatch walk (its ending gate, checked on the first MoveNext, then
+        /// <see cref="IterateHookListeners"/> with <paramref name="combat"/> as the child) as one iterator instead of an
+        /// iterator wrapped around this one. Keep the body equal to IterateHookListeners' combat branch.
+        /// </summary>
+        internal IEnumerable<AbstractModel> IterateCombatHookListeners(CombatState combat)
         {
+            if (combat.IsOverOrEnding() && !combat.IsStarting())
+                yield break;
             foreach (Player player in _players)
             {
-                foreach (RelicModel relic in player.Relics)
+                foreach (RelicModel relic in player.RelicList)
                 {
                     if (!relic.IsMelted)
                         yield return relic;
                 }
 
-                foreach (PotionModel potion in player.PotionSlots.OfType<PotionModel>())
+                foreach (PotionModel? slot in player.PotionSlotList)
                 {
-                    yield return potion;
+                    if (slot is PotionModel potion)
+                        yield return potion;
+                }
+            }
+
+            foreach (AbstractModel listener in combat.HookListenerList(includePlayerInventory: false))
+            {
+                yield return listener;
+            }
+        }
+
+        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState)
+        {
+            // Plan 09-O: the same lazy walk over the same live lists, through their struct enumerators (the same
+            // modified-collection checks, no boxed enumerator or OfType iterator per hook dispatch).
+            foreach (Player player in _players)
+            {
+                foreach (RelicModel relic in player.RelicList)
+                {
+                    if (!relic.IsMelted)
+                        yield return relic;
+                }
+
+                foreach (PotionModel? slot in player.PotionSlotList)
+                {
+                    if (slot is PotionModel potion)
+                        yield return potion;
                 }
 
                 if (childCombatState is null)
@@ -459,7 +492,14 @@ public sealed partial class CombatState
                 }
             }
 
-            if (childCombatState is not null)
+            if (childCombatState is CombatState concrete)
+            {
+                foreach (AbstractModel listener in concrete.HookListenerList(includePlayerInventory: false))
+                {
+                    yield return listener;
+                }
+            }
+            else if (childCombatState is not null)
             {
                 foreach (AbstractModel listener in childCombatState.IterateHookListeners())
                 {
