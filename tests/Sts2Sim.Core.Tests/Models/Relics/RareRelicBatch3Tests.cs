@@ -521,6 +521,32 @@ public sealed class RareRelicBatch3Tests : IDisposable
         await PotionCmd.Use(potion, player, player.Creature);
         Assert.Single(player.PlayerCombatState.Hand.Cards);
     }
+    // Game UnceasingTop.IsValidPhase: (uint)(phase - 2) <= 2 = AutoPrePlay, Play, AutoPostPlay.
+    // Start (before hand draw) and End (after flush) must not draw when a card played there empties the hand.
+    [Theory]
+    [InlineData(PlayerTurnPhase.None, false)]
+    [InlineData(PlayerTurnPhase.Start, false)]
+    [InlineData(PlayerTurnPhase.AutoPrePlay, true)]
+    [InlineData(PlayerTurnPhase.Play, true)]
+    [InlineData(PlayerTurnPhase.AutoPostPlay, true)]
+    [InlineData(PlayerTurnPhase.End, false)]
+    public async Task UnceasingTop_DrawsOnlyInValidTurnPhases(PlayerTurnPhase phase, bool expectDraw)
+    {
+        (RunState runState, Player player) = CreateRun("unceasing-phase");
+        await Obtain<UnceasingTop>(player);
+        CombatRoom room = CreateCombatRoom();
+        await room.Enter(runState);
+        ClearHand(player);
+        Task9SkillCard card = AddToHand<Task9SkillCard>(player);
+        int drawBefore = player.PlayerCombatState!.DrawPile.Cards.Count;
+        player.PlayerCombatState.Phase = phase;
+
+        await room.Engine.PlayCardAsync(player, card, null);
+
+        Assert.Equal(expectDraw ? 1 : 0, player.PlayerCombatState.Hand.Cards.Count);
+        Assert.Equal(expectDraw ? drawBefore - 1 : drawBefore, player.PlayerCombatState.DrawPile.Cards.Count);
+    }
+
     [Fact]
     public async Task UnceasingTop_DrawsOneAfterActiveExhaustEmptiesHand()
     {

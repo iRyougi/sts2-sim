@@ -15,8 +15,11 @@ public sealed class Haze : CardModel
     protected override int CanonicalEnergyCost => 2;
     protected override async Task OnPlay(CardPlay play)
     {
-        foreach (Creature enemy in CombatState!.HittableEnemies.ToArray())
-        { await PowerCmd.Apply<PoisonPower>(CombatState, enemy, Poison, Owner.Creature, this); await PowerCmd.Apply<WeakPower>(CombatState, enemy, Weak, Owner.Creature, this); }
+        // 游戏是两次群体施加：先对全部可攻击敌人施加毒，再重新取一遍可攻击敌人施加虚弱（毒的触发可能已杀死某个敌人）。
+        foreach (Creature enemy in CombatState!.HittableEnemies)
+            await PowerCmd.Apply<PoisonPower>(CombatState, enemy, Poison, Owner.Creature, this);
+        foreach (Creature enemy in CombatState!.HittableEnemies)
+            await PowerCmd.Apply<WeakPower>(CombatState, enemy, Weak, Owner.Creature, this);
     }
 
 }
