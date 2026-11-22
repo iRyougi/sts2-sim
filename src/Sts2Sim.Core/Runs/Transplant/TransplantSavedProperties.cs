@@ -65,6 +65,11 @@ internal static class TransplantSavedProperties
             ["MadScience.TinkerTimeRider"] = new("<Rider>k__BackingField", "ints"),
             ["ShowOff.CurrentAim"] = new("_currentAim", "ints"),
             ["ShowOff.IncreasedAim"] = new("_increasedAim", "ints"),
+            ["GeneticAlgorithm.CurrentBlock"] = new("_currentBlock", "ints"),
+            ["GeneticAlgorithm.IncreasedBlock"] = new("_increasedBlock", "ints"),
+            // 原版 TheScythe 同时存 CurrentDamage 与 IncreasedDamage；模拟器里 CurrentDamage 是 13 + 增幅的计算值，
+            // 只有 _increasedDamage 一个字段，CurrentDamage 由下方专门的导出/导入逻辑处理。
+            ["TheScythe.IncreasedDamage"] = new("_increasedDamage", "ints"),
         };
 
     public static IReadOnlyDictionary<string, JsonElement> Export(AbstractModel model, string path)
@@ -129,6 +134,12 @@ internal static class TransplantSavedProperties
             if (!groups.TryGetValue(binding.Value.Value.Group, out List<object>? entries))
                 groups.Add(binding.Value.Value.Group, entries = []);
             entries.Add(new { name = nativeName, value = savedValue });
+        }
+        if (model is TheScythe scythe)
+        {
+            if (!groups.TryGetValue("ints", out List<object>? ints))
+                groups.Add("ints", ints = []);
+            ints.Add(new { name = "CurrentDamage", value = scythe.CurrentDamage });
         }
         var outer = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         if (groups.Count > 0)
@@ -214,6 +225,7 @@ internal static class TransplantSavedProperties
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var furCoordinates = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         JsonElement? paelsCards = null;
+        int? scytheCurrentDamage = null;
         foreach (JsonProperty group in save.EnumerateObject())
         {
             if (group.Name is not ("ints" or "bools" or "strings" or "int_arrays" or
@@ -237,6 +249,14 @@ internal static class TransplantSavedProperties
                     if (group.Name != expectedGroup)
                         throw new TransplantMappingException($"{path}.{name}", "Wrong native property group.");
                     furCoordinates.Add(name, value);
+                    continue;
+                }
+                if (model is TheScythe && name == "CurrentDamage")
+                {
+                    if (group.Name != "ints" || value.ValueKind != JsonValueKind.Number ||
+                        !value.TryGetInt32(out int currentDamage))
+                        throw new TransplantMappingException($"{path}.{name}", "Invalid native CurrentDamage.");
+                    scytheCurrentDamage = currentDamage;
                     continue;
                 }
                 if (model is PaelsTooth && name == "SerializableCards")
@@ -304,6 +324,11 @@ internal static class TransplantSavedProperties
         }
         if (model is FurCoat coat && furCoordinates.Count > 0)
             ApplyFurCoatCoordinates(coat, furCoordinates, path);
+        // 原版 UpdateDamage 恒令 CurrentDamage = 13 + IncreasedDamage；两者不一致说明存档不是原版写出的。
+        if (model is TheScythe scythe && scytheCurrentDamage is { } savedDamage &&
+            savedDamage != scythe.CurrentDamage)
+            throw new TransplantMappingException($"{path}.CurrentDamage",
+                "TheScythe CurrentDamage disagrees with IncreasedDamage.");
         if (model is PaelsTooth storedTooth && paelsCards is { } cards)
         {
             var restored = new List<CardModel>();

@@ -37,6 +37,8 @@ public static class TransplantFieldRegistry
         "WingedBoots.<TimesUsed>k__BackingField", "SpoilsMap.<SpoilsActIndex>k__BackingField",
         "MadScience.<Rider>k__BackingField",
         "ShowOff._currentAim", "ShowOff._increasedAim",
+        "GeneticAlgorithm._currentBlock", "GeneticAlgorithm._increasedBlock",
+        "TheScythe._increasedDamage",
     ];
     private static readonly HashSet<string> NativeBoundaryResetFields =
     [
@@ -134,8 +136,10 @@ public static class TransplantFieldRegistry
                     (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
                         "Native history is combat-local; fresh combat copies reset the Fetch cache.");
                 // Native Rampage/Thrash/Claw mutate combat copies, not their persistent DeckVersion.
+                // GeneticAlgorithm._increase is the "Increase" DynamicVar (3, +1 on upgrade), not a [SavedProperty]:
+                // imports replay Upgrade() after applying saved properties, which reproduces it (#1075).
                 if ((type.Name is "Whistle" or "Rampage" or "Thrash" or "Claw" && field.Name == "_damage") ||
-                    (type.Name == "Claw" && field.Name == "_increase"))
+                    (type.Name is "Claw" or "GeneticAlgorithm" && field.Name == "_increase"))
                     (fieldClass, reason) = (TransplantFieldClass.Derived,
                         "Persistent deck values derive from canonical card vars and upgrade level.");
                 // Native Wuppy has no saved flag: loading [SavedProperty] CurrentHp runs the setter, which sets it.

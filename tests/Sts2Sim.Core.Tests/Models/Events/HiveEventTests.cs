@@ -3,6 +3,7 @@ using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Events;
@@ -18,6 +19,7 @@ using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
+using Sts2Sim.Core.ValueProps;
 using LostWispEvent = Sts2Sim.Core.Models.Events.LostWisp;
 using PaelsLegion = Sts2Sim.Core.Models.Relics.PaelsLegion;
 
@@ -322,6 +324,32 @@ public sealed class HiveEventTests : IDisposable
         Assert.True(first.IsUpgraded);
         Assert.Equal(hp - 10, player.Creature.CurrentHp);
         Assert.Equal(0, ev.Rng.Counter);
+    }
+
+    [Fact]
+    public async Task TheLanternKey_PreparedCombatIsNotInProgress_FoulPotionAndAmbergrisActOutsideCombat()
+    {
+        // Native FoulPotion / Ambergris check CombatManager.IsInProgress; the layout event only prepares the combat
+        // (player already registered in it) until FIGHT is chosen.
+        var run = new RunState("lantern-prepared-combat", new Overgrowth(), ascensionLevel: 10);
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        var eventRoom = new EventRoom(
+            () => (EventModel)ModelDb.Event<TheLanternKey>().MutableClone());
+        run.PushRoom(eventRoom);
+        await eventRoom.Enter(run);
+        Assert.NotNull(player.Creature.CombatState);
+
+        var foul = player.AddPotionInternal(ModelDb.Potion<Sts2Sim.Core.Models.Potions.FoulPotion>());
+        Assert.Equal(TargetType.TargetedNoCreature, foul.TargetType);
+        Assert.False(foul.PassesCustomUsabilityCheck);
+
+        player.Creature.LoseHpInternal(10m, ValueProp.Unpowered);
+        int hp = player.Creature.CurrentHp;
+        var ambergris = player.AddPotionInternal(ModelDb.Potion<Sts2Sim.Core.Models.Potions.Ambergris>());
+        await PotionCmd.Use(ambergris, player, player.Creature);
+        Assert.True(player.Creature.CurrentHp > hp);
+        Assert.Empty(player.Creature.Powers.OfType<ExtraTurnPower>());
     }
 
     [Theory]

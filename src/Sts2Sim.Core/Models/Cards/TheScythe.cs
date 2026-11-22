@@ -31,7 +31,7 @@ public sealed class TheScythe : CardModel, ICardChoiceBaseValueProvider, ICardDa
 
     public int IncreasedDamage => _increasedDamage;
 
-    private int CurrentDamage => BaseDamage + _increasedDamage;
+    internal int CurrentDamage => BaseDamage + _increasedDamage;
 
     private int Increase => IsUpgraded ? 7 : 5;
 

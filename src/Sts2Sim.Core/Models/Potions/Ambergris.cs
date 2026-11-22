@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
@@ -17,8 +18,9 @@ public sealed class Ambergris : PotionModel
         ArgumentNullException.ThrowIfNull(target);
         await CreatureCmd.Heal(target, target.MaxHp * 0.5m);
 
-        if (target.CombatState is { } combatState &&
-            combatState.IsLiveCombat() &&
+        // Native: CombatManager.Instance.IsInProgress. A combat-layout event's prepared combat has registered the player
+        // but has no running engine yet, so IsLiveCombat() (true when engine-less) would wrongly grant the extra turn.
+        if (target.CombatState is CombatState { Engine: { IsInProgress: true } } combatState &&
             combatState.ContainsCreature(target))
         {
             await PowerCmd.Apply<ExtraTurnPower>(
