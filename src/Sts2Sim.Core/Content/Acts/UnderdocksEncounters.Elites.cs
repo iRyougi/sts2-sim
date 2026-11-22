@@ -7,7 +7,7 @@ public static partial class UnderdocksEncounters
 {
     public static IReadOnlyList<EncounterDefinition> Elites { get; } =
     [
-        new(CreatePhantasmalGardeners, null, false, "PhantasmalGardenersElite"),
+        new(CreatePhantasmalGardeners, null, false, "PhantasmalGardenersElite") { Slots = ["first", "second", "third", "fourth"] },
         new(() => [(EliteMonster<SkulkingColony>(), null)], null, false, "SkulkingColonyElite"),
         new(() => [(EliteMonster<TerrorEel>(), null)], null, false, "TerrorEelElite"),
     ];

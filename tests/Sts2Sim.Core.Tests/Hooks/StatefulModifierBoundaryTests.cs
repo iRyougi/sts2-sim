@@ -79,6 +79,8 @@ public sealed class StatefulModifierBoundaryTests : IDisposable
         Assert.False(Hook.ShouldClearBlock(room.Engine.State, player.Creature));
         Assert.Equal(20, player.Creature.Block);
 
+        // game SwitchSides bumps TurnNumber before each player turn start; TurnNumber 1 would skip the block clear
+        player.PlayerCombatState!.TurnNumber++;
         await room.Engine.StartTurnAsync();
         Assert.Equal(10, player.Creature.Block);
         player.Creature.LoseBlockInternal(player.Creature.Block);
@@ -86,9 +88,11 @@ public sealed class StatefulModifierBoundaryTests : IDisposable
         player.Creature.GainBlockInternal(20m);
         CombatState clone = room.Engine.State.Clone();
 
+        clone.Players[0].PlayerCombatState!.TurnNumber++;
         await clone.Engine!.StartTurnAsync();
         Assert.Equal(20, clone.Players[0].Creature.Block);
         Assert.Equal(20, player.Creature.Block);
+        player.PlayerCombatState!.TurnNumber++;
         await room.Engine.StartTurnAsync();
         Assert.Equal(20, player.Creature.Block);
     }

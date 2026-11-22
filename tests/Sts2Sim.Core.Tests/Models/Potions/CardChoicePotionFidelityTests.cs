@@ -95,7 +95,7 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         CardModel selected = Assert.Single(player.PlayerCombatState!.Hand.Cards);
         Assert.Same(source.Candidates[0], selected);
         Assert.All(source.Candidates, card => Assert.Same(player, card.Owner));
-        Assert.True(selected.TemporaryFreeThisTurn);
+        Assert.Equal(0, selected.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game card-choice potions: SetToFreeThisTurn
         Assert.Equal(0, selected.EnergyCost);
         Assert.All(source.Candidates.Skip(1), card => Assert.Null(card.Pile));
     }
@@ -158,7 +158,7 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         {
             CardModel selected = Assert.Single(recipient.PlayerCombatState!.Hand.Cards);
             Assert.Same(source.Candidates[0], selected);
-            Assert.True(selected.TemporaryFreeThisTurn);
+            Assert.Equal(0, selected.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game card-choice potions: SetToFreeThisTurn
             Assert.Equal(0, selected.EnergyCost);
         }
     }

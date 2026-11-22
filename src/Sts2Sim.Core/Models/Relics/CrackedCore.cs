@@ -13,8 +13,7 @@ public sealed class CrackedCore : RelicModel
     public override async Task BeforeSideTurnStart(
         CombatSide side, IReadOnlyList<Creature> participants)
     {
-        // This hook precedes SetupPlayerTurnAsync's increment: native turn 1 is simulator turn 0.
-        if (participants.Contains(Owner.Creature) && Owner.PlayerCombatState!.TurnNumber == 0)
+        if (participants.Contains(Owner.Creature) && Owner.PlayerCombatState!.TurnNumber <= 1)
             await OrbCmd.Channel<LightningOrb>(Owner.Creature.CombatState!, Owner);
     }
 }

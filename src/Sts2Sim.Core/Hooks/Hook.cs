@@ -954,6 +954,17 @@ public static class Hook
             (combatState as CombatState)?.Observer?.SideTurnEndListener(nameof(AfterSideTurnEnd), model, side, false);
             model.InvokeExecutionFinished();
         }
+
+        // Game Hook.AfterSideTurnEnd: second pass over the listeners, AfterSideTurnEndLate.
+        foreach (AbstractModel model in IterateCombatHookListeners(combatState))
+        {
+            if ((combatState as CombatState)?.Observer is null && SkipNoOp(model, HookOverrideIndex.HookSlot.AfterSideTurnEndLate)) continue;
+            if (!IsEligibleHookListener(model)) continue;
+            (combatState as CombatState)?.Observer?.SideTurnEndListener("AfterSideTurnEndLate", model, side, true);
+            await model.AfterSideTurnEndLate(side, participants);
+            (combatState as CombatState)?.Observer?.SideTurnEndListener("AfterSideTurnEndLate", model, side, false);
+            model.InvokeExecutionFinished();
+        }
     }
 
     public static async Task AfterEnergyReset(ICombatState combatState, Player player)
@@ -1822,6 +1833,22 @@ public static class Hook
     {
         decimal result = damage;
         List<AbstractModel> changed = new();
+
+        // game Hook.ModifyDamage: the card's own enchantment modifies the base damage first (additive, then
+        // multiplicative), before the listener loops; it is not a listener and is not recorded in modifiers.
+        if (cardSource is not null && cardSource.EnchantmentList.Count > 0)
+        {
+            EnchantmentModel enchantment = cardSource.EnchantmentList[0];
+            if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Additive))
+            {
+                result += enchantment.EnchantDamageAdditive(result, props);
+            }
+
+            if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Multiplicative))
+            {
+                result *= enchantment.EnchantDamageMultiplicative(result, props);
+            }
+        }
 
         if (modifyDamageHookType.HasFlag(ModifyDamageHookType.Additive))
         {

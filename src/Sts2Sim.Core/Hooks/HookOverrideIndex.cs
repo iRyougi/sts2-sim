@@ -53,7 +53,7 @@ internal static class HookOverrideIndex
         ModifyBlockAdditive, ModifyBlockMultiplicative,
         BeforeAttack, AfterAttack, ModifyAttackHitCount,
         AfterSideTurnStart, AfterSideTurnStartLate,
-        BeforeSideTurnEndVeryEarly, BeforeSideTurnEndEarly, BeforeSideTurnEnd, AfterSideTurnEnd,
+        BeforeSideTurnEndVeryEarly, BeforeSideTurnEndEarly, BeforeSideTurnEnd, AfterSideTurnEnd, AfterSideTurnEndLate,
         BeforeFlush, BeforeFlushLate, ShouldTakeExtraTurnEarly, ShouldTakeExtraTurn,
         ShouldClearBlock, AfterBlockCleared,
         Count,

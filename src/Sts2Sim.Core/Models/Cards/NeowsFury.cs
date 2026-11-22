@@ -3,10 +3,7 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>
-/// Deviation #158: retrieves the first eligible discard cards because the simulator has no
-/// interactive discard-card selection UI.
-/// </summary>
+/// <summary>原版 <c>NeowsFury</c>：造成伤害，再从弃牌堆选至多 2（升级 3）张放回手牌。</summary>
 public sealed class NeowsFury : CardModel, ICardDamageVariableProvider
 {
     private decimal _damage = 10m;
@@ -34,15 +31,16 @@ public sealed class NeowsFury : CardModel, ICardDamageVariableProvider
             .Targeting(cardPlay.Target)
             .Execute();
 
-        int availableCapacity = Math.Max(
-            0,
-            CardPile.MaxCardsInHand - Owner.PlayerCombatState!.Hand.Cards.Count);
-        CardModel[] selected = Owner.PlayerCombatState.DiscardPile.Cards
-            .Take(Math.Min(_retrieveCount, availableCapacity))
-            .ToArray();
-        foreach (CardModel card in selected)
+        // 原版 NeowsFury.OnPlay：CardSelectCmd.FromCombatPile(弃牌堆, 0..min(张数, 手牌空位))，可少选
+        int count = Math.Min(_retrieveCount, CardPile.MaxCardsInHand - Owner.PlayerCombatState!.Hand.Cards.Count);
+        if (count > 0)
         {
-            CardPileCmd.Add(card, PileType.Hand);
+            IReadOnlyList<CardModel> selected = await CardSelectCmd.FromCombatPile(
+                CombatState!, Owner, Owner.PlayerCombatState.DiscardPile, 0, count, this);
+            foreach (CardModel card in selected)
+            {
+                CardPileCmd.Add(card, PileType.Hand);
+            }
         }
     }
 

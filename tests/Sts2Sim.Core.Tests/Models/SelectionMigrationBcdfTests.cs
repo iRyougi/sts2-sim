@@ -106,7 +106,7 @@ public sealed class SelectionMigrationBcdfTests : IDisposable
             if (relicEffect)
             {
                 var relic = (GamblingChip)ModelDb.Relic<GamblingChip>().MutableClone(); relic.AssignOwner(player);
-                await relic.AfterSideTurnStart(CombatSide.Player, new[] { player.Creature });
+                await relic.AfterPlayerTurnStart(player);     // game GamblingChip.AfterPlayerTurnStart
             }
             else
             {

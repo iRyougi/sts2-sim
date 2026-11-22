@@ -15,8 +15,7 @@ public sealed class TwistedFunnel : RelicModel
         CombatSide side,
         IReadOnlyList<Creature> participants)
     {
-        // 本引擎在 SetupPlayerTurnAsync 之后才加一回合数；0 是首回合的等价时刻。
-        if (!participants.Contains(Owner.Creature) || Owner.PlayerCombatState?.TurnNumber != 0)
+        if (!participants.Contains(Owner.Creature) || Owner.PlayerCombatState?.TurnNumber > 1)
         {
             return;
         }

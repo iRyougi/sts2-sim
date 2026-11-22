@@ -85,6 +85,8 @@ public sealed class HiveFidelityRound4Tests : IDisposable
 
         player.ResetCombatState();
         player.PopulateCombatState(new Rng(7uL));
+        // game CombatManager.SetupPlayerTurn arranges bottom/innate cards on turn 1, not in PopulateCombatState
+        player.ArrangeDrawPileForFirstHand();
 
         IReadOnlyList<CardModel> drawPile = player.PlayerCombatState!.DrawPile.Cards;
         CardModel combatImbuedInnate = Assert.Single(drawPile,
@@ -94,6 +96,56 @@ public sealed class HiveFidelityRound4Tests : IDisposable
         Assert.IsType<InnateKeywordTestCard>(drawPile[0]);
         Assert.NotSame(combatImbuedInnate, drawPile[0]);
         Assert.NotSame(ordinaryInnate, drawPile[0]);
+    }
+
+    [Theory]
+    [InlineData("PaelsFlesh", 2)]
+    [InlineData("HornCleat", 1)]
+    [InlineData("CaptainsWheel", 2)]
+    [InlineData("Innate", 0)]
+    public async Task TurnNumberTimingAndFirstHandMatchGame(string scenario, int turnsToEnd)
+    {
+        (RunState run, Player player) = CreateRun("turn-number-timing-" + scenario);
+        if (scenario == "Innate")
+        {
+            ClearDeck(player);
+            for (int i = 0; i < 7; i++)
+                _ = AddToDeck<InnateKeywordTestCard>(player);
+            for (int i = 0; i < 8; i++)
+                _ = AddToDeck<NormalKeywordTestCard>(player);
+        }
+        else
+        {
+            RelicModel relic = scenario switch
+            {
+                "PaelsFlesh" => ModelDb.Relic<PaelsFlesh>(),
+                "HornCleat" => ModelDb.Relic<HornCleat>(),
+                _ => ModelDb.Relic<CaptainsWheel>(),
+            };
+            await RelicCmd.Obtain(relic, player);
+        }
+        CombatRoom room = await EnterCombat(run);
+        for (int i = 0; i < turnsToEnd; i++)
+            await room.Engine.EndPlayerTurnAsync();
+
+        PlayerCombatState combat = player.PlayerCombatState!;
+        Assert.Equal(turnsToEnd + 1, combat.TurnNumber);
+        switch (scenario)
+        {
+            case "PaelsFlesh": // game PaelsFlesh.ModifyMaxEnergy: bonus from turn 3, seen at the energy reset
+                Assert.Equal(player.MaxEnergy + 1, combat.Energy);
+                break;
+            case "HornCleat": // game HornCleat.AfterBlockCleared: TurnNumber == 2
+                Assert.Equal(14, player.Creature.Block);
+                break;
+            case "CaptainsWheel": // game CaptainsWheel.AfterBlockCleared: TurnNumber == 3
+                Assert.Equal(18, player.Creature.Block);
+                break;
+            default: // game CombatManager.SetupPlayerTurn: first draw is max(draw, innate count), innate cards on top
+                Assert.Equal(7, combat.Hand.Cards.Count);
+                Assert.All(combat.Hand.Cards, card => Assert.IsType<InnateKeywordTestCard>(card));
+                break;
+        }
     }
 
     [Fact]

@@ -334,6 +334,13 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return Task.CompletedTask;
     }
 
+    /// <summary>Game <c>AbstractModel.AfterSideTurnEndLate</c>: called for every listener after all
+    /// <see cref="AfterSideTurnEnd"/> calls of the same side-turn end have completed.</summary>
+    public virtual Task AfterSideTurnEndLate(CombatSide side, IEnumerable<Creature> participants)
+    {
+        return Task.CompletedTask;
+    }
+
     public virtual Task AfterEnergyReset(Player player)
     {
         return Task.CompletedTask;

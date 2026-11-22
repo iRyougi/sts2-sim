@@ -14,8 +14,7 @@ public sealed class PowerCell : RelicModel
     public override Task BeforeSideTurnStart(
         CombatSide side, IReadOnlyList<Creature> participants)
     {
-        // The native <= 1 check runs before the turn increment. Only turn 0 is the first turn here.
-        if (!participants.Contains(Owner.Creature) || Owner.PlayerCombatState!.TurnNumber != 0)
+        if (!participants.Contains(Owner.Creature) || Owner.PlayerCombatState!.TurnNumber > 1)
             return Task.CompletedTask;
 
         Flash();

@@ -33,7 +33,9 @@ public sealed class SporeMindTests : IDisposable
         Assert.Equal(TargetType.None, card.TargetType);
         Assert.Equal(new[] { CardKeyword.Exhaust }, card.Keywords);
         Assert.Equal(0, card.MaxUpgradeLevel);
-        Assert.False(card.CanBeGeneratedInCombat);
+        // Game SporeMind overrides only CanBeGeneratedByModifiers.
+        Assert.True(card.CanBeGeneratedInCombat);
+        Assert.False(card.CanBeGeneratedByModifiers);
         Assert.DoesNotContain(CardKeyword.Unplayable, card.Keywords);
     }
 

@@ -195,6 +195,7 @@ public sealed class CardGenerationCardTests : IDisposable
         CardModel candidate = (CardModel)ModelDb.Get(candidateType).MutableClone();
         candidate.AssignOwner(player);
         CardPileCmd.Add(candidate, PileType.Hand);
+        candidate.SetToFreeThisTurn();
         HeirloomHammer card = AddToHand<HeirloomHammer>(player);
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         int hpBefore = enemy.CurrentHp;
@@ -205,6 +206,10 @@ public sealed class CardGenerationCardTests : IDisposable
         Assert.Equal(shouldClone ? 2 : 1,
             player.PlayerCombatState!.Hand.Cards.Count(c => c.GetType() == candidateType));
         Assert.Contains(candidate, player.PlayerCombatState!.Hand.Cards);
+        // game HeirloomHammer: CreateClone keeps the mutable cost state, so the copy of a card made free is free too.
+        Assert.All(
+            player.PlayerCombatState.Hand.Cards.Where(c => c.GetType() == candidateType),
+            c => Assert.Equal(0, c.TemporaryCostOverrideThisTurnOrUntilPlayed));
     }
 
     private sealed class SplashSelectionSource(bool upgraded) : Sts2Sim.Core.Combat.ICardSelectionDecisionSource

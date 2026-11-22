@@ -2,6 +2,7 @@ using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Factories;
 
@@ -11,14 +12,12 @@ public sealed class VexingPuzzlebox : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
 
-    public override async Task AfterSideTurnStart(
-        CombatSide side,
-        IReadOnlyList<Creature> participants)
+    // 游戏 VexingPuzzlebox.AfterPlayerTurnStart：抽完手牌后、AfterSideTurnStart 之前，仅 TurnNumber == 1。
+    public override async Task AfterPlayerTurnStart(Player player)
     {
-        // 偏离 #131：无独立 AfterPlayerTurnStart；用摸牌后的 AfterSideTurnStart 过滤到持有者首回合。
         // 该条的后半段（"CharacterModel 尚无 CardPool 映射且当前只启用 Regent"）已于 2026-09-08
         // 销案（偏离 #303）：现按权威源码走 Owner.Character.CardPool + CardFactory.GetDistinctForCombat。
-        if (!participants.Contains(Owner.Creature) ||
+        if (player != Owner ||
             Owner.PlayerCombatState?.TurnNumber != 1)
         {
             return;
@@ -36,7 +35,7 @@ public sealed class VexingPuzzlebox : RelicModel
             return;
         }
 
-        generated.MakeTemporaryFreeThisTurn();
+        generated.SetToFreeThisTurn();     // 游戏 VexingPuzzlebox 调 SetToFreeThisTurn
         await CardPileCmd.Generate(Owner.Creature.CombatState!, generated, PileType.Hand);
     }
 }

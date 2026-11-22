@@ -92,7 +92,7 @@ public sealed class BlankDeadCardBatchTests : IDisposable
 
         CardModel generated = Assert.Single(
             player.PlayerCombatState!.Hand.Cards,
-            card => card.TemporaryFreeThisTurn);
+            card => card.TemporaryCostOverrideThisTurnOrUntilPlayed == 0);     // game VexingPuzzlebox: SetToFreeThisTurn
         Assert.IsNotType<Soot>(generated);
     }
 
@@ -117,7 +117,7 @@ public sealed class BlankDeadCardBatchTests : IDisposable
 
         CardModel generated = Assert.Single(
             player.PlayerCombatState!.Hand.Cards,
-            card => card.TemporaryFreeThisTurn);
+            card => card.TemporaryCostOverrideThisTurnOrUntilPlayed == 0);     // game VexingPuzzlebox: SetToFreeThisTurn
         Assert.Contains(generated.Id, characterPoolIds);
         Assert.Same(player, generated.Owner);
     }

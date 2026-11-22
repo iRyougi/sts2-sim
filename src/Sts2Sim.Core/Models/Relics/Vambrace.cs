@@ -7,13 +7,17 @@ namespace Sts2Sim.Core.Models.Relics;
 
 public sealed class Vambrace : RelicModel
 {
-    private bool _triggeredThisCombat;
+    // game Vambrace: the first card to gain block is remembered (TriggeringCard), all block from that card's play doubles,
+    // and BlockGainedThisCombat is set only when that card's play finishes (AfterCardPlayed).
+    private CardModel? _triggeringCard;
+    private bool _blockGainedThisCombat;
 
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
     public override Task BeforeCombatStart()
     {
-        _triggeredThisCombat = false;
+        _triggeringCard = null;
+        _blockGainedThisCombat = false;
         Status = RelicStatus.Active;
         return Task.CompletedTask;
     }
@@ -25,22 +29,20 @@ public sealed class Vambrace : RelicModel
         CardModel? cardSource,
         CardPlay? cardPlay)
     {
-        if (_triggeredThisCombat ||
-            amount <= 0m ||
-            target != Owner.Creature ||
-            cardSource?.Owner != Owner ||
-            cardPlay?.Player != Owner)
+        if (!props.HasFlag(ValueProp.Move) ||
+            cardSource is null ||
+            (_triggeringCard is not null && !ReferenceEquals(_triggeringCard, cardSource)) ||
+            cardSource.Owner != Owner ||
+            _blockGainedThisCombat)
         {
             return 1m;
         }
 
-        // 偏离 #122：无 AfterModifyingBlockAmount；在乘算切片原子消费。后续 modifier 仍可能把最终格挡归零。
-        _triggeredThisCombat = true;
         return 2m;
     }
 
-    // Source Vambrace.AfterModifyingBlockAmount (Status part only). Hook.AfterModifyingBlockAmount only reaches
-    // modifiers whose multiplicative factor != 1, like the source. The consume logic stays in the multiplicative slice.
+    // Source Vambrace.AfterModifyingBlockAmount. Hook.AfterModifyingBlockAmount only reaches modifiers recorded by
+    // Hook.ModifyBlock (factor != 1), like the source; previews that only call ModifyBlock never reach it.
     public override Task AfterModifyingBlockAmount(
         decimal modifiedAmount,
         CardModel? cardSource,
@@ -49,6 +51,19 @@ public sealed class Vambrace : RelicModel
         if (modifiedAmount > 0m && cardSource is not null)
         {
             Status = RelicStatus.Normal;
+            _triggeringCard = cardSource;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public override Task AfterCardPlayed(CardPlay cardPlay)
+    {
+        if (cardPlay.Card.Owner == Owner &&
+            ReferenceEquals(cardPlay.Card, _triggeringCard) &&
+            !_blockGainedThisCombat)
+        {
+            _blockGainedThisCombat = true;
         }
 
         return Task.CompletedTask;
@@ -57,14 +72,44 @@ public sealed class Vambrace : RelicModel
     public override Task AfterCombatEnd()
     {
         Status = RelicStatus.Normal;
-        _triggeredThisCombat = false;
+        _triggeringCard = null;
+        _blockGainedThisCombat = false;
         return Task.CompletedTask;
+    }
+
+    internal override void RestoreCombatCloneReferencesFrom(
+        RelicModel source,
+        IReadOnlyDictionary<CardModel, CardModel> cardMap)
+    {
+        base.RestoreCombatCloneReferencesFrom(source, cardMap);
+        var sourceRelic = (Vambrace)source;
+        if (sourceRelic._triggeringCard is not { } sourceCard)
+        {
+            _triggeringCard = null;
+            return;
+        }
+
+        if (cardMap.TryGetValue(sourceCard, out CardModel? mappedCard))
+        {
+            _triggeringCard = mappedCard;
+            return;
+        }
+
+        if (sourceRelic._blockGainedThisCombat)
+        {
+            _triggeringCard = null;
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Vambrace cannot clone an active triggering card that is absent from the combat card graph.");
     }
 
     internal override void AppendCombatStateDescription(
         ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
         global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
     {
-        builder.Append(_triggeredThisCombat);
+        builder.Append(_blockGainedThisCombat);
+        context.AppendCardReferences(ref builder, new CardModel?[] { _triggeringCard });
     }
 }

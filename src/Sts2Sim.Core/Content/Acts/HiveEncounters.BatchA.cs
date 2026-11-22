@@ -10,13 +10,13 @@ public static partial class HiveEncounters
     [
         new(CreateBowlbugsNormal, [EncounterTag.Workers], false, "BowlbugsNormal"),
         new(CreateBowlbugsWeak, [EncounterTag.Workers], true, "BowlbugsWeak"),
-        new(CreateDecimillipede, null, false, "DecimillipedeElite"),
+        new(CreateDecimillipede, null, false, "DecimillipedeElite") { Slots = ["segment1", "segment2", "segment3"] },
         new(() => [(Monster<Entomancer>(), null)], null, false, "EntomancerElite"),
-        new(() => CreateExoskeletons(4), [EncounterTag.Exoskeletons], false, "ExoskeletonsNormal"),
-        new(() => CreateExoskeletons(3), [EncounterTag.Exoskeletons], true, "ExoskeletonsWeak"),
+        new(() => CreateExoskeletons(4), [EncounterTag.Exoskeletons], false, "ExoskeletonsNormal") { Slots = ["first", "second", "third", "fourth"] },
+        new(() => CreateExoskeletons(3), [EncounterTag.Exoskeletons], true, "ExoskeletonsWeak") { Slots = ["first", "second", "third"] },
         new(() => [(Monster<HunterKiller>(), null)], null, false, "HunterKillerNormal"),
         new(() => [(Monster<InfestedPrism>(), null)], null, false, "InfestedPrismsElite"),
-        new(() => [(Monster<Ovicopter>(), "ovicopter")], null, false, "OvicopterNormal"),
+        new(() => [(Monster<Ovicopter>(), "ovicopter")], null, false, "OvicopterNormal") { Slots = ["egg1", "egg2", "egg3", "egg4", "egg5", "ovicopter"] },
     ];
 
     private static IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateBowlbugsNormal(Rng rng)

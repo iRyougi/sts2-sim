@@ -30,11 +30,13 @@ public sealed class PoorSleepTests : IDisposable
     }
 
     [Fact]
-    public void ModifierGenerationRestriction_MapsToCombatGenerationFlag()
+    public void ModifierGenerationRestriction_DoesNotRestrictCombatGeneration()
     {
         PoorSleep card = ModelDb.Card<PoorSleep>();
 
-        Assert.False(card.CanBeGeneratedInCombat);
+        // Game PoorSleep overrides only CanBeGeneratedByModifiers.
+        Assert.True(card.CanBeGeneratedInCombat);
+        Assert.False(card.CanBeGeneratedByModifiers);
     }
 
     [Fact]

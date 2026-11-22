@@ -32,7 +32,9 @@ public sealed class GreedTests : IDisposable
         Assert.Equal(TargetType.None, card.TargetType);
         Assert.Equal(new[] { CardKeyword.Eternal, CardKeyword.Unplayable }, card.Keywords);
         Assert.Equal(0, card.MaxUpgradeLevel);
-        Assert.False(card.CanBeGeneratedInCombat);
+        // Game Greed overrides only CanBeGeneratedByModifiers.
+        Assert.True(card.CanBeGeneratedInCombat);
+        Assert.False(card.CanBeGeneratedByModifiers);
     }
 
     [Fact]

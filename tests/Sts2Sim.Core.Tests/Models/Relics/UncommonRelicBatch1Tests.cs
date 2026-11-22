@@ -81,6 +81,32 @@ file sealed class EndTurnBlockProbeRelic : RelicModel
     }
 }
 
+file sealed class SideTurnEndLateProbeRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Uncommon;
+
+    public List<string> Events { get; } = new();
+
+    public override Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)
+    {
+        Events.Add($"after:{Owner.Creature.CurrentHp}");
+        return Task.CompletedTask;
+    }
+
+    public override Task AfterSideTurnEndLate(CombatSide side, IEnumerable<Creature> participants)
+    {
+        Events.Add($"late:{Owner.Creature.CurrentHp}");
+        return Task.CompletedTask;
+    }
+
+    public override Task AfterDamageGiven(
+        Creature? dealer, DamageResult result, ValueProp props, Creature target, CardModel? cardSource)
+    {
+        Events.Add(ReferenceEquals(dealer, Owner.Creature) ? "dealer:owner" : "dealer:other");
+        return Task.CompletedTask;
+    }
+}
+
 file sealed class ZeroCostAttackProbeCard : CardModel
 {
     public override CardType Type => CardType.Attack;
@@ -134,6 +160,7 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
             ContentRegistry.AllTypes
                 .Append(typeof(LifecycleProbeRelic))
                 .Append(typeof(EndTurnBlockProbeRelic))
+                .Append(typeof(SideTurnEndLateProbeRelic))
                 .Append(typeof(ZeroCostAttackProbeCard))
                 .Append(typeof(ZeroCostSkillProbeCard))
                 .Append(typeof(ExhaustProbeCard))
@@ -542,6 +569,46 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
         EndTurnBlockProbeRelic probe =
             Assert.Single(player.Relics.OfType<EndTurnBlockProbeRelic>());
         Assert.Equal(expectedObservedBlock, probe.ObservedBlock);
+    }
+
+    [Fact]
+    public async Task SideTurnEndLate_DisintegrationAfterAllAfterSideTurnEnd_AndOrichalcumChecksBlockVeryEarly()
+    {
+        // Game DisintegrationPower.AfterSideTurnEndLate + Hook.AfterSideTurnEnd (second pass):
+        // damage only when participants contain the owner, dealer is the owner, after every AfterSideTurnEnd.
+        (RunState runState, Player player) = CreateRun("disintegration-late");
+        await Obtain<SideTurnEndLateProbeRelic>(player);
+        CombatRoom room = CreateCombatRoom();
+        await room.Enter(runState);
+        SideTurnEndLateProbeRelic probe = Assert.Single(player.Relics.OfType<SideTurnEndLateProbeRelic>());
+        await PowerCmd.Apply<DisintegrationPower>(room.Engine.State, player.Creature, 3m, null, null);
+        int hp = player.Creature.CurrentHp;
+
+        await Hook.AfterSideTurnEnd(room.Engine.State, CombatSide.Player, room.Engine.State.Enemies);
+        Assert.Equal(hp, player.Creature.CurrentHp);
+        Assert.DoesNotContain(probe.Events, e => e.StartsWith("dealer"));
+
+        probe.Events.Clear();
+        await Hook.AfterSideTurnEnd(room.Engine.State, CombatSide.Enemy, room.Engine.State.Allies);
+        Assert.Equal(hp - 3, player.Creature.CurrentHp);
+        // The probe's own Late call may come before or after Disintegration's (listener order is a separate issue),
+        // but the damage is never dealt during the AfterSideTurnEnd pass and its dealer is the owner.
+        Assert.Equal($"after:{hp}", probe.Events[0]);
+        Assert.Contains("dealer:owner", probe.Events);
+        Assert.Contains(probe.Events, e => e.StartsWith("late:"));
+        Assert.True(probe.Events.IndexOf("dealer:owner") > 0, "Game Hook.AfterSideTurnEnd: Disintegration damages in the Late pass.");
+
+        // Game Orichalcum.BeforeSideTurnEndVeryEarly records the empty-block check; block gained after it
+        // (Plating-style early block) does not cancel the trigger, so the relic still adds 6.
+        (RunState runState2, Player player2) = CreateRun("orichalcum-very-early");
+        await Obtain<Orichalcum>(player2);
+        CombatRoom room2 = CreateCombatRoom();
+        await room2.Enter(runState2);
+        player2.Creature.LoseBlockInternal(player2.Creature.Block);
+        await Hook.BeforeSideTurnEndVeryEarly(room2.Engine.State, CombatSide.Player, room2.Engine.State.Allies);
+        player2.Creature.GainBlockInternal(5);
+        await Hook.BeforeSideTurnEnd(room2.Engine.State, CombatSide.Player, room2.Engine.State.Allies);
+        Assert.Equal(11, player2.Creature.Block);
     }
 
     private static Task Obtain<TRelic>(Player player)

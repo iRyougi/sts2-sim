@@ -50,7 +50,7 @@ public sealed class Pocketwatch : RelicModel
         if (participants.Contains(Owner.Creature))
         {
             _shouldDrawExtra =
-                Owner.PlayerCombatState!.TurnNumber >= 1 &&
+                Owner.PlayerCombatState!.TurnNumber > 1 &&
                 CardsPlayedThisTurn <= CardPlayThreshold;
         }
 

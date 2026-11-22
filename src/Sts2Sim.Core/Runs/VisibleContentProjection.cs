@@ -114,7 +114,6 @@ public static partial class VisibleContentProjection
             values.Add(VisibleValue.Scope("Keyword", keyword.ToString()));
 
         // Native card hover text adds ReplayDynamic from the enchanted replay count.
-        // Core Glam.EnchantPlayCount consumes its charge, so derive this display purely.
         int replayCount = card.BaseReplayCount + card.Enchantments.Count(enchantment =>
             enchantment is Spiral || enchantment is Glam { Status: EnchantmentStatus.Normal });
         if (replayCount > 0) values.Add(VisibleValue.Int("Replay", replayCount));

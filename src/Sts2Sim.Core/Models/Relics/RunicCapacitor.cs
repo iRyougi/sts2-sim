@@ -12,7 +12,7 @@ public sealed class RunicCapacitor : RelicModel
     public override async Task AfterSideTurnStart(
         CombatSide side, IReadOnlyList<Creature> participants)
     {
-        // SetupPlayerTurnAsync has already incremented the first turn to 1.
+        // game PlayerCombatState.TurnNumber starts at 1: the first player turn is turn 1.
         if (!participants.Contains(Owner.Creature) || Owner.PlayerCombatState!.TurnNumber != 1)
             return;
         Flash();

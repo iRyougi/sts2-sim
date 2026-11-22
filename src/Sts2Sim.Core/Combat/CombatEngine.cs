@@ -155,10 +155,9 @@ public sealed class CombatEngine
 
         foreach (Creature creature in participants)
         {
-            // The real Creature.AfterTurnStart skips block clearing on a player's first turn. This engine
-            // increments TurnNumber later in SetupPlayerTurnAsync, so zero is the equivalent pre-increment state.
+            // Game Creature.AfterTurnStart skips block clearing on a player's first turn (TurnNumber == 1).
             bool isFirstPlayerTurn = State.CurrentSide == CombatSide.Player &&
-                                     creature.Player?.PlayerCombatState?.TurnNumber == 0;
+                                     creature.Player?.PlayerCombatState?.TurnNumber == 1;
             if (!isFirstPlayerTurn)
             {
                 if (Hook.ShouldClearBlock(State, creature, out AbstractModel? preventer))
@@ -365,6 +364,8 @@ public sealed class CombatEngine
                 p.PlayerCombatState!.ResetMelodyTurnCounters();
             _observer?.PlayerTurnEnded(State);
             State.CurrentSide = CombatSide.Player;
+            // game SwitchSides: only the players taking the extra turn get their TurnNumber incremented.
+            extraTurnPlayer.PlayerCombatState!.TurnNumber++;
             NotifySideSwitch();
             await StartTurnAsync(extraTurnPlayer);
             return;
@@ -479,7 +480,9 @@ public sealed class CombatEngine
         return true;
     }
 
-    /// <summary>逐字移植 <c>CombatManager.SetupPlayerTurn</c>：重置能量、增加回合数并抽牌。</summary>
+    /// <summary>逐字移植 <c>CombatManager.SetupPlayerTurn</c>：重置能量并抽牌。回合数不在这里加：原版在
+    /// <c>SwitchSides</c> 换到玩家侧时就加一（<c>PlayerCombatState.TurnNumber</c> 初值为 1，首回合不换边），
+    /// 所以 <c>BeforeSideTurnStart</c>、重置能量、<c>AfterBlockCleared</c> 等钩子看到的已经是新回合数。</summary>
     private async Task SetupPlayerTurnAsync(Player player)
     {
         player.PlayerCombatState!.Phase = PlayerTurnPhase.Start;
@@ -495,11 +498,17 @@ public sealed class CombatEngine
         await Hook.AfterEnergyReset(State, player);
 
         player.PlayerCombatState!.ResetMelodyTurnCounters();
-        player.PlayerCombatState!.TurnNumber++;
         await Hook.BeforeHandDraw(State, player);
         decimal handDrawCount = Hook.ModifyHandDraw(State, player, BaseHandDrawCount,
             out IEnumerable<AbstractModel> modifiers);
         await Hook.AfterModifyingHandDraw(State, modifiers);
+        if (player.PlayerCombatState!.TurnNumber == 1)
+        {
+            // 原版第 1 回合：先排灌注牌与固有牌，再保证固有牌都能抽进手（不超过手牌上限）。
+            int innateCount = player.ArrangeDrawPileForFirstHand();
+            handDrawCount = Math.Max(handDrawCount, innateCount);
+            handDrawCount = Math.Min(handDrawCount, CardPile.MaxCardsInHand);
+        }
         await CardPileCmd.Draw(State, (int)handDrawCount, player, fromHandDraw: true);
     }
 
@@ -641,6 +650,11 @@ public sealed class CombatEngine
         ResetPlayerTurnCountersAtSideSwitch();
         State.CurrentSide = CombatSide.Player;
         State.RoundNumber++;
+        foreach (Player player in State.Players)
+        {
+            // game SwitchSides: RoundNumber and every player's TurnNumber advance together on the switch to the player side.
+            player.PlayerCombatState!.TurnNumber++;
+        }
         NotifySideSwitch();
         await StartTurnAsync();
     }

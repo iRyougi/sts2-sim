@@ -12,7 +12,7 @@ public sealed class CaptainsWheel : RelicModel
     public override Task AfterBlockCleared(Creature creature)
     {
         if (creature != Owner.Creature ||
-            Owner.PlayerCombatState?.TurnNumber != 2)
+            Owner.PlayerCombatState?.TurnNumber != 3)
         {
             return Task.CompletedTask;
         }

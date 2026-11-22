@@ -31,7 +31,7 @@ public sealed class BurningSticks : RelicModel
 
         // v0.113.1：先置位再生成复制，防止生成过程重入二次触发。
         _wasUsedThisCombat = true;
-        CardModel copy = (CardModel)card.MutableClone();
+        CardModel copy = card.CreateClone();     // 游戏 BurningSticks：CreateClone，保留改费等可变状态
         await CardPileCmd.Generate(card.CombatState!, copy, PileType.Hand);
         Status = RelicStatus.Normal;
     }

@@ -56,7 +56,7 @@ public sealed class AbundanceTests : IDisposable
         Assert.Equal(3, abundance.GeneratedCandidates.Select(card => card.GetType()).Distinct().Count());
         CardModel chosen = abundance.GeneratedCandidates[0];
         Assert.Contains(chosen, player.PlayerCombatState!.Hand.Cards);
-        Assert.True(chosen.TemporaryFreeThisTurn);
+        Assert.Equal(0, chosen.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game SetToFreeThisTurn (free until played or turn end)
         Assert.Equal(0, chosen.EnergyCost);
     }
 

@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Cards;
@@ -41,9 +42,16 @@ public sealed class NeowsFuryTests : IDisposable
             CardPileCmd.Add(card, PileType.Discard);
         }
         decimal hpBefore = room.Engine.State.Enemies[0].CurrentHp;
+        // 原版 NeowsFury.OnPlay：CardSelectCmd.FromCombatPile(弃牌堆, 0..min(张数, 手牌空位))；决策源取前几张
+        var selection = new LegacySelectionDecisionSource();
+        room.Engine.State.CardSelectionSource = selection;
 
         await fury.PlayAsync(room.Engine.State.Enemies[0]);
 
+        CardSelectionRequest request = Assert.Single(selection.Requests);
+        Assert.Equal(0, request.MinCount);
+        Assert.Equal(expectedRetrieved, request.MaxCount);
+        Assert.Equal(discard, request.Candidates);
         Assert.Equal(expectedDamage, hpBefore - room.Engine.State.Enemies[0].CurrentHp);
         Assert.Equal(discard.Take(expectedRetrieved),
             player.PlayerCombatState!.Hand.Cards.Where(discard.Contains));
@@ -68,8 +76,13 @@ public sealed class NeowsFuryTests : IDisposable
         {
             Task11CombatTestSupport.AddToHand<StrikeRegent>(player);
         }
+        var selection = new LegacySelectionDecisionSource();
+        room.Engine.State.CardSelectionSource = selection;
 
         await fury.PlayAsync(room.Engine.State.Enemies[0]);
+
+        // 原版：手牌空位 <= 0 时不发起选牌
+        Assert.Empty(selection.Requests);
 
         Assert.All(discard, card => Assert.Contains(card, player.PlayerCombatState.DiscardPile.Cards));
     }

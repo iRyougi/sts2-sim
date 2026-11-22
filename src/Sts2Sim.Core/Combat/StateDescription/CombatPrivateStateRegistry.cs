@@ -46,7 +46,7 @@ internal static class CombatPrivateStateRegistry
         "StoneCalendar._shouldTriggerThisTurn", "SwordOfStone._eliteVictories",
         "Toolbox._wasUsedThisCombat", "TuningFork._skillsPlayed",
         "UnsettlingLamp._triggeringCard", "UnsettlingLamp._finished",
-        "Vambrace._triggeredThisCombat", "VenerableTeaSet._isArmed",
+        "Vambrace._triggeringCard", "Vambrace._blockGainedThisCombat", "VenerableTeaSet._isArmed",
         "BoneTea._combatsLeft", "EmberTea._combatsLeft", "TeaOfDiscourtesy._combatsLeft",
         "HistoryCourse._lastAttack", "HistoryCourse._lastAttackTurn",
         "HistoryCourse._previousAttack", "HistoryCourse._previousAttackTurn",

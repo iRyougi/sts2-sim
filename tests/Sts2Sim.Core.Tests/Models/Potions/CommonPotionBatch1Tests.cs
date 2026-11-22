@@ -249,7 +249,7 @@ public sealed class CommonPotionBatch1Tests : IDisposable
             room.Engine.State.RunState.Rng.CombatCardGeneration.Counter,
             room.Engine.State.RunState.Rng.CombatCardSelection.Counter,
             selected.Pile!.Type,
-            selected.TemporaryFreeThisTurn,
+            selected.TemporaryCostOverrideThisTurnOrUntilPlayed == 0,     // game AttackPotion/SkillPotion/PowerPotion/ColorlessPotion: SetToFreeThisTurn
             selected.EnergyCost);
     }
 

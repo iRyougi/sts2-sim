@@ -79,13 +79,8 @@ public abstract class EnchantmentModel : AbstractModel, ICombatStateDescriptionC
 
     public virtual decimal EnchantDamageMultiplicative(decimal amount, ValueProp props) => 1m;
 
-    public override decimal ModifyDamageAdditive(Creature? target, decimal amount, ValueProp props,
-        Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) =>
-        ReferenceEquals(cardSource, _owner) ? EnchantDamageAdditive(amount, props) : 0m;
-
-    public override decimal ModifyDamageMultiplicative(Creature? target, decimal amount, ValueProp props,
-        Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) =>
-        ReferenceEquals(cardSource, _owner) ? EnchantDamageMultiplicative(amount, props) : 1m;
+    // game Hook.ModifyDamage applies cardSource.Enchantment's EnchantDamageAdditive and EnchantDamageMultiplicative to the
+    // card damage before any listener runs; enchantments are not damage listeners, so Hook.ModifyDamage does it directly.
 
     public virtual bool CanEnchant(CardModel card)
     {

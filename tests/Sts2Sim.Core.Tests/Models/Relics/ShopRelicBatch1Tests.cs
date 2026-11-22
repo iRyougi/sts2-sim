@@ -372,6 +372,7 @@ public sealed class ShopRelicBatch1Tests : IDisposable
 
         Task10ExhaustSkillCard firstSkill =
             AddToPile<Task10ExhaustSkillCard>(player, PileType.Hand);
+        firstSkill.SetToFreeThisTurn();
         await CardPileCmd.Exhaust(
             firstRoom.Engine.State,
             firstSkill,
@@ -381,6 +382,8 @@ public sealed class ShopRelicBatch1Tests : IDisposable
             Assert.Single(player.PlayerCombatState.Hand.Cards.OfType<Task10ExhaustSkillCard>());
         Assert.NotSame(firstSkill, firstCopy);
         Assert.Equal(PileType.Exhaust, firstSkill.Pile!.Type);
+        // game BurningSticks: CreateClone keeps the mutable cost state of the exhausted card.
+        Assert.Equal(0, firstCopy.TemporaryCostOverrideThisTurnOrUntilPlayed);
 
         Task10ExhaustSkillCard secondSkill =
             AddToPile<Task10ExhaustSkillCard>(player, PileType.Hand);

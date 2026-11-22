@@ -267,10 +267,6 @@ public sealed class Player
         }
         PlayerCombatState!.DrawPile.RandomizeOrderInternal(shuffleRng);
         List<CardModel> initialOrder = PlayerCombatState.DrawPile.Cards.ToList();
-        var bottomDesignatedCards = new HashSet<CardModel>(
-            initialOrder.Where(card => card.Enchantments.Any(
-                enchantment => enchantment.ShouldStartAtBottomOfDrawPile)),
-            ReferenceEqualityComparer.Instance);
         foreach (EnchantmentModel enchantment in initialOrder
                      .SelectMany(card => card.Enchantments)
                      .ToList())
@@ -281,14 +277,30 @@ public sealed class Player
         {
             PlayerCombatState.DrawPile.MoveToBottomInternal(card);
         }
+    }
 
-        // 偏离 #87：多张 Innate 卡移到牌堆顶时，未核实真实游戏中的相对顺序。
-        foreach (CardModel innateCard in PlayerCombatState.DrawPile.Cards
-                     .Where(card => card.HasKeyword(CardKeyword.Innate) && !bottomDesignatedCards.Contains(card))
-                     .ToList())
+    /// <summary>逐字移植 <c>CombatManager.SetupPlayerTurn</c> 第 1 回合抽牌前（<c>ModifyHandDraw</c> 之后）的牌堆整理：
+    /// 附魔要求开局在底部的牌（灌注）依次移到底部，其余固有牌依次移到顶部，返回移到顶部的张数。
+    /// 原版不在 <c>Player.PopulateCombatState</c> 里做这一步：进房间的钩子看到的是没挪过固有牌的抽牌堆。</summary>
+    public int ArrangeDrawPileForFirstHand()
+    {
+        CardPile pile = PlayerCombatState!.DrawPile;
+        List<CardModel> bottom = pile.Cards
+            .Where(card => card.Enchantments.Any(enchantment => enchantment.ShouldStartAtBottomOfDrawPile))
+            .ToList();
+        foreach (CardModel card in bottom)
         {
-            PlayerCombatState.DrawPile.MoveToTopInternal(innateCard);
+            pile.MoveToBottomInternal(card);
         }
+        List<CardModel> innate = pile.Cards
+            .Where(card => card.HasKeyword(CardKeyword.Innate))
+            .Except(bottom)
+            .ToList();
+        foreach (CardModel card in innate)
+        {
+            pile.MoveToTopInternal(card);
+        }
+        return innate.Count;
     }
 
     public Task AfterCombatEnd()

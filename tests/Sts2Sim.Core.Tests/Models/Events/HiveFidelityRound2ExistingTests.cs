@@ -269,10 +269,28 @@ public sealed class HiveFidelityRound2ExistingTests : IDisposable
         await PowerCmd.Apply<NoDrawPower>(room.Engine.State, player.Creature, 1m, player.Creature, null);
         await CardPileCmd.Draw(room.Engine.State, 5, player, fromHandDraw: true);
 
-        await Hook.AfterSideTurnStart(room.Engine.State, CombatSide.Player, [player.Creature]);
+        await Hook.AfterPlayerTurnStart(room.Engine.State, player);     // game ToastyMittens.AfterPlayerTurnStart
 
         Assert.Empty(player.PlayerCombatState!.Hand.Cards);
         Assert.Equal(2, Assert.Single(player.Creature.Powers.OfType<StrengthPower>()).Amount);
+    }
+
+    [Theory]
+    [InlineData(typeof(Bellows))]
+    [InlineData(typeof(BoneTea))]
+    [InlineData(typeof(ChoicesParadox))]
+    [InlineData(typeof(FestivePopper))]
+    [InlineData(typeof(GamblingChip))]
+    [InlineData(typeof(MrStruggles))]
+    [InlineData(typeof(ToastyMittens))]
+    [InlineData(typeof(VexingPuzzlebox))]
+    public void TurnStartRelics_HookAfterPlayerTurnStartNotAfterSideTurnStart(Type relicType)
+    {
+        // game Bellows/BoneTea/ChoicesParadox/FestivePopper/GamblingChip/MrStruggles/ToastyMittens/VexingPuzzlebox
+        // override AfterPlayerTurnStart (dispatched by CombatManager.SetupPlayerTurn right after the hand draw)
+        // and do not override AfterSideTurnStart.
+        Assert.Equal(relicType, relicType.GetMethod("AfterPlayerTurnStart")!.DeclaringType);
+        Assert.NotEqual(relicType, relicType.GetMethod("AfterSideTurnStart")!.DeclaringType);
     }
 
     private static (RunState Run, Player Player) CreateRun(string seed)

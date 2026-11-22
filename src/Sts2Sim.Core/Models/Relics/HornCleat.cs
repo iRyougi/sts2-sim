@@ -12,7 +12,7 @@ public sealed class HornCleat : RelicModel
     public override Task AfterBlockCleared(Creature creature)
     {
         if (creature != Owner.Creature ||
-            Owner.PlayerCombatState?.TurnNumber != 1)
+            Owner.PlayerCombatState?.TurnNumber != 2)
         {
             return Task.CompletedTask;
         }

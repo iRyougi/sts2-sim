@@ -549,7 +549,7 @@ public sealed class GloryEventTests : IDisposable
         else
         {
             CardModel generated = Assert.Single(player.PlayerCombatState!.Hand.Cards);
-            Assert.True(generated.TemporaryFreeThisTurn);
+            Assert.Equal(0, generated.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game MadScience chaos rider: SetToFreeThisTurn
         }
     }
 
@@ -574,7 +574,7 @@ public sealed class GloryEventTests : IDisposable
         CardModel generated = Assert.Single(player.PlayerCombatState!.Hand.Cards);
         Assert.Equal(Assert.Single(expected).Id, generated.Id);
         Assert.Equal(probe.Counter - counterBefore, rng.Counter - counterBefore);
-        Assert.True(generated.TemporaryFreeThisTurn);
+        Assert.Equal(0, generated.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game MadScience chaos rider: SetToFreeThisTurn
     }
 
     [Theory]

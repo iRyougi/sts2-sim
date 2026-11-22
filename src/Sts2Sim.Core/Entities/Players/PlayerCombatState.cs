@@ -69,7 +69,9 @@ public sealed class PlayerCombatState
 
     public PlayerTurnPhase Phase { get; set; }
 
-    public int TurnNumber { get; set; }
+    /// <summary>game <c>PlayerCombatState.TurnNumber</c>：初值 1（首回合不换边），之后由 <c>CombatManager.SwitchSides</c>
+    /// 在换到玩家侧时加一，早于该回合的 <c>BeforeSideTurnStart</c>。</summary>
+    public int TurnNumber { get; set; } = 1;
 
     public CardPile Hand { get; } = new(PileType.Hand);
 

@@ -15,7 +15,7 @@ public sealed class BagOfMarbles : RelicModel
         IReadOnlyList<Creature> participants)
     {
         if (!participants.Contains(Owner.Creature) ||
-            Owner.PlayerCombatState?.TurnNumber != 0)
+            Owner.PlayerCombatState?.TurnNumber > 1)
         {
             return;
         }

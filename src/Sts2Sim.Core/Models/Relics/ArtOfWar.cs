@@ -52,7 +52,7 @@ public sealed class ArtOfWar : RelicModel
         }
 
         if (player == Owner &&
-            player.PlayerCombatState?.TurnNumber >= 1 &&
+            player.PlayerCombatState?.TurnNumber > 1 &&
             _previousTurnHadNoAttack)
         {
             player.PlayerCombatState.GainEnergy(1m);

@@ -129,6 +129,27 @@ public sealed class CommonRelicBatch2Tests : IDisposable
     }
 
     [Fact]
+    public async Task Pendulum_ExtraCardIsPartOfTheHandDrawOnTurnsThreeAndSix()
+    {
+        // 原版 Pendulum.BeforeHandDraw：TurnsSeen = (TurnsSeen + 1) % 3，初值 0；Pendulum.ModifyHandDraw：TurnsSeen == 0 时 +1。
+        // 与 Fiddle（非手牌抽牌在己方回合内被禁止）同持：多出的那张若不算手牌抽牌就会被挡掉。
+        (RunState runState, Player player) = CreateRun("pendulum-hand-draw");
+        await Obtain<Fiddle>(player);
+        await Obtain<Pendulum>(player);
+        CombatRoom room = CreateCombatRoom();
+        await room.Enter(runState);
+
+        var handSizes = new List<int>();
+        for (int turn = 1; turn <= 6; turn++)
+        {
+            handSizes.Add(player.PlayerCombatState!.Hand.Cards.Count);
+            await room.Engine.EndPlayerTurnAsync();
+        }
+
+        Assert.Equal(new[] { 7, 7, 8, 7, 7, 8 }, handSizes);
+    }
+
+    [Fact]
     public async Task PotionBelt_PreservesExistingPotionAndAppendsTwoEmptySlots()
     {
         (_, Player player) = CreateRun("potion-belt");

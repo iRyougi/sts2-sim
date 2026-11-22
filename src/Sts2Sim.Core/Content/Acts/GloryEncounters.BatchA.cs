@@ -7,9 +7,9 @@ public static partial class GloryEncounters
 {
     public static IReadOnlyList<EncounterDefinition> BatchA { get; } =
     [
-        new(() => [(Monster<Axebot>(), "front")], null, false, "AxebotsNormal"),
+        new(() => [(Monster<Axebot>(), "front")], null, false, "AxebotsNormal") { Slots = ["front"] },
         new(() => [(Monster<DevotedSculptor>(), null)], null, true, "DevotedSculptorWeak"),
-        new(() => [(Monster<Fabricator>(), "fabricator")], null, false, "FabricatorNormal"),
+        new(() => [(Monster<Fabricator>(), "fabricator")], null, false, "FabricatorNormal") { Slots = ["bot1", "bot2", "fabricator", "bot3", "bot4"] },
         new(() => [(Monster<FrogKnight>(), null)], null, false, "FrogKnightNormal"),
         new(() => [(Monster<GlobeHead>(), null)], null, false, "GlobeHeadNormal"),
         new(() => [(Monster<MechaKnight>(), null)], null, false, "MechaKnightElite"),

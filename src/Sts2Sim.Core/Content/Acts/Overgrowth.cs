@@ -31,7 +31,7 @@ public sealed class Overgrowth : ActDefinition
         new(CreateMonster<FuzzyWurmCrawler>, [EncounterTag.Crawler], isWeak: true, name: "FuzzyWurmCrawler") { IdEntry = "FUZZY_WURM_CRAWLER_WEAK" },
         new(CreateInklets, tags: null, isWeak: false, name: "Inklets") { IdEntry = "INKLETS_NORMAL" },
         new(CreateMonster<Mawler>, tags: null, isWeak: false, name: "Mawler") { IdEntry = "MAWLER_NORMAL" },
-        new(CreateNibbits, tags: null, isWeak: false, name: "Nibbits") { IdEntry = "NIBBITS_NORMAL" },
+        new(CreateNibbits, tags: null, isWeak: false, name: "Nibbits") { Slots = ["front", "back"], IdEntry = "NIBBITS_NORMAL" },
         new(CreateLoneNibbit, [EncounterTag.Nibbit], isWeak: true, name: "LoneNibbit") { IdEntry = "NIBBITS_WEAK" },
         new(() =>
         [
@@ -55,13 +55,13 @@ public sealed class Overgrowth : ActDefinition
     {
         new(CreateMonster<BygoneEffigy>, tags: null, isWeak: false, name: "BygoneEffigy") { IdEntry = "BYGONE_EFFIGY_ELITE" },
         new(CreateMonster<Byrdonis>, tags: null, isWeak: false, name: "Byrdonis") { IdEntry = "BYRDONIS_ELITE" },
-        new(() => [(CreateMonster<PhrogParasite>(), "phrog")], tags: null, isWeak: false, name: "PhrogParasite") { IdEntry = "PHROG_PARASITE_ELITE" },
+        new(() => [(CreateMonster<PhrogParasite>(), "phrog")], tags: null, isWeak: false, name: "PhrogParasite") { Slots = ["phrog", "wriggler1", "wriggler2", "wriggler3", "wriggler4"], IdEntry = "PHROG_PARASITE_ELITE" },
     };
 
     protected override IReadOnlyList<EncounterDefinition> BossEncounters { get; } = new List<EncounterDefinition>
     {
         new(CreateMonster<CeremonialBeast>, tags: null, isWeak: false, name: "CeremonialBeast") { IdEntry = "CEREMONIAL_BEAST_BOSS" },
-        new(CreateTheKin, tags: null, isWeak: false, name: "TheKin") { IdEntry = "THE_KIN_BOSS" },
+        new(CreateTheKin, tags: null, isWeak: false, name: "TheKin") { Slots = ["slot1", "slot2", "leaderSlot"], IdEntry = "THE_KIN_BOSS" },
         new(CreateMonster<Vantom>, tags: null, isWeak: false, name: "Vantom") { IdEntry = "VANTOM_BOSS" },
     };
 

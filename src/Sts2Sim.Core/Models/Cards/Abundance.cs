@@ -40,7 +40,7 @@ public sealed class Abundance : CardModel
         CardModel? chosen = _generatedCandidates.FirstOrDefault();
         if (chosen is null) return;
         chosen.AssignOwner(Owner);
-        chosen.MakeTemporaryFreeThisTurn();
+        chosen.SetToFreeThisTurn();     // 游戏 Abundance：SetToFreeThisTurn（本回合内或打出前免费；不覆盖 X 费用）
         await CardPileCmd.Generate(CombatState!, chosen, PileType.Hand);
     }
 

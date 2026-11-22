@@ -182,7 +182,18 @@ public sealed class CombatStateCloneTests
                 await originalEnchantment.OnPlay(originalCard);
                 break;
             case Glam:
-                originalEnchantment.EnchantPlayCount(1);
+                // game Glam.AfterCardPlayed disables it; EnchantPlayCount is a pure query.
+                await originalEnchantment.AfterCardPlayed(new CardPlay
+                    {
+                        Card = originalCard,
+                        Player = original.Players[0],
+                        Target = null,
+                        ResultPile = PileType.Discard,
+                        Resources = new ResourceInfo(0, 0, 0, 0),
+                        IsAutoPlay = false,
+                        PlayIndex = 0,
+                        PlayCount = 1,
+                    });
                 break;
             default:
                 throw new InvalidOperationException(
@@ -519,7 +530,17 @@ public sealed class CombatStateCloneTests
         var originalEnchantment = (Glam)ModelDb.Get(typeof(Glam)).MutableClone();
         originalEnchantment.AssignMagnitude(2m);
         originalSecond.AttachEnchantment(originalEnchantment);
-        Assert.Equal(2, originalEnchantment.EnchantPlayCount(1));
+        await originalEnchantment.AfterCardPlayed(new CardPlay
+            {
+                Card = originalSecond,
+                Player = originalPlayer,
+                Target = null,
+                ResultPile = PileType.Discard,
+                Resources = new ResourceInfo(0, 0, 0, 0),
+                IsAutoPlay = false,
+                PlayIndex = 0,
+                PlayCount = 1,
+            });
         Assert.Equal(EnchantmentStatus.Disabled, originalEnchantment.Status);
         originalThird.MakeFreeUntilPlayed();
         originalThird.SetTemporaryCostOverrideThisTurn(4);

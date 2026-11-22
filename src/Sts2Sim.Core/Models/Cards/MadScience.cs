@@ -41,8 +41,6 @@ public sealed class MadScience : CardModel, ICardDamageVariableProvider
     public override CardType Type => _type;
     public override CardRarity Rarity => CardRarity.Event;
     public override TargetType TargetType => Type == CardType.Attack ? TargetType.AnyEnemy : TargetType.Self;
-    public override bool CanBeGeneratedByModifiers => false;
-    public override bool CanBeGeneratedInCombat => false;
     protected override int CanonicalEnergyCost => 1;
 
     public void Configure(CardType type, MadScienceRider rider)
@@ -123,7 +121,7 @@ public sealed class MadScience : CardModel, ICardDamageVariableProvider
         {
             return;
         }
-        generated.MakeTemporaryFreeThisTurn();
+        generated.SetToFreeThisTurn();     // 游戏 MadScience 混沌分支：SetToFreeThisTurn（本回合内或打出前免费；不覆盖 X 费用）
         await CardPileCmd.Generate(CombatState, generated, PileType.Hand);
     }
 

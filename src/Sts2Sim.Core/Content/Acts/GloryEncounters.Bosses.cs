@@ -9,7 +9,7 @@ public static partial class GloryEncounters
     [
         // Glory.GenerateAllEncounters order governs seeded draws; BossDiscoveryOrder is UI-only.
         new(() => [(Monster<Aeonglass>(), null)], null, false, "AeonglassBoss"),
-        new(() => [(Monster<TorchHeadAmalgam>(), "amalgam"), (Monster<Queen>(), "queen")], null, false, "QueenBoss"),
+        new(() => [(Monster<TorchHeadAmalgam>(), "amalgam"), (Monster<Queen>(), "queen")], null, false, "QueenBoss") { Slots = ["amalgam", "queen"] },
         new(() => [(Monster<TestSubject>(), null)], null, false, "TestSubjectBoss"),
     ];
 }

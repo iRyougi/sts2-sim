@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.ValueProps;
 
@@ -10,11 +11,10 @@ public sealed class MrStruggles : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Event;
 
-    public override Task AfterSideTurnStart(
-        CombatSide side,
-        IReadOnlyList<Creature> participants)
+    // 游戏 MrStruggles.AfterPlayerTurnStart：每个玩家回合抽完手牌后、AfterSideTurnStart 之前。
+    public override Task AfterPlayerTurnStart(Player player)
     {
-        if (!participants.Contains(Owner.Creature))
+        if (player != Owner)
         {
             return Task.CompletedTask;
         }

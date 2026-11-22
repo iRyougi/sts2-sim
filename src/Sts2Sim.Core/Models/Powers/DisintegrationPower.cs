@@ -10,9 +10,10 @@ public sealed class DisintegrationPower : PowerModel
 {
     public override PowerType Type => PowerType.Debuff;
     public override PowerStackType StackType => PowerStackType.Counter;
-    public override Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants) =>
-        side == Owner.Side
+    // Game DisintegrationPower.AfterSideTurnEndLate: participants decide, the owner is the damage dealer.
+    public override Task AfterSideTurnEndLate(CombatSide side, IEnumerable<Creature> participants) =>
+        participants.Contains(Owner)
             ? CreatureCmd.Damage(Owner.CombatState!, [Owner], Amount,
-                ValueProp.Unpowered, null, null, null)
+                ValueProp.Unpowered, Owner, null, null)
             : Task.CompletedTask;
 }

@@ -32,7 +32,7 @@ public sealed class PlanPowerHookTests : IDisposable
             typeof(Sts2Sim.Core.Models.Relics.DivineRight),
             typeof(WanderingGrunt),
             typeof(SovereignBlade),
-            typeof(ConquerorPower), typeof(FurnacePower), typeof(ReflectPower), typeof(ArsenalPower),
+            typeof(ConquerorPower), typeof(NoBlockPower), typeof(ShrinkPower), typeof(FurnacePower), typeof(ReflectPower), typeof(ArsenalPower),
             typeof(ForegoneConclusionPower), typeof(TyrannyPower), typeof(TheSealedThronePower),
             typeof(PaleBlueDotPower), typeof(SpectrumShiftPower), typeof(CalamityPower),
             typeof(MonarchsGazePower), typeof(TheGambitPower), typeof(MayhemPower), typeof(EntropyPower),
@@ -70,6 +70,30 @@ public sealed class PlanPowerHookTests : IDisposable
         await Hook.AfterSideTurnEnd(room.Engine.State, CombatSide.Enemy, new[] { enemy });
 
         Assert.Equal(1, power!.Amount);
+    }
+
+    [Theory]
+    [InlineData("conqueror")]
+    [InlineData("noblock")]
+    [InlineData("shrink")]
+    public async Task DecrementPowers_IgnoreSkipNextDurationTick(string kind)
+    {
+        // 原版 ConquerorPower / NoBlockPower / ShrinkPower.AfterSideTurnEnd 调用 PowerCmd.Decrement：
+        // 直接减一层，不读也不清 SkipNextDurationTick（那是 TickDownDuration 的规则）。
+        (_, CombatRoom room) = await CreateCombatAsync($"decrement-{kind}");
+        Creature enemy = room.Engine.State.HittableEnemies.Single();
+        PowerModel power = kind switch
+        {
+            "conqueror" => (await PowerCmd.Apply<ConquerorPower>(room.Engine.State, enemy, 2m, null, null))!,
+            "noblock" => (await PowerCmd.Apply<NoBlockPower>(room.Engine.State, enemy, 2m, null, null))!,
+            _ => (await PowerCmd.Apply<ShrinkPower>(room.Engine.State, enemy, 2m, null, null))!,
+        };
+        power.SkipNextDurationTick = true;
+
+        await Hook.AfterSideTurnEnd(room.Engine.State, CombatSide.Enemy, new[] { enemy });
+
+        Assert.Equal(1, power.Amount);
+        Assert.True(power.SkipNextDurationTick, "PowerCmd.Decrement does not consume SkipNextDurationTick");
     }
 
     [Fact]

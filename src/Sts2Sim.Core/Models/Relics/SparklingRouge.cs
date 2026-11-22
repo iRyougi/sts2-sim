@@ -12,7 +12,7 @@ public sealed class SparklingRouge : RelicModel
     public override async Task AfterBlockCleared(Creature creature)
     {
         if (creature != Owner.Creature ||
-            Owner.PlayerCombatState?.TurnNumber != 2)
+            Owner.PlayerCombatState?.TurnNumber != 3)
         {
             return;
         }

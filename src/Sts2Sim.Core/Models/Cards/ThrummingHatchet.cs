@@ -7,7 +7,7 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>11伤害;上回合打出则本回合自动回手。逐字移植核心行为（<c>MegaCrit.Sts2.Core.Models.Cards.ThrummingHatchet</c>），
 /// 偏离 #101：真实源码查战斗历史日志判断"上一个我方回合是否打出过这张具体实例"，本项目没有历史日志系统，
 /// 改用"打出时记录当时的 TurnNumber，摸牌前检查 TurnNumber 是否恰好+1"这个等价的轻量判定
-/// （开始设置玩家回合时，TurnNumber 会在 <c>Hook.BeforeHandDraw</c> 之前递增，
+/// （TurnNumber 在换到玩家侧时递增（原版 <c>CombatManager.SwitchSides</c>），早于 <c>Hook.BeforeHandDraw</c>，
 /// 所以"上一回合打出"精确等价于"当前 TurnNumber == 打出时记录的 TurnNumber + 1"）。</summary>
 public sealed class ThrummingHatchet : CardModel, ICardDamageVariableProvider
 {

@@ -53,7 +53,7 @@ public static class TransplantFieldRegistry
         "RainbowRing._playedSkill", "RainbowRing._playedPower",
         "RainbowRing._triggeredThisTurn", "Regalite._usedThisTurn",
         "Shuriken._attacksThisTurn", "UnsettlingLamp._triggeringCard",
-        "UnsettlingLamp._finished", "Vambrace._triggeredThisCombat",
+        "UnsettlingLamp._finished", "Vambrace._triggeringCard", "Vambrace._blockGainedThisCombat",
         "LavaLamp._tookDamageThisCombat",
         "PaelsEye._eligibleForExtraTurn", "RippleBasin._attackPlayedThisTurn",
         "StoneCalendar._shouldTriggerThisTurn", "Toolbox._wasUsedThisCombat",

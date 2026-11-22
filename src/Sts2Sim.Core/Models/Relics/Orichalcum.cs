@@ -24,7 +24,8 @@ public sealed class Orichalcum : RelicModel
         return Task.CompletedTask;
     }
 
-    public override Task BeforeSideTurnEndEarly(
+    // Game Orichalcum.BeforeSideTurnEndVeryEarly: the block check precedes PlatingPower's early block.
+    public override Task BeforeSideTurnEndVeryEarly(
         CombatSide side,
         IEnumerable<Creature> participants)
     {

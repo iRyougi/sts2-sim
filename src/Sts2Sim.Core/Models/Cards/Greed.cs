@@ -9,7 +9,6 @@ public sealed class Greed : CardModel
     public override TargetType TargetType => TargetType.None;
     public override int MaxUpgradeLevel => 0;
     public override bool CanBeGeneratedByModifiers => false;
-    public override bool CanBeGeneratedInCombat => false;
     protected override int CanonicalEnergyCost => -1;
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords =>
         new[] { CardKeyword.Eternal, CardKeyword.Unplayable };

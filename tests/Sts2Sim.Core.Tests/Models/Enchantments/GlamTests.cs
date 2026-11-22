@@ -27,6 +27,11 @@ public sealed class GlamTests : IDisposable
         var glam = Assert.IsType<Glam>(Assert.Single(card.Enchantments));
         decimal hpBefore = room.Engine.State.Enemies[0].CurrentHp;
 
+        // game Glam.EnchantPlayCount is a pure query: asking twice (encoder / preview) must not use up the replay.
+        Assert.Equal(2, glam.EnchantPlayCount(1));
+        Assert.Equal(2, glam.EnchantPlayCount(1));
+        Assert.Equal(EnchantmentStatus.Normal, glam.Status);
+
         await card.PlayAsync(room.Engine.State.Enemies[0]);
 
         Assert.Equal(12, hpBefore - room.Engine.State.Enemies[0].CurrentHp);
@@ -42,11 +47,12 @@ public sealed class GlamTests : IDisposable
     [Fact]
     public async Task FreshCombatClone_ResetsToNormal()
     {
-        (var player, _) = await Task11CombatTestSupport.CreateCombatAsync("task11-glam-reset");
+        (var player, var room) = await Task11CombatTestSupport.CreateCombatAsync("task11-glam-reset");
         Peck card = Task11CombatTestSupport.AddToHand<Peck>(player);
         await CardCmd.Enchant<Glam>(card, 1m);
         var glam = Assert.IsType<Glam>(card.Enchantments.Single());
-        _ = glam.EnchantPlayCount(1);
+        await card.PlayAsync(room.Engine.State.Enemies[0]);
+        Assert.Equal(EnchantmentStatus.Disabled, glam.Status);
 
         var freshClone = (Peck)card.MutableClone();
 

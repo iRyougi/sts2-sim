@@ -33,11 +33,6 @@ public sealed class Bread : RelicModel
         {
             return PlayerCmd.LoseEnergy(2m, Owner);
         }
-        else if (Owner.PlayerCombatState.TurnNumber == 2)
-        {
-            // Bridge only the first transition: reset precedes the turn increment.
-            Owner.PlayerCombatState.GainEnergy(1m);
-        }
 
         return Task.CompletedTask;
     }

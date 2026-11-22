@@ -672,7 +672,7 @@ public sealed class RareRelicBatch3Tests : IDisposable
 
         CardModel generated =
             Assert.Single(
-                player.PlayerCombatState!.Hand.Cards, card => card.TemporaryFreeThisTurn);
+                player.PlayerCombatState!.Hand.Cards, card => card.TemporaryCostOverrideThisTurnOrUntilPlayed == 0);     // game VexingPuzzlebox: SetToFreeThisTurn
         Assert.False(generated.IsColorless);
         Assert.Same(player, generated.Owner);
         Assert.Equal(1, player.PlayerCombatState.CardsGeneratedThisCombat);

@@ -35,7 +35,8 @@ public sealed class NoBlockPower : PowerModel
     {
         if (side == CombatSide.Enemy)
         {
-            await PowerCmd.TickDownDuration(Owner.CombatState!, this);
+            // 原版 PowerCmd.Decrement：直接减一层，不看 SkipNextDurationTick
+            await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
         }
     }
 }

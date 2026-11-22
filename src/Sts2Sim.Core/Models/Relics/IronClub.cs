@@ -20,10 +20,9 @@ public sealed class IronClub : RelicModel
         if (cardPlay.Card.Owner != Owner) return;
         _cardsPlayed++;
         // IronClub.UpdateDisplay via the CardsPlayed setter (IsActivating is animation only). The source counter
-        // never wraps; this one resets to 0 on a trigger, so compare the same modulo the state description uses.
+        // never wraps or resets (modulo only), and neither does this one.
         Status = _cardsPlayed % CardsThreshold == CardsThreshold - 1 ? RelicStatus.Active : RelicStatus.Normal;
-        if (_cardsPlayed < 4 || Owner.Creature.CombatState is null) return;
-        _cardsPlayed = 0;
+        if (_cardsPlayed % CardsThreshold != 0 || Owner.Creature.CombatState is null) return;
         if (Owner.Creature.CombatState is not null)
             await CardPileCmd.Draw(Owner.Creature.CombatState, 1, Owner, fromHandDraw: false);
     }
