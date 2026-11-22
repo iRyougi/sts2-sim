@@ -80,12 +80,21 @@ public sealed class SapphireSeedTests : IDisposable
     }
 
     [Fact]
-    public async Task Plant_EnchantsTheFirstSownCandidateWithMagnitudeOne()
+    public async Task Plant_EnchantsTheChosenSownCandidateWithMagnitudeOne()
     {
-        (_, Player player, SapphireSeed ev) = Setup("sapphire-plant");
+        (RunState runState, Player player, SapphireSeed ev) = Setup("sapphire-plant");
         CardModel expected = player.Deck.Cards[0];
+        Sown sownModel = ModelDb.GetById<Sown>(ModelDb.GetId<Sown>());
+        CardModel[] candidates = player.Deck.Cards.Where(sownModel.CanEnchant).ToArray();
 
         await Choose(ev, "PLANT");
+
+        // SapphireSeed.Plant → CardSelectCmd.FromDeckForEnchantment(1): one request, deck order; this source takes the first.
+        var request = Assert.Single(((LegacySelectionDecisionSource)runState.CardSelectionSource).Requests);
+        Assert.Same(ev, request.Source);
+        Assert.Equal(1, request.MinCount);
+        Assert.Equal(1, request.MaxCount);
+        Assert.True(candidates.SequenceEqual(request.Candidates), "SapphireSeed.Plant: candidates are Sown-enchantable deck cards in deck order");
 
         var sown = Assert.IsType<Sown>(Assert.Single(expected.Enchantments));
         Assert.Equal(1m, sown.Magnitude);

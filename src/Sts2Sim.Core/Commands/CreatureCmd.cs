@@ -477,6 +477,9 @@ public static class CreatureCmd
             await Kill(player.Osty!);
         }
 
+        // 原版 CreatureCmd.Kill：死亡结算完、全体玩家都已死亡时 CombatManager.LoseCombat()。
+        if (target.IsPlayer && combatState is CombatState concrete && !concrete.HasLivingPlayerCreature())
+            concrete.Engine?.LoseCombat();
         return result;
     }
 

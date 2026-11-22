@@ -365,15 +365,17 @@ public sealed class GloryEventTests : IDisposable
     public async Task Trial_NondescriptVerdictsOfferTwoCardRewardsOrTransformTwoCards()
     {
         (_, Player guiltyPlayer, Trial guilty) = await FindTrialPage("NONDESCRIPT");
+        int rewardsBefore = guiltyPlayer.PlayerRng.Rewards.Counter;
         await Choose(guilty, "NONDESCRIPT_GUILTY");
+        // ForNonCombatWithDefaultOdds: rarity roll + pick per card, NoUpgradeRoll (game Trial.NondescriptGuilty).
+        Assert.Equal(2 * 3 * 2, guiltyPlayer.PlayerRng.Rewards.Counter - rewardsBefore);
         Assert.Single(guiltyPlayer.Deck.Cards.OfType<Doubt>());
-        var offers = new List<RewardsSet>();
-        while (guilty.TryDequeuePendingRewardOffer(out RewardsSet? reward))
-        {
-            offers.Add(reward);
-        }
-        Assert.Equal(2, offers.Count);
-        Assert.All(offers, reward => Assert.Equal(3, reward.Card.Options.Count));
+        // #1039 (closes #253): game Trial.NondescriptGuilty -> RewardsCmd.OfferCustom, one screen, two card rewards.
+        Assert.True(guilty.TryDequeuePendingRewardOffer(out RewardsSet? offer));
+        Assert.False(guilty.TryDequeuePendingRewardOffer(out _));
+        CardReward[] cardRewards = offer!.ExtraRewards.Cast<CardReward>().ToArray();
+        Assert.Equal(2, cardRewards.Length);
+        Assert.All(cardRewards, reward => Assert.Equal(3, reward.Options.Count));
 
         (RunState innocentRunState, Player innocentPlayer, Trial innocent) = await FindTrialPage("NONDESCRIPT");
         var transformSelection = new NonFirstCardsSelectionSource();
@@ -771,7 +773,12 @@ public sealed class GloryEventTests : IDisposable
     {
         for (int i = 0; i < 256; i++)
         {
-            (RunState runState, Player player, Trial ev) = Begin<Trial>($"trial-{pagePrefix}-{i}");
+            // An EventRoom makes the Trial the current event, which RewardsCmd.OfferCustom requires (#1039).
+            (RunState runState, Player player) = CreateRun($"trial-{pagePrefix}-{i}");
+            var room = new EventRoom(() => (Trial)ModelDb.Event<Trial>().MutableClone());
+            runState.PushRoom(room);
+            await room.Enter(runState);
+            var ev = (Trial)room.Event;
             await Choose(ev, "ACCEPT");
             if (ev.CurrentOptions.All(option => option.Key.StartsWith(pagePrefix, StringComparison.Ordinal)))
             {

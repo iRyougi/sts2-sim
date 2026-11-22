@@ -67,7 +67,7 @@ public sealed class CrystalSphereMinigame
             {
                 // The source creates rewards only after all divinations; Doubt is applied immediately when revealed.
                 // OneOffSynchronizer first calls ToReward for every item. Only potion construction
-                // draws immediately; card and relic draws occur in the later Populate pass.
+                // draws immediately; gold, relic and card draws occur in the later Populate pass, in reveal order.
                 var prepared = _revealed.Where(item => item.Kind != CrystalSphereItemKind.Curse)
                     .Select(item => (Item: item, Potion: item.Kind == CrystalSphereItemKind.Potion
                         ? CreateReward(item) : null)).ToArray();
@@ -301,7 +301,12 @@ public sealed class CrystalSphereMinigame
         switch (item.Kind)
         {
             case CrystalSphereItemKind.Gold:
-                return new GoldReward(item.IsBigGold ? 30 : 10, _owner);
+                // #1040: native RewardsSet.GenerateWithoutOffering populates every custom reward, and
+                // GoldReward.Populate draws NextInt(amount, amount + 1) from the sphere RNG
+                // (CrystalSphereGold.ToReward sets it) even though the amount is fixed.
+                var gold = new GoldReward(item.IsBigGold ? 30 : 10, _owner);
+                gold.Populate(_owner.RunState, _rng);
+                return gold;
             case CrystalSphereItemKind.Potion:
                 var potion = _rng.NextItem(PotionFactory.GetOutOfCombatPool(_owner)
                     .Where(p => p.Rarity == item.PotionRarity))!;

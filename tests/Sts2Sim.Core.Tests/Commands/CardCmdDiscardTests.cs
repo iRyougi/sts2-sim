@@ -48,7 +48,7 @@ public sealed class CardCmdDiscardTests : IDisposable
     }
 
     [Fact]
-    public async Task DiscardAndDraw_MovesWholeBatchAndDrawsBeforeOrderedDiscardHooks()
+    public async Task DiscardAndDraw_FiresEachDiscardHookBeforeTheDraw()
     {
         (Player player, _) = CreateCombat("discard-draw-order");
         var probe = (DiscardProbeRelic)ModelDb.Relic<DiscardProbeRelic>().MutableClone();
@@ -60,10 +60,12 @@ public sealed class CardCmdDiscardTests : IDisposable
 
         await CardCmd.DiscardAndDraw(new CardModel[] { first, second }, cardsToDraw: 1);
 
+        // 原版 v0.113.1 CardCmd.DiscardAndDraw：逐张移牌并立即触发 AfterCardDiscarded，全部弃完后才抽牌（#1048）。
         Assert.Equal(new CardModel[] { first, second }, probe.DiscardedCards);
         Assert.All(probe.HandCardsAtDiscardHook, hand =>
-            Assert.Contains(hand, card => ReferenceEquals(card, drawn)));
-        Assert.All(probe.DiscardPileCountsAtDiscardHook, count => Assert.Equal(2, count));
+            Assert.DoesNotContain(hand, card => ReferenceEquals(card, drawn)));
+        Assert.Equal(new[] { 1, 2 }, probe.DiscardPileCountsAtDiscardHook);
+        Assert.Same(drawn, Assert.Single(player.PlayerCombatState!.Hand.Cards));
     }
 
     [Fact]

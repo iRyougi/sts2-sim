@@ -94,6 +94,13 @@ public sealed class ResolvedEnemyDamageRecordingTests : IDisposable
         UsePotionAction potionAction = Assert.IsType<UsePotionAction>(actions[1]);
         Assert.Equal(ModelDb.GetId<FairyInABottle>().ToString(), potionAction.Potion);
         Assert.Equal(37, turn.PlayerPost.Hp);
+        // 原版 CreatureCmd.Damage 在 IsInProgress && !IsEnding 时记 DamageReceivedEntry；致死一击在防死结算前
+        // 没有 PendingLoss，IsEnding 为假，两次被救的致死伤害都要记进战斗历史（#1049）。
+        Assert.Equal(
+            new[] { 75, 22 },
+            room.Engine.State.DamageHistory.Entries
+                .Where(entry => ReferenceEquals(entry.Receiver, player.Creature))
+                .Select(entry => entry.Result.UnblockedDamage));
     }
 
     [Theory]

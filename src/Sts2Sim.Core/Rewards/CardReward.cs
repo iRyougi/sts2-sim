@@ -127,7 +127,7 @@ public sealed class CardReward : Reward
                 }
                 IReadOnlyList<CardModel> cards = Player.PlayerRng.UsesSemanticKeys
                     ? CardFactory.CreateForReward(Player, OptionCount, creationOptions)
-                    : CardFactory.CreateForReward(Player, OptionCount, _oddsType, _isFromCombat);
+                    : CardFactory.CreateForEncounterReward(Player, OptionCount, creationOptions);
                 Options = CardFactory.ModifyRewardOptions(runState, Player, cards, creationOptions);
             }
             else Options = CardFactory.ModifyRewardOptions(runState, Player, _explicitOptions, creationOptions);

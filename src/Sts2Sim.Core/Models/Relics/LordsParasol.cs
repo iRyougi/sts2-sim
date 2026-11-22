@@ -1,6 +1,5 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Merchant;
-using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Rooms;
 
@@ -10,9 +9,8 @@ public sealed class LordsParasol : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Ancient;
 
-    public override decimal ModifyMerchantPrice(Player player, MerchantEntry entry, decimal originalPrice) =>
-        ReferenceEquals(player, Owner) ? 0m : originalPrice;
-
+    // #1047：原版不改商店价格（没有 ModifyMerchantPrice），只在进店时以 ignoreCost: true 依次买下角色卡、无色卡、
+    // 遗物、药水，再做一次不可取消的免费删牌；买不下的药水（栏位满、Sozu）留在货架上并保持原价。
     public override async Task AfterRoomEntered(AbstractRoom room)
     {
         if (room is not MerchantRoom merchant)
@@ -25,35 +23,35 @@ public sealed class LordsParasol : RelicModel
         {
             if (!entry.Purchased)
             {
-                await merchant.Buy(entry, Owner);
+                await merchant.Buy(entry, Owner, ignoreCost: true);
             }
         }
         foreach (MerchantRelicEntry entry in inventory.Relics.ToArray())
         {
             if (!entry.Purchased)
             {
-                await merchant.Buy(entry, Owner);
+                await merchant.Buy(entry, Owner, ignoreCost: true);
             }
         }
         foreach (MerchantPotionEntry entry in inventory.Potions.ToArray())
         {
             if (!entry.Purchased)
             {
-                await merchant.Buy(entry, Owner);
+                await merchant.Buy(entry, Owner, ignoreCost: true);
             }
         }
 
-        CardModel? cardToRemove = (await CardSelectCmd.SelectCardsAsync(
-            Owner.RunState,
-            Owner,
-            Owner.Deck.Cards.Where(card => card.IsRemovable),
-            minCount: 1,
-            maxCount: 1,
-            source: this,
-            cancelable: false)).FirstOrDefault();
-        if (cardToRemove is not null && !inventory.CardRemoval.Purchased)
+        // 原版 OnTryPurchaseUnsynchronized 在 IsStocked 为 false（删牌已用）时直接返回，不打开选牌。
+        if (inventory.CardRemoval.Purchased)
         {
-            await merchant.BuyCardRemoval(cardToRemove, Owner);
+            return;
+        }
+
+        // 原版 MerchantCardRemovalEntry.DoCardRemoval → CardSelectCmd.FromDeckForRemoval：诅咒排在最前，其余按牌组顺序。
+        CardModel? cardToRemove = (await CardSelectCmd.FromDeckForRemoval(Owner, 1, this)).FirstOrDefault();
+        if (cardToRemove is not null)
+        {
+            await merchant.BuyCardRemoval(cardToRemove, Owner, ignoreCost: true);
         }
     }
 }

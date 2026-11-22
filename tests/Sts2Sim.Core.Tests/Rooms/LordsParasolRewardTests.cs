@@ -8,6 +8,7 @@ using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Models.Relics;
@@ -114,6 +115,10 @@ public sealed class LordsParasolRewardTests : RelicModel, IRunDecisionSource, ID
         Assert.Equal(bought, stock.Potions.Count(entry => entry.Purchased));
         Assert.Equal(bought, probe._trace.Count(item => item == "potion-purchased"));
         Assert.All(stock.Potions.Where(entry => !entry.Purchased), entry => Assert.Null(entry.Potion.Owner));
+        // #1047: game LordsParasol buys with ignoreCost and has no ModifyMerchantPrice; leftover stock keeps its price.
+        Assert.All(stock.Potions.Where(entry => !entry.Purchased), entry =>
+            Assert.True(entry.Price > 0, $"{scenario}: leftover potion must keep its price (MerchantEntry.Cost)"));
+        Assert.True(stock.CardRemoval.Price > 0, $"{scenario}: card removal keeps its price (MerchantCardRemovalEntry.CalcCost)");
         Assert.Equal(probe._goldBefore, player.Gold);
         Assert.True(stock.CardRemoval.Purchased);
         Assert.Equal(1, player.CardRemovalsUsed);
@@ -131,7 +136,12 @@ public sealed class LordsParasolRewardTests : RelicModel, IRunDecisionSource, ID
         var probe = player.Relics.OfType<LordsParasolRewardTests>().Single();
         probe._rewardRelic = rewardRelic;
         probe._scenario = scenario;
-        probe._removed = player.Deck.Cards.First(card => card.IsRemovable);
+        // A curse at the end of the deck: game CardSelectCmd.FromDeckForRemoval lists curses first, so the
+        // parasol's free removal (the probe takes the first candidate) must remove it (#1047).
+        var curse = (CardModel)ModelDb.Card<Clumsy>().MutableClone();
+        curse.AssignOwner(player);
+        await CardPileCmd.AddToDeck(curse);
+        probe._removed = curse;
         probe._goldBefore = player.Gold;
         probe._deckBefore = player.Deck.Cards.Count;
         await RelicCmd.Obtain(ModelDb.Relic<LordsParasol>(), player);
@@ -152,16 +162,17 @@ public sealed class LordsParasolRewardTests : RelicModel, IRunDecisionSource, ID
         _stock = shop.Inventory;
         var relics = (List<MerchantRelicEntry>)shop.Inventory.Relics;
         relics.Clear();
-        relics.Add(new MerchantRelicEntry((RelicModel)ModelDb.Get(_rewardRelic ?? typeof(Vajra)), 0, Owner));
-        relics.Add(new MerchantRelicEntry(ModelDb.Relic<Anchor>(), 0, Owner));
-        relics.Add(new MerchantRelicEntry(ModelDb.Relic<BagOfPreparation>(), 0, Owner));
+        relics.Add(new MerchantRelicEntry((RelicModel)ModelDb.Get(_rewardRelic ?? typeof(Vajra)), 150, Owner));
+        relics.Add(new MerchantRelicEntry(ModelDb.Relic<Anchor>(), 150, Owner));
+        relics.Add(new MerchantRelicEntry(ModelDb.Relic<BagOfPreparation>(), 150, Owner));
         _rewardEntry = _rewardRelic is null ? null : relics[0];
         var potions = (List<MerchantPotionEntry>)shop.Inventory.Potions;
         potions.Clear();
         for (int index = 0; index < 3; index++)
         {
             var potion = (PotionModel)ModelDb.Potion<StrengthPotion>().MutableClone();
-            potions.Add(new MerchantPotionEntry(potion, 0, Owner));
+            // Real prices above the starting gold: the parasol must buy with ignoreCost, not a zero price (#1047).
+            potions.Add(new MerchantPotionEntry(potion, 50, Owner));
             _shelfAttempts.Add(potion, 0);
         }
         return Task.CompletedTask;

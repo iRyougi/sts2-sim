@@ -32,10 +32,13 @@ public sealed class SapphireSeed : EventModel
         Finish();
     }
 
+    /// <summary>原版 <c>Plant</c>：<c>CardSelectCmd.FromDeckForEnchantment(deck.Where(Sown.CanEnchant), Sown, 1, prefs(1))</c>，
+    /// 牌组顺序，由玩家选 1 张。</summary>
     private async Task PlantAsync()
     {
         Sown sown = ModelDb.GetById<Sown>(ModelDb.GetId<Sown>());
-        CardModel? card = Owner.Deck.Cards.FirstOrDefault(sown.CanEnchant);
+        CardModel? card = (await CardSelectCmd.SelectCardsAsync(
+            RunState, Owner, Owner.Deck.Cards.Where(sown.CanEnchant), 1, 1, this)).FirstOrDefault();
         if (card is not null)
         {
             await CardCmd.Enchant<Sown>(card, 1m);

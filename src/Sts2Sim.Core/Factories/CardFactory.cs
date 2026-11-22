@@ -219,6 +219,15 @@ public static class CardFactory
         {
             creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
         }
+        return CreateForEncounterReward(player, optionCount, creationOptions);
+    }
+
+    /// <summary>Same selection as the odds overload, on the caller's options object. #1045: native
+    /// <c>Hook.ModifyCardRewardCreationOptions</c> (PrismaticGem <c>WithCardPools</c>) mutates the caller's
+    /// options in place, so the later <c>TryModifyCardRewardOptions</c> hooks (LastingCandy) see the widened pools.</summary>
+    internal static IReadOnlyList<CardModel> CreateForEncounterReward(
+        Player player, int optionCount, CardCreationOptions creationOptions)
+    {
         var options = new List<CardModel>();
         var selectedCanonicals = new HashSet<CardModel>();
         Random.Rng rng = player.PlayerRng.Rewards;

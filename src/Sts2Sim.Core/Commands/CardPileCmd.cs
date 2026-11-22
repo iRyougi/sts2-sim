@@ -151,7 +151,9 @@ public static class CardPileCmd
 
         // 原版 CardPileCmd.Add 在战斗结束中（例如刚打死最后一个敌人）对战斗牌堆直接返回失败：牌不入堆，
         // Random 位置不抽 Rng.Shuffle，也不派发入场钩子。生成记录与生成钩子在原版 Add 之外，照常进行。
-        if (combatState.IsEnding())
+        // 原版 CardPileCmd.Add 还对牌主已死的牌记失败（生命归零、死亡尚未确认时战斗还不算正在结束，#1049）；
+        // 变形（insertionIndex）走原版 CardCmd.Transform 的 AddInternal，不查这一条。
+        if (combatState.IsEnding() || (insertionIndex is null && owner.Creature.IsDead))
         {
             beforeEntryHook?.Invoke();
             return;
@@ -210,6 +212,11 @@ public static class CardPileCmd
         ArgumentNullException.ThrowIfNull(combatState);
         ArgumentNullException.ThrowIfNull(card);
         if (combatState.IsOverOrEnding())
+        {
+            return null;
+        }
+        // 原版 CardCmd.Exhaust 另查牌主已死（生命归零、死亡尚未确认时战斗还不算正在结束，#1049）。
+        if (card.Owner.Creature.IsDead)
         {
             return null;
         }

@@ -17,8 +17,14 @@ public sealed class RoyalStamp : RelicModel
         var enchantment = (RoyallyApproved)ModelDb.Get(typeof(RoyallyApproved));
         List<CardModel> eligible = Owner.Deck.Cards.Where(enchantment.CanEnchant).ToList();
         eligible.UnstableShuffle(Owner.PlayerRng.NonCombatGeneration);
+        // #1044：原版 CardSelectCmd.FromDeckForEnchantment(IReadOnlyList<CardModel>, ...) 展示前按牌组下标重排
+        // （OrderBy(indexMap)），所以玩家看到的是牌组顺序；上面的洗牌只消耗 NonCombatGeneration。
+        Dictionary<CardModel, int> deckIndex = Owner.Deck.Cards
+            .Select((deckCard, index) => (deckCard, index))
+            .ToDictionary(pair => pair.deckCard, pair => pair.index);
+        List<CardModel> shown = eligible.OrderBy(deckCard => deckIndex[deckCard]).ToList();
         CardModel? card = (await CardSelectCmd.SelectCardsAsync(
-            Owner.RunState, Owner, eligible, 1, 1, this)).FirstOrDefault();
+            Owner.RunState, Owner, shown, 1, 1, this)).FirstOrDefault();
         if (card is not null)
             await CardCmd.Enchant<RoyallyApproved>(card, 1m);
     }

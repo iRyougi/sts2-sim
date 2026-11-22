@@ -84,8 +84,10 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             });
             if (relicType == typeof(RoyalStamp))
             {
+                // Game RoyalStamp.AfterObtained still shuffles on PlayerRng.NonCombatGeneration, but
+                // CardSelectCmd.FromDeckForEnchantment shows the candidates in deck order (#1044).
                 Assert.True(player.PlayerRng.NonCombatGeneration.Counter > noncombatBefore);
-                Assert.False(before.SequenceEqual(Selection.Candidates));
+                Assert.Equal(before.Where(card => Selection.Candidates.Contains(card)), Selection.Candidates);
                 Assert.All(Selection.Candidates, card => Assert.True(card.Type is CardType.Attack or CardType.Skill));
                 Assert.True(enchanted[0].HasKeyword(CardKeyword.Innate));
                 Assert.True(enchanted[0].HasKeyword(CardKeyword.Retain));
@@ -255,6 +257,28 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             Assert.All(starExtra.Options, card => Assert.Equal(CardRarity.Rare, card.Rarity));
             await starRoom.Exit(starRun);
             starRun.PopCurrentRoom();
+
+            // #1045: PrismaticGem widens the native options object in place (CardCreationOptions.WithCardPools), so the
+            // bonus Power of LastingCandy.TryModifyCardRewardOptions is drawn from every character pool, not only Silent's.
+            var silentPoolIds = ModelDb.Character<Silent>().CardPool.AllCards.Select(card => card.Id).ToHashSet();
+            var bonusPowers = new List<CardModel>();
+            for (int seed = 0; seed < 12; seed++)
+            {
+                var gemRun = new RunState($"task3b-candy-prismatic-{seed}", new Overgrowth());
+                Player gemPlayer = Player.CreateForNewRun(ModelDb.Character<Silent>(), gemRun);
+                gemRun.AddPlayer(gemPlayer);
+                await RelicCmd.Obtain(ModelDb.Relic<PrismaticGem>(), gemPlayer);
+                await RelicCmd.Obtain(canonical, gemPlayer);
+                LastingCandy gemCandy = Assert.Single(gemPlayer.Relics.OfType<LastingCandy>());
+                await gemCandy.BeforeCombatRewardOffered(RewardsSet.CreateCustom(gemPlayer,
+                    card: new CardReward(gemPlayer, CardRarityOddsType.RegularEncounter)), null!);
+                var gemReward = new CardReward(gemPlayer, CardRarityOddsType.RegularEncounter);
+                gemReward.Populate(gemRun);
+                Assert.Equal(4, gemReward.Options.Count);
+                bonusPowers.Add(gemReward.Options[^1]);
+            }
+            Assert.All(bonusPowers, card => Assert.Equal(CardType.Power, card.Type));
+            Assert.Contains(bonusPowers, card => !silentPoolIds.Contains(card.Id));
         }
         else if (relicType == typeof(MiniatureTent))
             await VerifyRestFlow(canonical);

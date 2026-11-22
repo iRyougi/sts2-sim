@@ -73,10 +73,14 @@ public sealed class DrawTriggerCardTests : IDisposable
 
         await card.PlayAsync(enemy);
         Assert.NotEqual(PileType.Hand, card.Pile!.Type);
+        CardModel clone = card.CreateClone();
+        CardPileCmd.Add(clone, PileType.Discard);
 
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Equal(PileType.Hand, card.Pile!.Type);
+        Assert.True(PileType.Discard == clone.Pile!.Type,
+            "ThrummingHatchet.BeforeHandDraw: native CardPlayFinishedEntry matches the card instance; a clone has no play history");
     }
 
     [Fact]
@@ -103,10 +107,14 @@ public sealed class DrawTriggerCardTests : IDisposable
 
         await card.PlayAsync(enemy);
         Assert.NotEqual(PileType.Hand, card.Pile!.Type);
+        CardModel clone = card.CreateClone();
+        CardPileCmd.Add(clone, PileType.Discard);
 
         await room.Engine.EndPlayerTurnAsync();
 
         Assert.Equal(PileType.Hand, card.Pile!.Type);
+        Assert.True(PileType.Discard == clone.Pile!.Type,
+            "Bolas.BeforeHandDraw: native CardPlayFinishedEntry matches the card instance; a clone has no play history");
     }
 
     private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed)

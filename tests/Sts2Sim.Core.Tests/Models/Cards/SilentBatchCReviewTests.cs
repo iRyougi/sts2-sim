@@ -29,7 +29,7 @@ public sealed class SilentBatchCReviewTests : IDisposable
         typeof(Acrobatics), typeof(BladeSymphony), typeof(CalculatedGamble),
         typeof(Prepared), typeof(Reflex), typeof(Tactician), typeof(Inky),
         typeof(BatchCReviewProbeRelic), typeof(BatchCMultiHitAttack),
-        typeof(BatchCAllEnemyAttack),
+        typeof(BatchCAllEnemyAttack), typeof(Tingsha),
     ];
 
     public SilentBatchCReviewTests()
@@ -77,7 +77,7 @@ public sealed class SilentBatchCReviewTests : IDisposable
     }
 
     [Fact]
-    public async Task CalculatedGamble_AutoplaysSlyCardsAfterDrawAndOrderedDiscardHooks()
+    public async Task CalculatedGamble_AutoplaysSlyCardsAfterOrderedDiscardHooksAndDraw()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("gamble-sly-order");
         BatchCReviewProbeRelic probe = AttachProbe(player);
@@ -95,8 +95,9 @@ public sealed class SilentBatchCReviewTests : IDisposable
         Assert.Contains(tactician, player.PlayerCombatState.DiscardPile.Cards);
         Assert.Equal(
         [
-            "discard:Reflex:hand=2",
-            "discard:Tactician:hand=2",
+            // 原版 CardCmd.DiscardAndDraw：每张弃牌的钩子在抽牌之前触发（#1048）。
+            "discard:Reflex:hand=1",
+            "discard:Tactician:hand=0",
             "play:Reflex:auto=True",
             "play:Tactician:auto=True",
         ], probe.Events);
@@ -134,6 +135,30 @@ public sealed class SilentBatchCReviewTests : IDisposable
 
         Assert.Equal(1m, Assert.Single(enemy.Powers.OfType<WeakPower>()).Amount);
         Assert.False(probe.SawWeakDuringDamagePost);
+    }
+
+    [Fact]
+    public async Task CalculatedGamble_TingshaKillOnTheFirstDiscardSkipsTheDrawAndItsShuffle()
+    {
+        (Player player, CombatRoom room) = await CreateCombatAsync("gamble-tingsha-kill");
+        await RelicCmd.Obtain(ModelDb.Relic<Tingsha>(), player);
+        Creature enemy = Assert.Single(room.Engine.State.Enemies);
+        enemy.SetCurrentHpInternal(3);
+        CalculatedGamble gamble = AddToPile<CalculatedGamble>(player, PileType.Hand);
+        AddToPile<StrikeSilent>(player, PileType.Hand);
+        AddToPile<DefendSilent>(player, PileType.Hand);
+        AddToPile<Survivor>(player, PileType.Discard);
+        int shuffleCounter = room.Engine.State.RunState.Rng.Shuffle.Counter;
+
+        await room.Engine.PlayCardAsync(player, gamble, null);
+
+        // 原版 CardCmd.DiscardAndDraw：第一张弃牌的 Tingsha 打死最后一个敌人后，第二张的钩子与抽牌都因
+        // IsOverOrEnding 跳过，弃牌堆不洗回抽牌堆（#1048）。
+        Assert.True(enemy.IsDead, "Tingsha.AfterCardDiscarded should kill the 3-HP enemy on the first discard");
+        Assert.Empty(player.PlayerCombatState!.Hand.Cards);
+        Assert.Empty(player.PlayerCombatState.DrawPile.Cards);
+        Assert.True(shuffleCounter == room.Engine.State.RunState.Rng.Shuffle.Counter,
+            "CardPileCmd.DrawInternal must not shuffle once the combat is ending");
     }
 
     [Fact]

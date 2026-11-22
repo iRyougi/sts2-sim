@@ -37,6 +37,7 @@ public sealed class CombatEngine
             IsInProgress = IsInProgress,
             IsStarting = IsStarting,
             Won = Won,
+            _pendingLoss = _pendingLoss,
         };
         return clone;
     }
@@ -55,9 +56,19 @@ public sealed class CombatEngine
     /// <summary>Native setup window: combat hooks run before IsInProgress becomes true.</summary>
     public bool IsStarting { get; private set; }
 
-    /// <summary>Native IsEnding: victory/pending loss while combat is still in progress.
-    /// Single-player pending loss uses the same all-player-dead condition as CheckWinCondition.</summary>
-    public bool IsEnding => IsInProgress && (HasLost || HasWon);
+    /// <summary>原版 <c>CombatManager.IsCombatEnding</c>：战斗进行中且已有待定败北（<c>PendingLoss</c>）或主要敌人全灭。
+    /// 待定败北只在玩家死亡确认后由 <c>CreatureCmd.Kill</c> → <c>LoseCombat</c> 设定；玩家生命归零但防死效果
+    /// （例如 Lizard Tail）尚未结算的窗口里战斗不算正在结束，这段时间的受伤照常记进战斗历史（#1049）。</summary>
+    public bool IsEnding => IsInProgress && (_pendingLoss || HasWon);
+
+    private bool _pendingLoss;
+
+    /// <summary>原版 <c>CombatManager.LoseCombat</c>：玩家死亡确认、全体玩家都已死亡时标记待定败北。</summary>
+    internal void LoseCombat()
+    {
+        if (IsInProgress)
+            _pendingLoss = true;
+    }
 
     public bool IsOverOrEnding => IsEnding || !IsInProgress;
 
@@ -452,7 +463,7 @@ public sealed class CombatEngine
     }
 
     /// <summary>
-    /// 胜负判定,逐字移植 <c>CombatManager.IsEnding</c> 的单人简化版（无多人加时/待定败北的竞态规避)：
+    /// 胜负判定,对应 <c>CombatManager.CheckWinCondition</c> 的单人简化版（无多人加时的竞态规避）；正在结束的判定见 <see cref="IsEnding"/>：
     /// 玩家全灭优先判负；否则若还有存活的主要敌人则未结束；若 <c>Hook.ShouldStopCombatFromEnding</c> 拦截则未结束；
     /// 否则判胜。
     /// </summary>

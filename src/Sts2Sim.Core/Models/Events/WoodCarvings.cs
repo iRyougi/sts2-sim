@@ -41,9 +41,17 @@ public sealed class WoodCarvings : EventModel
     private static bool IsBasicTransformable(CardModel card) =>
         card.Rarity == CardRarity.Basic && card.IsTransformable;
 
+    /// <summary>原版 <c>Bird</c> / <c>Torus</c>：<c>CardSelectCmd.FromDeckGeneric(Owner, prefs(1), IsTransformable &amp;&amp; Basic)</c>，
+    /// 牌组顺序、无排序，由玩家选 1 张。</summary>
+    private Task<CardModel?> SelectBasicTransformableAsync() =>
+        SelectOneAsync(Owner.Deck.Cards.Where(IsBasicTransformable));
+
+    private async Task<CardModel?> SelectOneAsync(IEnumerable<CardModel> candidates) =>
+        (await CardSelectCmd.SelectCardsAsync(RunState, Owner, candidates, 1, 1, this)).FirstOrDefault();
+
     private async Task BirdAsync()
     {
-        CardModel? card = Owner.Deck.Cards.FirstOrDefault(IsBasicTransformable);
+        CardModel? card = await SelectBasicTransformableAsync();
         if (card is not null)
         {
             await CardCmd.TransformTo<Peck>(card, RunState);
@@ -55,7 +63,8 @@ public sealed class WoodCarvings : EventModel
     private async Task SnakeAsync()
     {
         Slither slither = ModelDb.GetById<Slither>(ModelDb.GetId<Slither>());
-        CardModel? card = Owner.Deck.Cards.FirstOrDefault(slither.CanEnchant);
+        // 原版 Snake：CardSelectCmd.FromDeckForEnchantment(Owner, Slither, 1, prefs(1))，牌组顺序。
+        CardModel? card = await SelectOneAsync(Owner.Deck.Cards.Where(slither.CanEnchant));
         if (card is not null)
         {
             await CardCmd.Enchant<Slither>(card, 1m);
@@ -66,7 +75,7 @@ public sealed class WoodCarvings : EventModel
 
     private async Task TorusAsync()
     {
-        CardModel? card = Owner.Deck.Cards.FirstOrDefault(IsBasicTransformable);
+        CardModel? card = await SelectBasicTransformableAsync();
         if (card is not null)
         {
             await CardCmd.TransformTo<ToricToughness>(card, RunState);

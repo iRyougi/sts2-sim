@@ -413,6 +413,39 @@ public sealed class RareRelicBatch2Tests : IDisposable
         Assert.Equal(5, player.PlayerCombatState!.Hand.Cards.Count);
     }
 
+    [Fact]
+    public async Task Pocketwatch_CountsPlaysMadeDuringTurnStartSetupForTheNewTurn()
+    {
+        (RunState runState, Player player) = CreateRun("pocketwatch-setup-play");
+        await Obtain<Pocketwatch>(player);
+        CombatRoom room = CreateCombatRoom();
+        await room.Enter(runState);
+        await room.Engine.EndPlayerTurnAsync();
+        Pocketwatch relic = Assert.Single(player.Relics.OfType<Pocketwatch>());
+        IReadOnlyList<Creature> side = room.Engine.State.Allies;
+        CardModel setupCard = AddToHand<Task8ZeroSkillCard>(player);
+        var play = new CardPlay
+        {
+            Card = setupCard, Player = player, Target = null, ResultPile = PileType.Discard,
+            Resources = new ResourceInfo(0, 0, 0, 0), IsAutoPlay = true, PlayIndex = 0, PlayCount = 1,
+        };
+
+        for (int i = 0; i < 3; i++) await relic.AfterCardPlayed(play);
+        // 原版 CombatManager.StartTurn：BeforeSideTurnStart → SetupPlayerTurn（摸牌、AfterPlayerTurnStart，
+        // 其间可以自动打出牌，例如 Gambling Chip 弃掉的 Sly 牌）→ AfterSideTurnStart。
+        await relic.BeforeSideTurnStart(CombatSide.Player, side);
+        Assert.Equal(8m, relic.ModifyHandDraw(player, 5m));
+        await relic.AfterCardPlayed(play);
+        await relic.AfterSideTurnStart(CombatSide.Player, side);
+        Assert.True(1 == relic.CardsPlayedThisTurn,
+            "Pocketwatch.BeforeSideTurnStart must zero the count; a setup-phase play belongs to the new turn");
+
+        for (int i = 0; i < 3; i++) await relic.AfterCardPlayed(play);
+        await relic.BeforeSideTurnStart(CombatSide.Player, side);
+        Assert.True(5m == relic.ModifyHandDraw(player, 5m),
+            "Pocketwatch.ModifyHandDraw: 1 setup play + 3 plays = 4 > CardThreshold 3, no extra draw");
+    }
+
     private static Task Obtain<TRelic>(Player player)
         where TRelic : RelicModel =>
         RelicCmd.Obtain(ModelDb.Relic<TRelic>(), player);

@@ -7,6 +7,7 @@ using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
+using Sts2Sim.Core.Models.Enchantments;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Runs;
 
@@ -23,9 +24,16 @@ public sealed class DeckSelectionMigrationTests : IDisposable
     [InlineData("AromaOfChaos", "MAINTAIN_CONTROL", "upgrade", 1)]
     [InlineData("DoorsOfLightAndDark", "LIGHT", "upgrade", 1)]
     [InlineData("FieldOfManSizedHoles", "RESIST", "remove", 2)]
+    [InlineData("FieldOfManSizedHoles", "ENTER_YOUR_HOLE", "enchant", 1)]
+    [InlineData("Amalgamator", "COMBINE_STRIKES", "remove", 2)]
+    [InlineData("Amalgamator", "COMBINE_DEFENDS", "remove", 2)]
+    [InlineData("WoodCarvings", "BIRD", "transform", 1)]
+    [InlineData("WoodCarvings", "SNAKE", "enchant", 1)]
+    [InlineData("WoodCarvings", "TORUS", "transform", 1)]
     [InlineData("LuminousChoir", "REACH_INTO_THE_FLESH", "remove", 2)]
     [InlineData("MorphicGrove", "GROUP", "transform", 2)]
     [InlineData("SapphireSeed", "EAT", "upgrade", 1)]
+    [InlineData("SapphireSeed", "PLANT", "enchant", 1)]
     [InlineData("SpiritGrafter", "REJECTION", "upgrade", 1)]
     [InlineData("Wellspring", "BATHE", "remove", 1)]
     [InlineData("WhisperingHollow", "HUG", "transform", 1)]
@@ -59,6 +67,19 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         Assert.Equal(count, request.MinCount); Assert.Equal(count, request.MaxCount);
         Assert.False(request.Cancelable);
         Assert.All(request.Candidates, c => Assert.Contains(c, player.Deck.Cards));
+        Func<CardModel, bool>? gameFilter = (name, option) switch
+        {
+            ("FieldOfManSizedHoles", "ENTER_YOUR_HOLE") => ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>()).CanEnchant,
+            ("Amalgamator", _) => c => c.Tags.Contains(option == "COMBINE_STRIKES" ? CardTag.Strike : CardTag.Defend)
+                && c.Rarity == CardRarity.Basic && c.IsRemovable,
+            ("SapphireSeed", "PLANT") => ModelDb.GetById<Sown>(ModelDb.GetId<Sown>()).CanEnchant,
+            ("WoodCarvings", "SNAKE") => ModelDb.GetById<Slither>(ModelDb.GetId<Slither>()).CanEnchant,
+            ("WoodCarvings", _) => c => c.IsTransformable && c.Rarity == CardRarity.Basic,
+            _ => null,
+        };
+        if (gameFilter is not null)
+            Assert.True(player.Deck.Cards.Where(gameFilter).SequenceEqual(request.Candidates),
+                $"{name}.{option}: game CardSelectCmd.FromDeckForEnchantment / FromDeckForRemoval / FromDeckGeneric offers the filtered deck in deck order");
         if (name == "DoorsOfLightAndDark")
         {
             Assert.Equal(player.Deck.Cards.Where(card => card.IsUpgradable), request.Candidates);
@@ -83,6 +104,11 @@ public sealed class DeckSelectionMigrationTests : IDisposable
         {
             Assert.All(chosen, c => Assert.True(c.IsUpgraded));
             Assert.False(untouched.IsUpgraded);
+        }
+        else if (operation == "enchant")
+        {
+            Assert.All(chosen, c => Assert.Single(c.Enchantments));
+            Assert.Empty(untouched.Enchantments);
         }
         else Assert.All(chosen, c => Assert.DoesNotContain(player.Deck.Cards, other => ReferenceEquals(c, other)));
         if (name == "ZenWeaver") Assert.Equal(option == "EMOTIONAL_AWARENESS" ? 175 : 50, player.Gold);

@@ -312,10 +312,12 @@ public sealed class FoolCrossColorTests : IDisposable
                     var cRun = new RunState($"fool-g6-colorful-offer-{seed}", new Overgrowth());
                     Player cPlayer = Player.CreateForNewRun(ModelDb.Character<Silent>(), cRun);
                     cRun.AddPlayer(cPlayer);
-                    var ev = (ColorfulPhilosophers)ModelDb.Event<ColorfulPhilosophers>().MutableClone();
-                    Assert.True(ev.IsAllowed(cRun));
-                    ev.AssignOwner(cPlayer);
-                    ev.BeginEvent(cRun);
+                    Assert.True(ModelDb.Event<ColorfulPhilosophers>().IsAllowed(cRun));
+                    // EventRoom: RewardsCmd.OfferCustom needs the event to be the current room's event (#1039).
+                    var cRoom = new EventRoom(() => (ColorfulPhilosophers)ModelDb.Event<ColorfulPhilosophers>().MutableClone());
+                    cRun.PushRoom(cRoom);
+                    await cRoom.Enter(cRun);
+                    var ev = (ColorfulPhilosophers)cRoom.Event;
                     if (ev.CurrentOptions.Any(o => o.Key == "FOOL"))
                         foolOfferEvent = ev;
                 }
@@ -333,11 +335,11 @@ public sealed class FoolCrossColorTests : IDisposable
                 }
                 Assert.Equal("REGENT/FOOL/DEFECT | IRONCLAD/REGENT/DEFECT | REGENT/FOOL/DEFECT | IRONCLAD/FOOL/DEFECT | NECROBINDER/IRONCLAD/REGENT | NECROBINDER/FOOL/DEFECT", string.Join(" | ", colorfulKeys));
                 await foolOfferEvent!.ChooseOption(foolOfferEvent.CurrentOptions.Single(o => o.Key == "FOOL"));
-                var foolRewards = new List<RewardsSet>();
-                while (foolOfferEvent.TryDequeuePendingRewardOffer(out RewardsSet? set))
-                    foolRewards.Add(set);
-                Assert.Equal(3, foolRewards.Count);
-                Assert.All(foolRewards, set => Assert.All(set.Card.Options, card => Assert.Contains(card.Id, foolIds)));
+                Assert.True(foolOfferEvent.TryDequeuePendingRewardOffer(out RewardsSet? foolOffer));
+                Assert.False(foolOfferEvent.TryDequeuePendingRewardOffer(out _));
+                CardReward[] foolRewards = foolOffer!.ExtraRewards.Cast<CardReward>().ToArray();
+                Assert.Equal(3, foolRewards.Length);
+                Assert.All(foolRewards, reward => Assert.All(reward.Options, card => Assert.Contains(card.Id, foolIds)));
                 break;
             }
             case "silent_shoot_card_auto_arrow_slot":

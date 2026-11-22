@@ -50,6 +50,22 @@ public sealed class ThrummingHatchet : CardModel, ICardDamageVariableProvider
         return Task.CompletedTask;
     }
 
+    // 原版按 CardPlayFinishedEntry 的卡牌身份查上回合出牌，CreateClone / CreateDupe 出来的新实例没有这条历史；
+    // 整场战斗克隆再由 RestoreCombatCloneReferencesFrom 带回原值（同 Bounce、Fetch）。
+    protected override void AfterCloned()
+    {
+        base.AfterCloned();
+        _playedOnTurnNumber = null;
+    }
+
+    internal override void RestoreCombatCloneReferencesFrom(
+        CardModel source,
+        IReadOnlyDictionary<CardModel, CardModel> cardMap)
+    {
+        base.RestoreCombatCloneReferencesFrom(source, cardMap);
+        _playedOnTurnNumber = ((ThrummingHatchet)source)._playedOnTurnNumber;
+    }
+
     protected override void OnUpgrade() => _damage += 3m;
 
     internal override void AppendCombatStateDescription(

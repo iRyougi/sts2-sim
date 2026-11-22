@@ -141,7 +141,7 @@ public sealed class HiveEventTests : IDisposable
     {
         (RunState run, Player player) = CreateRun("colorful");
         await RelicCmd.Obtain(ModelDb.Relic<Driftwood>(), player);
-        var ev = Begin<ColorfulPhilosophers>(run, player);
+        var ev = await BeginInRoom<ColorfulPhilosophers>(run);
         Assert.True(ev.IsAllowed(run));
         Assert.Equal(NativeFullUnlockColorOrder.OrderBy(id => id, StringComparer.Ordinal),
             ModelDb.AllCharacters.Where(character => character.IsPlayable)
@@ -157,21 +157,18 @@ public sealed class HiveEventTests : IDisposable
         int rewardsBefore = player.PlayerRng.Rewards.Counter;
         await ev.ChooseOption(option);
 
-        var offered = new List<RewardsSet>();
-        while (ev.TryDequeuePendingRewardOffer(out RewardsSet? rewards))
-        {
-            offered.Add(rewards);
-        }
-        Assert.Equal(3, offered.Count);
+        // #1039: game ColorfulPhilosophers.OfferRewards -> RewardsCmd.OfferCustom, one screen with three card rewards.
+        Assert.True(ev.TryDequeuePendingRewardOffer(out RewardsSet? offer));
+        Assert.False(ev.TryDequeuePendingRewardOffer(out _));
+        CardReward[] offered = offer!.ExtraRewards.Cast<CardReward>().ToArray();
         Assert.Equal(new[] { CardRarity.Common, CardRarity.Uncommon, CardRarity.Rare },
-            offered.Select(set => Assert.Single(set.Card.Options.Select(card => card.Rarity).Distinct())));
-        Assert.All(offered, set => Assert.Equal(3, set.Card.Options.Count));
+            offered.Select(reward => Assert.Single(reward.Options.Select(card => card.Rarity).Distinct())));
+        Assert.All(offered, reward => Assert.Equal(3, reward.Options.Count));
         Assert.Equal(18, player.PlayerRng.Rewards.Counter - rewardsBefore);
         var chosenCharacter = ModelDb.AllCharacters.Single(character => character.Id.Entry == option.Key);
         var chosenCards = chosenCharacter.CardPool.AllCards.Select(card => card.Id).ToHashSet();
-        foreach (RewardsSet rewardSet in offered)
+        foreach (CardReward cardReward in offered)
         {
-            CardReward cardReward = rewardSet.Card;
             CardRarity rarity = cardReward.Options[0].Rarity;
             Assert.True(cardReward.CanReroll);
             await cardReward.Reroll();
@@ -652,7 +649,7 @@ public sealed class HiveEventTests : IDisposable
             Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
             run.AddPlayer(player);
             run.AdvanceToNextAct();
-            var ev = Begin<ColorfulPhilosophers>(run, player);
+            var ev = await BeginInRoom<ColorfulPhilosophers>(run);
             int before = player.PlayerRng.Rewards.Counter;
             string[] colors = ["NECROBINDER", "IRONCLAD", "FOOL", "SILENT", "DEFECT"];
             string[] keys = ev.CurrentOptions.Select(candidate => candidate.Key).ToArray();
@@ -661,7 +658,7 @@ public sealed class HiveEventTests : IDisposable
             await ev.ChooseOption(ev.CurrentOptions[^1]);
             Assert.Equal(18, player.PlayerRng.Rewards.Counter - before);
             while (ev.TryDequeuePendingRewardOffer(out RewardsSet? rewards))
-                upgraded += rewards.Card.Options.Count(card => card.IsUpgraded);
+                upgraded += rewards.ExtraRewards.Cast<CardReward>().Sum(reward => reward.Options.Count(card => card.IsUpgraded));
         }
         Assert.True(upgraded > 0);
     }
@@ -701,6 +698,15 @@ public sealed class HiveEventTests : IDisposable
         ev.AssignOwner(player);
         ev.BeginEvent(runState);
         return ev;
+    }
+
+    private static async Task<TEvent> BeginInRoom<TEvent>(RunState runState)
+        where TEvent : EventModel
+    {
+        var room = new EventRoom(() => (TEvent)ModelDb.Event<TEvent>().MutableClone());
+        runState.PushRoom(room);
+        await room.Enter(runState);
+        return (TEvent)room.Event;
     }
 
     private static Task Choose(EventModel ev, string key) =>

@@ -10,6 +10,7 @@ using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Powers;
@@ -659,6 +660,29 @@ public sealed class RareRelicBatch3Tests : IDisposable
 
         Assert.Equal(7, Assert.Single(enemy.Powers.OfType<WeakPower>()).Amount);
         Assert.Equal(9, Assert.Single(enemy.Powers.OfType<VulnerablePower>()).Amount);
+    }
+
+    // #1041: game UnsettlingLamp tests power.GetTypeForAmount(amount), so Malaise's negative Strength arms the lamp
+    // and is doubled; HasDoubledTemporaryPowerSource keeps PiercingWail's internal Strength from being doubled twice.
+    [Theory]
+    [InlineData(nameof(Malaise), -6, 6)]
+    [InlineData(nameof(PiercingWail), -12, 0)]
+    public async Task UnsettlingLamp_DoublesAmountTypedDebuffsOnce(string cardName, int expectedStrength, int expectedWeak)
+    {
+        (RunState runState, Player player) = CreateRun("unsettling-lamp-amount-type");
+        await Obtain<UnsettlingLamp>(player);
+        CombatRoom room = CreateCombatRoom();
+        await room.Enter(runState);
+        Creature enemy = room.Engine.State.Enemies[0];
+        Assert.Equal(3, player.PlayerCombatState!.Energy);
+
+        CardModel card = cardName == nameof(Malaise) ? AddToHand<Malaise>(player) : AddToHand<PiercingWail>(player);
+        await room.Engine.PlayCardAsync(player, card, enemy);
+
+        Assert.True(
+            expectedStrength == enemy.Powers.OfType<StrengthPower>().Sum(power => power.Amount),
+            $"{cardName}: UnsettlingLamp.ModifyPowerAmountGivenMultiplicative should give Strength {expectedStrength}");
+        Assert.Equal(expectedWeak, enemy.Powers.OfType<WeakPower>().Sum(power => power.Amount));
     }
 
     [Fact]

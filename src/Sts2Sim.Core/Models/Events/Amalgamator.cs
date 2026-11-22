@@ -31,9 +31,12 @@ public sealed class Amalgamator : EventModel
         new EventOption("COMBINE_DEFENDS", () => CombineAsync(CardTag.Defend, typeof(UltimateDefend))),
     };
 
+    /// <summary>原版 <c>CombineStrikes</c> / <c>CombineDefends</c>：玩家用
+    /// <c>CardSelectCmd.FromDeckForRemoval</c> 选 2 张（过滤 <see cref="IsValid"/>），按选择顺序移除。</summary>
     private async Task CombineAsync(CardTag tag, Type resultType)
     {
-        foreach (CardModel card in Owner.Deck.Cards.Where(card => IsValid(tag, card)).Take(2).ToList())
+        foreach (CardModel card in (await CardSelectCmd.FromDeckForRemoval(
+                     Owner, 2, this, card => IsValid(tag, card))).ToList())
         {
             await CardPileCmd.RemoveFromDeck(Owner, card);
         }

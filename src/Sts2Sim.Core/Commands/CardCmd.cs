@@ -31,14 +31,22 @@ public static class CardCmd
             return Task.FromResult<T?>(null);
         }
 
+        T applied;
         if (card.Affliction is T existing)
         {
             existing.SetAmount(existing.Amount + amount);
-            return Task.FromResult<T?>(existing);
+            applied = existing;
+        }
+        else
+        {
+            card.AttachAffliction(affliction, amount);
+            applied = affliction;
         }
 
-        card.AttachAffliction(affliction, amount);
-        return Task.FromResult<T?>(affliction);
+        // 原版 CardCmd.Afflict 每次成功都记 CardAfflictedEntry；模拟器只记 ChainsOfBindingPower 读取的 Bound 条目。
+        if (applied is Bound && card.CombatState is Combat.CombatState combat)
+            combat.SemanticHistory.Record(combat, Combat.CombatSemanticHistory.ActorEvent.BoundAfflicted, card.Owner);
+        return Task.FromResult<T?>(applied);
     }
 
     public static void ClearAffliction(Models.CardModel card)
@@ -153,21 +161,17 @@ public static class CardCmd
             return;
         }
 
-        (Combat.ICombatState combatState, Player owner, bool departedHand) =
-            ValidateDiscardBatch(discardCards);
-        // 原版 v0.113.1 DiscardAndDraw：狡诈只在弃牌时该牌位于手牌才触发（#922）。
-        Models.CardModel[] slyCards = discardCards
-            .Where(card => card.Pile?.Type == PileType.Hand && card.HasKeyword(CardKeyword.Sly))
-            .ToArray();
-        await MoveAndBroadcastDiscardCards(combatState, discardCards);
-        await CardPileCmd.NotifyHandDeparture(combatState, owner, departedHand);
-        await AutoPlayCmd.FromCards(combatState, owner, slyCards);
+        // 原版 CardCmd.Discard 即 DiscardAndDraw(cards, 0)。
+        await DiscardAndDraw(discardCards, 0);
     }
 
     /// <summary>
     /// Discards a single owner's selected cards, then draws the requested number for that owner.
     /// An empty selection is a no-op, matching optional discard-and-redraw effects.
     /// </summary>
+    /// <remarks>原版 v0.113.1 <c>CardCmd.DiscardAndDraw</c>：战斗已结束或正在结束时整体不做；逐张弃牌并立即触发
+    /// <c>AfterCardDiscarded</c>（例如 Tingsha 造成伤害），全部弃完后才抽牌——若弃牌钩子已打死最后一个敌人，
+    /// <c>CardPileCmd.Draw</c> 不再抽牌也不洗牌；最后自动打出弃牌时位于手牌的狡诈牌（#922、#1048）。</remarks>
     public static async Task DiscardAndDraw(
         IReadOnlyList<Models.CardModel> cardsToDiscard,
         int cardsToDraw)
@@ -182,18 +186,23 @@ public static class CardCmd
         Models.CardModel[] discardCards = cardsToDiscard.ToArray();
         (Combat.ICombatState combatState, Player owner, bool departedHand) =
             ValidateDiscardBatch(discardCards);
-        // 原版 v0.113.1 DiscardAndDraw：狡诈只在弃牌时该牌位于手牌才触发（#922）。
+        if (combatState.IsOverOrEnding())
+        {
+            return;
+        }
+
         Models.CardModel[] slyCards = discardCards
             .Where(card => card.Pile?.Type == PileType.Hand && card.HasKeyword(CardKeyword.Sly))
             .ToArray();
-        MoveDiscardCards(discardCards);
-
-        await CardPileCmd.Draw(
-            combatState,
-            cardsToDraw,
-            owner,
-            fromHandDraw: false);
-        await BroadcastDiscardHooks(combatState, discardCards);
+        await MoveAndBroadcastDiscardCards(combatState, discardCards);
+        if (cardsToDraw > 0)
+        {
+            await CardPileCmd.Draw(
+                combatState,
+                cardsToDraw,
+                owner,
+                fromHandDraw: false);
+        }
         await CardPileCmd.NotifyHandDeparture(combatState, owner, departedHand);
         await AutoPlayCmd.FromCards(combatState, owner, slyCards);
     }
@@ -229,24 +238,6 @@ public static class CardCmd
         foreach (Models.CardModel card in discardCards)
         {
             MoveDiscardCard(card);
-            await BroadcastDiscardHook(combatState, card);
-        }
-    }
-
-    private static void MoveDiscardCards(IEnumerable<Models.CardModel> discardCards)
-    {
-        foreach (Models.CardModel card in discardCards)
-        {
-            MoveDiscardCard(card);
-        }
-    }
-
-    private static async Task BroadcastDiscardHooks(
-        Combat.ICombatState combatState,
-        IEnumerable<Models.CardModel> discardCards)
-    {
-        foreach (Models.CardModel card in discardCards)
-        {
             await BroadcastDiscardHook(combatState, card);
         }
     }

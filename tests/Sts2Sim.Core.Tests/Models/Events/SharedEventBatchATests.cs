@@ -264,12 +264,14 @@ public sealed class SharedEventBatchATests : IDisposable
         var silver = Assert.Single(player.Relics.OfType<SilverCrucible>());
         run.AdvanceToNextAct();
         var rng = new Rng(24);
-        var game = new CrystalSphereMinigame(player, rng, 1);
+        var game = new CrystalSphereMinigame(player, rng, 2);
         Assert.True(game.PlacedAllItems);
         Assert.Equal(15, rng.Counter);
         var item = game.Items.Single(i => i.Kind == CrystalSphereItemKind.CardReward && i.CardRarity == CardRarity.Common);
         var position = item.Position!.Value;
+        var goldPosition = game.Items.First(i => i.Kind == CrystalSphereItemKind.Gold).Position!.Value;
         int before = rng.Counter, rewardsBefore = player.PlayerRng.Rewards.Counter;
+        await game.RevealAsync(goldPosition.X, goldPosition.Y);
         await game.RevealAsync(position.X, position.Y);
         Assert.Contains(item, game.RevealedItems);
         var cardReward = Assert.Single(game.Rewards.OfType<CardReward>());
@@ -278,7 +280,10 @@ public sealed class SharedEventBatchATests : IDisposable
         Assert.Equal(1, silver.TimesUsed);
         Assert.Equal(3, cardReward.Options.Count);
         Assert.All(cardReward.Options, c => Assert.Equal(CardRarity.Common, c.Rarity));
-        Assert.Equal(6 + game.RevealedItems.Count(i => i.Kind is CrystalSphereItemKind.Potion or CrystalSphereItemKind.Relic),
+        // #1040: fixed gold also draws once in GoldReward.Populate (sphere RNG), in reveal order.
+        Assert.Contains(game.RevealedItems, i => i.Kind == CrystalSphereItemKind.Gold);
+        Assert.Equal(6 + game.RevealedItems.Count(i => i.Kind is CrystalSphereItemKind.Potion or CrystalSphereItemKind.Relic
+                or CrystalSphereItemKind.Gold),
             rng.Counter - before);
         Assert.Equal(rewardsBefore, player.PlayerRng.Rewards.Counter);
         Assert.Contains(cardReward.Options, c => c.IsUpgraded);

@@ -23,6 +23,8 @@ public sealed class CombatSemanticHistory
         DoomApplied,
         /// <summary>原版 <c>CardPlayFinishedEntry.WasEthereal</c>（BansheesCry、PullFromBelow）。</summary>
         EtherealPlayFinished,
+        /// <summary>原版 <c>CardAfflictedEntry</c>，苦痛是 Bound、Actor 是牌主（ChainsOfBindingPower 按本回合条数限量）。</summary>
+        BoundAfflicted,
     }
 
     private readonly List<ExhaustEntry> _exhausts = [];

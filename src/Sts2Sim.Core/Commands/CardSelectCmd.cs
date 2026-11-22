@@ -187,7 +187,8 @@ public static class CardSelectCmd
         Func<CardModel, bool>? filter = null, bool cancelable = false,
         bool? requireManualConfirmation = null)
     {
-        if (combatState.IsEnding())
+        // 原版 CardSelectCmd.FromCombatPile：IsEnding 之外另查玩家已死（#1049）。
+        if (combatState.IsEnding() || player.Creature.IsDead)
             return Task.FromResult<IReadOnlyList<CardModel>>(Array.Empty<CardModel>());
         IEnumerable<CardModel> candidates = pile.Cards.Where(filter ?? (_ => true));
         List<CardModel> options = candidates.ToList();
@@ -240,10 +241,13 @@ public static class CardSelectCmd
         SelectCardsAsync(player.RunState, player,
             player.Deck.Cards.Where(card => card.IsUpgradable), count, count, source);
 
-    public static Task<IReadOnlyList<CardModel>> FromDeckForRemoval(Player player, int count, AbstractModel? source = null) =>
+    /// <summary>原版 <c>CardSelectCmd.FromDeckForRemoval(player, prefs, filter)</c>：可移除的牌再过可选
+    /// <paramref name="filter"/>，诅咒排前，其余按牌组顺序。</summary>
+    public static Task<IReadOnlyList<CardModel>> FromDeckForRemoval(
+        Player player, int count, AbstractModel? source = null, Func<CardModel, bool>? filter = null) =>
         SelectCardsAsync(player.RunState, player,
             player.Creature.IsDead ? Array.Empty<CardModel>() :
-                player.Deck.Cards.Where(card => card.IsRemovable)
+                player.Deck.Cards.Where(card => card.IsRemovable && (filter is null || filter(card)))
                     .OrderBy(card => card.Type == CardType.Curse ? 0 : 1),
             count, count, source);
 
@@ -303,7 +307,8 @@ public static class CardSelectCmd
         bool cancelable = false)
     {
         ArgumentNullException.ThrowIfNull(combatState);
-        if (combatState.IsOverOrEnding())
+        // 原版 CardSelectCmd.FromHand：IsOverOrEnding 之外另查玩家已死（#1049）。
+        if (combatState.IsOverOrEnding() || player.Creature.IsDead)
         {
             return Task.FromResult<IReadOnlyList<CardModel>>(Array.Empty<CardModel>());
         }

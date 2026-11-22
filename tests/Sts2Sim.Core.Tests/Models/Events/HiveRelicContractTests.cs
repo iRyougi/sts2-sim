@@ -195,7 +195,8 @@ public sealed class HiveRelicContractTests : IDisposable
         Assert.Equal(player.MaxEnergy + 1, player.PlayerCombatState!.MaxEnergy);
         int gold = player.Gold;
         int energy = player.PlayerCombatState.Energy;
-        await Hook.AfterEnergyReset(room.Engine.State, player);
+        // #1046: game SealOfGold listens on AfterSideTurnStart (after SetupPlayerTurn), not AfterEnergyReset.
+        await Hook.AfterSideTurnStart(room.Engine.State, Sts2Sim.Core.Combat.CombatSide.Player, [player.Creature]);
         Assert.Equal(gold - 3, player.Gold);
         Assert.Equal(energy + 1, player.PlayerCombatState.Energy);
         player.PlayerCombatState.TurnNumber = 3;
@@ -203,8 +204,10 @@ public sealed class HiveRelicContractTests : IDisposable
         player.PlayerCombatState.Energy = 1;
         await Hook.BeforeSideTurnEnd(room.Engine.State, Sts2Sim.Core.Combat.CombatSide.Player, [player.Creature]);
         player.PlayerCombatState.Energy = 0;
+        gold = player.Gold;
         await Hook.AfterEnergyReset(room.Engine.State, player);
-        Assert.Equal(3, player.PlayerCombatState.Energy);
+        Assert.Equal(2, player.PlayerCombatState.Energy);
+        Assert.True(gold == player.Gold, "SealOfGold must not fire on AfterEnergyReset (game SealOfGold.AfterSideTurnStart)");
         await candle.AfterCombatEnd();
         Assert.Equal(4, candle.KindleCount);
     }

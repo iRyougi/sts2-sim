@@ -57,7 +57,8 @@ public sealed class V01131RngMigrationTests : IDisposable
         var run = keyed ? RunState.CreateKeyedForLabels(seed, [new Overgrowth()]) : new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
-        run.ConfigureCardSelectionSource(new LegacySelectionDecisionSource());
+        var selection = new LegacySelectionDecisionSource();
+        run.ConfigureCardSelectionSource(selection);
         bool combat = effect is "BeatDown" or "Uproar" or "Catastrophe" or "StampedePower" or "EntropyPower" or "ThievingHopper";
         CombatRoom? room = null;
         if (combat)
@@ -162,6 +163,14 @@ public sealed class V01131RngMigrationTests : IDisposable
             if (effect == "DelicateFrond") await relic.BeforeCombatStart();
             if (effect == "WarHammer") await relic.AfterCombatVictory();
             if (effect == "FishingRod") for (int i = 0; i < 3; i++) await relic.AfterCombatEnd();
+            if (effect == "RoyalStamp")
+            {
+                // #1044: game CardSelectCmd.FromDeckForEnchantment orders the shuffled list by deck index before showing it.
+                CardSelectionRequest request = Assert.Single(selection.Requests, request => request.Source is RoyalStamp);
+                CardModel[] deckOrder = player.Deck.Cards.Where(card => request.Candidates.Contains(card)).ToArray();
+                Assert.True(request.Candidates.SequenceEqual(deckOrder, ReferenceEqualityComparer.Instance),
+                    $"seed {seed}: RoyalStamp candidates must follow deck order (CardSelectCmd.FromDeckForEnchantment)");
+            }
         }
 
         if (!combat)
