@@ -8,6 +8,18 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class StoneOfAllTime : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => VisibleDecisionMetadata.Empty;
+
+    protected override VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) => option.Key switch
+    {
+        "LIFT" when _potion is not null => new(option.Key, [VisibleValue.Id("PotionId", _potion.Id.Entry), VisibleValue.Int("MaxHpGain", 10)])
+            { Contents = [VisibleContentProjection.ForPotion(_potion)] },
+        "PUSH" => new(option.Key, [VisibleValue.Int("HpLoss", 6), VisibleValue.Id("EnchantmentId", "VIGOROUS"), VisibleValue.Int("Amount", 8), VisibleValue.Scope("CardType", "Attack"), VisibleValue.Int("SelectCount", 1), VisibleValue.Int("AdditionalDamage", 8)]),
+        "LIFT_LOCKED" => new(option.Key, [VisibleValue.Condition("Requirement", "CarriedPotion")]),
+        "PUSH_LOCKED" => new(option.Key, [VisibleValue.Condition("RequiredCardType", "Attack")]),
+        _ => base.DescribeVisibleOption(option, displayIndex, declared),
+    };
+
     private PotionModel? _potion;
     protected override bool LocksPotions => true;
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: 1 } &&

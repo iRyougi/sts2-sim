@@ -208,10 +208,24 @@ public static class CardFactory
     }
 
     /// <summary>Creates distinct mutable reward options using rarity odds, card selection, then one upgrade roll per option.</summary>
-    public static IReadOnlyList<CardModel> CreateForReward(Player player, int optionCount, CardRarityOddsType oddsType)
+    public static IReadOnlyList<CardModel> CreateForReward(
+        Player player, int optionCount, CardRarityOddsType oddsType, bool isFromCombat = true)
     {
         var creationOptions = new CardCreationOptions([player.Character.CardPool], CardCreationSource.Encounter, oddsType)
-            .WithFlags(CardCreationFlags.IsCardReward | CardCreationFlags.IsFromCombat);
+            .WithFlags(CardCreationFlags.IsCardReward);
+        if (isFromCombat)
+        {
+            creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
+        }
+        return CreateForEncounterReward(player, optionCount, creationOptions);
+    }
+
+    /// <summary>Same selection as the odds overload, on the caller's options object. #1045: native
+    /// <c>Hook.ModifyCardRewardCreationOptions</c> (PrismaticGem <c>WithCardPools</c>) mutates the caller's
+    /// options in place, so the later <c>TryModifyCardRewardOptions</c> hooks (LastingCandy) see the widened pools.</summary>
+    internal static IReadOnlyList<CardModel> CreateForEncounterReward(
+        Player player, int optionCount, CardCreationOptions creationOptions)
+    {
         var options = new List<CardModel>();
         var selectedCanonicals = new HashSet<CardModel>();
         Random.Rng rng = player.PlayerRng.Rewards;

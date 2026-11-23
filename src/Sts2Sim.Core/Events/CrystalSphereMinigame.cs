@@ -67,7 +67,7 @@ public sealed class CrystalSphereMinigame
             {
                 // The source creates rewards only after all divinations; Doubt is applied immediately when revealed.
                 // OneOffSynchronizer first calls ToReward for every item. Only potion construction
-                // draws immediately; card and relic draws occur in the later Populate pass.
+                // draws immediately; gold, relic and card draws occur in the later Populate pass, in reveal order.
                 var prepared = _revealed.Where(item => item.Kind != CrystalSphereItemKind.Curse)
                     .Select(item => (Item: item, Potion: item.Kind == CrystalSphereItemKind.Potion
                         ? CreateReward(item) : null)).ToArray();
@@ -78,6 +78,96 @@ public sealed class CrystalSphereMinigame
         }
         finally { _revealGate.Release(); }
     }
+
+    internal CrystalSphereMinigame CloneExactForRun(
+        Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        if (_revealGate.CurrentCount != 1)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "A sphere reveal is still executing.");
+        return new CrystalSphereMinigame(this, owner, rng, mapItem, mapReward, registerGame);
+    }
+
+    private CrystalSphereMinigame(CrystalSphereMinigame source, Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        _owner = owner;
+        _rng = rng;
+        // Publish before reward/card closures can point back to this same game.
+        registerGame(source, this);
+        Array.Copy(source._hidden, _hidden, source._hidden.Length);
+        DivinationCount = source.DivinationCount;
+        PlacedAllItems = source.PlacedAllItems;
+        _items.AddRange(source._items.Select(mapItem));
+        _revealed.AddRange(source._revealed.Select(mapItem));
+        for (int x = 0; x < Width; x++)
+            for (int y = 0; y < Height; y++)
+                _occupants[x, y] = source._occupants[x, y] is { } item ? mapItem(item) : null;
+        Rewards = Array.AsReadOnly(source.Rewards.Select(mapReward).ToArray());
+        // Fresh reveal gate; no RevealAsync/Clear/CreateReward/curse or RNG draws.
+    }
+
+    internal CrystalSphereMinigame CloneReseededForRun(
+        Player owner, Rng rng, Func<CrystalSphereItem, CrystalSphereItem> mapVisibleItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame,
+        Action<CrystalSphereItem, CrystalSphereItem> registerVisibleItem)
+    {
+        if (_revealGate.CurrentCount != 1)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "A sphere reveal is still executing.");
+        if (DivinationCount == 0)
+        {
+            // No board outcome can be consumed after the final divination. Retain only
+            // public items and frozen rewards, not the old concealed item catalogue.
+            return CloneResolvedVisibleForRun(owner, rng, mapVisibleItem, mapReward, registerGame);
+        }
+
+        // #563: this event's layout (including fixed gold/Doubt) is an approved
+        // information-boundary exception. Copy it through the existing identity map;
+        // future potion/card/relic content still uses this clone's RNG at settlement.
+        // The copy constructor creates a fresh reveal gate and invokes no reveal,
+        // reward, curse or RNG side effects. Never rejection-sample a late board.
+        return new CrystalSphereMinigame(this, owner, rng, mapVisibleItem, mapReward, registerGame);
+    }
+
+    private CrystalSphereMinigame(Player owner, Rng rng)
+    {
+        _owner = owner;
+        _rng = rng;
+    }
+
+    private CrystalSphereMinigame CloneResolvedVisibleForRun(Player owner, Rng rng,
+        Func<CrystalSphereItem, CrystalSphereItem> mapVisibleItem,
+        Func<Reward, Reward> mapReward,
+        Action<CrystalSphereMinigame, CrystalSphereMinigame> registerGame)
+    {
+        var target = new CrystalSphereMinigame(owner, rng);
+        registerGame(this, target);
+        Array.Copy(_hidden, target._hidden, _hidden.Length);
+        target.DivinationCount = DivinationCount;
+        target.PlacedAllItems = PlacedAllItems;
+        var included = new HashSet<CrystalSphereItem>(ReferenceEqualityComparer.Instance);
+        foreach (CrystalSphereItem known in _revealed)
+        {
+            CrystalSphereItem copied = mapVisibleItem(known);
+            target._revealed.Add(copied);
+            if (!included.Add(known)) continue;
+            target._items.Add(copied);
+            if (copied.Position is not { } position) continue;
+            for (int dx = 0; dx < copied.Width; dx++)
+                for (int dy = 0; dy < copied.Height; dy++)
+                    target._occupants[position.X + dx, position.Y + dy] = copied;
+        }
+        target.Rewards = Array.AsReadOnly(Rewards.Select(mapReward).ToArray());
+        return target;
+    }
+
 
     private bool PopulateItems()
     {
@@ -144,7 +234,12 @@ public sealed class CrystalSphereMinigame
         switch (item.Kind)
         {
             case CrystalSphereItemKind.Gold:
-                return new GoldReward(item.IsBigGold ? 30 : 10, _owner);
+                // #1040: native RewardsSet.GenerateWithoutOffering populates every custom reward, and
+                // GoldReward.Populate draws NextInt(amount, amount + 1) from the sphere RNG
+                // (CrystalSphereGold.ToReward sets it) even though the amount is fixed.
+                var gold = new GoldReward(item.IsBigGold ? 30 : 10, _owner);
+                gold.Populate(_owner.RunState, _rng);
+                return gold;
             case CrystalSphereItemKind.Potion:
                 var potion = _rng.NextItem(PotionFactory.GetOutOfCombatPool(_owner)
                     .Where(p => p.Rarity == item.PotionRarity))!;

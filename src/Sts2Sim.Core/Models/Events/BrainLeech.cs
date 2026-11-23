@@ -11,6 +11,11 @@ namespace Sts2Sim.Core.Models.Events;
 public sealed class BrainLeech : EventModel
 {
     public override bool IsAllowed(IRunState runState) => runState is not RunState { CurrentActIndex: >= 2 };
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("SHARE_KNOWLEDGE", [VisibleValue.Int("CardChoiceCount", 1), VisibleValue.Int("FromCardChoiceCount", 5)]),
+        new("RIP", [VisibleValue.Int("RipHpLoss", 5), VisibleValue.Int("RewardCount", 1), VisibleValue.Scope("RewardKind", "ColorlessCardReward")])
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
         [new("SHARE_KNOWLEDGE", ShareKnowledge), new("RIP", Rip)];
 

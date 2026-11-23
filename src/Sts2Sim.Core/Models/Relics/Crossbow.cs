@@ -31,7 +31,7 @@ public sealed class Crossbow : RelicModel
             return;
         }
 
-        generated.MakeTemporaryFreeThisTurn();
+        generated.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
         await CardPileCmd.Generate(Owner.Creature.CombatState!, generated, PileType.Hand);
     }
 }

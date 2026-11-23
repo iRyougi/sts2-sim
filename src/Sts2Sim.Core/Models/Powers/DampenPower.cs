@@ -23,7 +23,7 @@ public sealed class DampenPower : PowerModel
                      .Where(card => card.IsUpgraded))
         {
             _downgraded[card] = card.CurrentUpgradeLevel;
-            card.Downgrade();
+            CardCmd.Downgrade(card);
         }
 
         return Task.CompletedTask;
@@ -43,7 +43,7 @@ public sealed class DampenPower : PowerModel
     {
         foreach ((CardModel card, int level) in _downgraded)
         {
-            while (card.CurrentUpgradeLevel < level)
+            for (int i = 0; i < level; i++)
             {
                 CardCmd.Upgrade(card);
             }

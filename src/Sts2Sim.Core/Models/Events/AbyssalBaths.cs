@@ -14,6 +14,12 @@ public sealed class AbyssalBaths : EventModel
     private int _lingerCount;
     private decimal _damage = BaseDamage;
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("IMMERSE", [VisibleValue.Int("MaxHp", 2), VisibleValue.Int("Damage", (int)_damage)]),
+        new("LINGER", [VisibleValue.Int("MaxHp", 2), VisibleValue.Int("Damage", (int)_damage)]),
+        new("ABSTAIN", [VisibleValue.Int("Heal", 10)]),
+    ]);
+
     protected override void CalculateVars() => _damage = BaseDamage;
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>

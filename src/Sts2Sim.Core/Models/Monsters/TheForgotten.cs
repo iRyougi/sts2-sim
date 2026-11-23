@@ -17,8 +17,10 @@ public sealed class TheForgotten : MonsterModel
     private int Dread => Value(AscensionLevel.DeadlyEnemies, 15, 13) +
                          (int)(Creature.GetPower<DexterityPower>()?.Amount ?? 0);
 
-    public override Task BeforeCombatStart() =>
-        PowerCmd.Apply<PossessSpeedPower>(Creature.CombatState!, Creature, 1m, null, null);
+    public override async Task AfterAddedToRoom()
+    {
+        await PowerCmd.Apply<PossessSpeedPower>(Creature.CombatState!, Creature, 1m, null, null);
+    }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {

@@ -261,10 +261,12 @@ public sealed class GloryEventTests : IDisposable
             }
         }
         var ev = Begin<Reflections>(runState, player);
+        int rngBefore = ev.Rng.Counter;
 
         await Choose(ev, "TOUCH_A_MIRROR");
 
         Assert.Equal(4, player.Deck.Cards.Count(card => card.IsUpgraded));
+        Assert.Equal(6, ev.Rng.Counter - rngBefore);
         Assert.True(ev.IsFinished);
     }
 
@@ -542,7 +544,7 @@ public sealed class GloryEventTests : IDisposable
         else
         {
             CardModel generated = Assert.Single(player.PlayerCombatState!.Hand.Cards);
-            Assert.True(generated.TemporaryFreeThisTurn);
+            Assert.True((generated.TemporaryCostOverrideThisTurnOrUntilPlayed == 0));
         }
     }
 
@@ -567,7 +569,7 @@ public sealed class GloryEventTests : IDisposable
         CardModel generated = Assert.Single(player.PlayerCombatState!.Hand.Cards);
         Assert.Equal(Assert.Single(expected).Id, generated.Id);
         Assert.Equal(probe.Counter - counterBefore, rng.Counter - counterBefore);
-        Assert.True(generated.TemporaryFreeThisTurn);
+        Assert.True((generated.TemporaryCostOverrideThisTurnOrUntilPlayed == 0));
     }
 
     [Theory]

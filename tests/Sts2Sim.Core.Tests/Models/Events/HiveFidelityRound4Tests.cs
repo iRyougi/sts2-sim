@@ -85,6 +85,7 @@ public sealed class HiveFidelityRound4Tests : IDisposable
 
         player.ResetCombatState();
         player.PopulateCombatState(new Rng(7uL));
+        player.ArrangeDrawPileForFirstHand();
 
         IReadOnlyList<CardModel> drawPile = player.PlayerCombatState!.DrawPile.Cards;
         CardModel combatImbuedInnate = Assert.Single(drawPile,

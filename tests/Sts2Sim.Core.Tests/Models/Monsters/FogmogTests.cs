@@ -78,7 +78,7 @@ public sealed class FogmogTests : IDisposable
         int expectedSwipeDamage,
         int expectedHeadbuttDamage)
     {
-        Fogmog inspected = CreateStructuralFogmog(ascension, "fogmog-structure");
+        Fogmog inspected = CreateStructuralFogmog(ascension, "fogmog-branch-4");
         MonsterMoveStateMachine machine = inspected.MoveStateMachine!;
         MoveState illusion = Assert.IsType<MoveState>(machine.States["ILLUSION_MOVE"]);
         MoveState swipe = Assert.IsType<MoveState>(machine.States["SWIPE_MOVE"]);
@@ -118,31 +118,40 @@ public sealed class FogmogTests : IDisposable
             state => AssertBranch(state, "SWIPE_RANDOM_MOVE", 0.4f),
             state => AssertBranch(state, "HEADBUTT_MOVE", 0.6f));
 
-        int swipeRandomCount = 0;
-        int headbuttCount = 0;
-        for (int seed = 0; seed < 256; seed++)
+        if (ascension != 0)
+            return; // Both rows retain graph/intents; random topology is ascension-independent.
+
+        const string illusionId = "ILLUSION_MOVE", swipeId = "SWIPE_MOVE";
+        const string randomSwipeId = "SWIPE_RANDOM_MOVE", headbuttId = "HEADBUTT_MOVE";
+        var witnesses = new[]
         {
-            Fogmog fogmog = CreateStructuralFogmog(ascension, $"fogmog-branch-{seed}");
-            Assert.Equal("ILLUSION_MOVE", fogmog.NextMove!.StateId);
-            fogmog.MoveStateMachine!.OnMovePerformed(fogmog.NextMove);
-            fogmog.RollMove(fogmog.Creature.CombatState!.Allies);
-            Assert.Equal("SWIPE_MOVE", fogmog.NextMove!.StateId);
-            fogmog.MoveStateMachine.OnMovePerformed(fogmog.NextMove);
-            fogmog.RollMove(fogmog.Creature.CombatState.Allies);
-            if (fogmog.NextMove!.StateId == "SWIPE_RANDOM_MOVE")
+            (Seed: 4, Moves: new[] { illusionId, swipeId, randomSwipeId, headbuttId, swipeId, headbuttId, swipeId },
+                InitialRng: (2114714368296200267UL, 5355718624399310421UL, 971672238006141679UL, 8413031386188848677UL)),
+            (Seed: 0, Moves: new[] { illusionId, swipeId, headbuttId, swipeId, headbuttId, swipeId, headbuttId },
+                InitialRng: (214913823484131689UL, 2710796473368640764UL, 15182363428569358517UL, 6351179354232170191UL)),
+        };
+        foreach (var witness in witnesses)
+        {
+            Fogmog fogmog = witness.Seed == 4 ? inspected : CreateStructuralFogmog(ascension, $"fogmog-branch-{witness.Seed}");
+            var rng = fogmog.Creature.CombatState!.RunState.Rng.MonsterAi;
+            var initialRng = rng.ToSerializable();
+            Assert.Equal(0, initialRng.counter);
+            Assert.Equal(witness.InitialRng, (initialRng.state0, initialRng.state1, initialRng.state2, initialRng.state3));
+            Assert.Equal(illusionId, fogmog.NextMove!.StateId);
+            Assert.Equal(witness.Moves.Take(1), fogmog.MoveStateMachine!.StateLog.Select(state => state.Id));
+            var expectedRng = rng.CloneExact();
+            for (int turn = 0; turn < witness.Moves.Length - 1; turn++)
             {
-                swipeRandomCount++;
-            }
-            else
-            {
-                Assert.Equal("HEADBUTT_MOVE", fogmog.NextMove.StateId);
-                headbuttCount++;
+                // Only SWIPE -> BRANCH draws; fixed edges must leave the full RNG state untouched.
+                if (witness.Moves[turn] == swipeId)
+                    expectedRng.NextFloat();
+                fogmog.MoveStateMachine.OnMovePerformed(fogmog.NextMove!);
+                fogmog.RollMove(fogmog.Creature.CombatState.Allies);
+                Assert.True(fogmog.NextMove!.StateId == witness.Moves[turn + 1], $"seed={witness.Seed}, turn={turn}");
+                Assert.Equal(witness.Moves.Take(turn + 2), fogmog.MoveStateMachine.StateLog.Select(state => state.Id));
+                Assert.Equal(expectedRng.ToSerializable(), rng.ToSerializable());
             }
         }
-
-        Assert.InRange(swipeRandomCount, 75, 130);
-        Assert.InRange(headbuttCount, 125, 180);
-        Assert.Equal(256, swipeRandomCount + headbuttCount);
     }
 
     [Theory]

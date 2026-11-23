@@ -1,4 +1,5 @@
 using Sts2Sim.Core.Combat;
+using Sts2Sim.Core.Combat.StateDescription;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
@@ -142,15 +143,52 @@ public sealed class GeneratedCardRepairTask7Tests : IDisposable
     [Fact]
     public async Task Monologue_SeparateCopiesTriggerIndependentlyWithoutNewCopyTriggeringItself()
     {
-        (Player[] players, CombatRoom room) = await CreateCombatAsync("task7-monologue-multiple", 1);
-        Player owner = players[0];
+        var run = new RunState("129h-monologue-natural-a10", new Overgrowth(), ascensionLevel: 10);
+        Player owner = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(owner);
+        var room = new CombatRoom(() => (MonsterModel)ModelDb.Monster<TwigSlimeM>().MutableClone());
+        await room.Enter(run);
+        Monologue firstCard = AddTo<Monologue>(owner, PileType.Hand);
+        Monologue secondCard = AddTo<Monologue>(owner, PileType.Hand);
+        DefendRegent defend = AddTo<DefendRegent>(owner, PileType.Hand);
+        var displayProperty = typeof(PowerModel).GetProperty("DisplayAmount");
 
-        await room.Engine.PlayCardAsync(owner, AddTo<Monologue>(owner, PileType.Hand), null);
-        await room.Engine.PlayCardAsync(owner, AddTo<Monologue>(owner, PileType.Hand), null);
+        await room.Engine.PlayCardAsync(owner, firstCard, null);
+        MonologuePower firstPower = owner.Creature.Powers.OfType<MonologuePower>().Single();
+        int? firstDisplay = (int?)displayProperty?.GetValue(firstPower);
+        await room.Engine.PlayCardAsync(owner, secondCard, null);
+        MonologuePower[] powers = owner.Creature.Powers.OfType<MonologuePower>().ToArray();
+        Assert.Equal(PowerStackType.Counter, powers[0].StackType);
+        Assert.Equal<int?>(0, firstDisplay);
         Assert.Equal(1, owner.Creature.Powers.OfType<StrengthPower>().Single().Amount);
-        Assert.Equal(2, owner.Creature.Powers.Count(power => power.GetType().Name == "MonologuePower"));
-        await room.Engine.PlayCardAsync(owner, AddTo<Task7ProbeSkill>(owner, PileType.Hand), null);
+        Assert.Equal(new[] { 1, 1 }, powers.Select(power => power.Amount).ToArray());
+        Assert.Equal(new int?[] { 1, 0 }, powers.Select(power => (int?)displayProperty?.GetValue(power)).ToArray());
+        Assert.Equal(PowerStackType.None, powers[1].StackType);
+
+        CombatState cloned = room.Engine.State.Clone(out CombatCloneMap map);
+        Player cloneOwner = map.Player(owner);
+        MonologuePower[] clonePowers = cloneOwner.Creature.Powers.OfType<MonologuePower>().ToArray();
+        var originalDescription = new CombatStateDescriptionBuilder();
+        var cloneDescription = new CombatStateDescriptionBuilder();
+        CombatStateDescription.AppendExactState(ref originalDescription, room.Engine.State);
+        CombatStateDescription.AppendExactState(ref cloneDescription, cloned);
+        Assert.Equal(originalDescription.Build(), cloneDescription.Build());
+        await cloned.Engine!.PlayCardAsync(cloneOwner, map.Card(defend), null);
+        Assert.Equal(3, cloneOwner.Creature.Powers.OfType<StrengthPower>().Single().Amount);
+        Assert.Equal(new int?[] { 2, 1 }, clonePowers.Select(power => (int?)displayProperty?.GetValue(power)).ToArray());
+        Assert.Equal(new[] { 1, 1 }, clonePowers.Select(power => power.Amount).ToArray());
+        Assert.All(clonePowers, power => Assert.Equal(PowerStackType.Counter, power.StackType));
+        Assert.Equal(1, owner.Creature.Powers.OfType<StrengthPower>().Single().Amount);
+        Assert.Equal(new int?[] { 1, 0 }, powers.Select(power => (int?)displayProperty?.GetValue(power)).ToArray());
+
+        await room.Engine.PlayCardAsync(owner, defend, null);
         Assert.Equal(3, owner.Creature.Powers.OfType<StrengthPower>().Single().Amount);
+        Assert.Equal(new int?[] { 2, 1 }, powers.Select(power => (int?)displayProperty?.GetValue(power)).ToArray());
+        Assert.All(powers, power => Assert.Equal(PowerStackType.Counter, power.StackType));
+        await cloned.Engine.EndPlayerTurnAsync();
+        await room.Engine.EndPlayerTurnAsync();
+        Assert.DoesNotContain(owner.Creature.Powers, power => power is StrengthPower or MonologuePower);
+        Assert.DoesNotContain(cloneOwner.Creature.Powers, power => power is StrengthPower or MonologuePower);
     }
 
     [Fact]

@@ -23,6 +23,8 @@ public sealed class CombatSemanticHistory
         DoomApplied,
         /// <summary>原版 <c>CardPlayFinishedEntry.WasEthereal</c>（BansheesCry、PullFromBelow）。</summary>
         EtherealPlayFinished,
+        /// <summary>原版 <c>CardAfflictedEntry</c>，苦痛是 Bound、Actor 是牌主（ChainsOfBindingPower 按本回合条数限量）。</summary>
+        BoundAfflicted,
     }
 
     private readonly List<ExhaustEntry> _exhausts = [];
@@ -31,6 +33,34 @@ public sealed class CombatSemanticHistory
     private readonly List<EnergySpentEntry> _energySpent = [];
     private readonly List<CardDrawnEntry> _cardDrawn = [];
     private readonly List<ActorEventEntry> _actorEvents = [];
+    // sls2 补丁：原版 CombatHistory.CardPlaysFinished（出牌结算完毕的记录），观测编码按回合数出牌、按类型分、判断某张牌本回合打过没有
+    private readonly List<CardPlayEntry> _cardPlays = [];
+
+    internal void RecordCardPlayFinished(CombatState state, CardModel card, CardPlay? play) =>
+        _cardPlays.Add(new CardPlayEntry(CaptureTurnKey(state), PlayerIndex(state, card.Owner), card.Type, card, play?.IsAutoPlay ?? false));
+
+    /// <summary>sls2 补丁：本回合这名玩家结算完毕的出牌（牌、类型、是否自动打出），按发生顺序。</summary>
+    public IEnumerable<(CardModel? Card, CardType Type, bool AutoPlay)> CardPlaysThisTurn(CombatState state, Player actor)
+    {
+        int actorIndex = PlayerIndex(state, actor);
+        return _cardPlays.Where(e => e.ActorIndex == actorIndex && e.Turn.HappenedThisTurn(state)).Select(e => (e.Card, e.Type, e.AutoPlay));
+    }
+
+    /// <summary>sls2 补丁：本场这名玩家结算完毕的出牌数。</summary>
+    public int CardPlaysThisCombat(CombatState state, Player actor) => _cardPlays.Count(e => e.ActorIndex == PlayerIndex(state, actor));
+
+    /// <summary>sls2 补丁：本回合这名玩家抽到的牌数（含回合抽牌）。</summary>
+    public int CountCardsDrawnThisTurn(CombatState state, Player actor)
+    {
+        int actorIndex = PlayerIndex(state, actor);
+        return _cardDrawn.Count(e => e.ActorIndex == actorIndex && e.Turn.HappenedThisTurn(state));
+    }
+
+    /// <summary>sls2 补丁：本场这名玩家消耗的牌数。</summary>
+    public int CountCardsExhaustedThisCombat(CombatState state, Player actor) => _exhausts.Count(e => e.ActorIndex == PlayerIndex(state, actor));
+
+    /// <summary>sls2 补丁：本场这名玩家生成的充能球数（各类合计）。</summary>
+    public int CountOrbsChanneledThisCombat(CombatState state, Player actor) => _orbChannels.Count(e => e.ActorIndex == PlayerIndex(state, actor));
 
     internal void Record(CombatState state, ActorEvent kind, Player actor) =>
         _actorEvents.Add(new ActorEventEntry(kind, CaptureTurnKey(state), PlayerIndex(state, actor)));
@@ -135,9 +165,15 @@ public sealed class CombatSemanticHistory
              entry.PlayOrdinal != currentPlay.PlayOrdinal));
     }
 
-    internal CombatSemanticHistory Clone()
+    internal CombatSemanticHistory Clone(IReadOnlyDictionary<CardModel, CardModel>? cardMap = null)
     {
         var clone = new CombatSemanticHistory();
+        // sls2 补丁：出牌记录里的牌按复制时的对照表换到新战斗里的那张（不在表里的，如已移出战斗的能力牌，记为空）
+        clone._cardPlays.AddRange(_cardPlays.Select(entry => entry with
+        {
+            Turn = entry.Turn.Copy(),
+            Card = entry.Card is { } c && cardMap != null && cardMap.TryGetValue(c, out var m) ? m : null,
+        }));
         clone._exhausts.AddRange(_exhausts.Select(entry => entry with
         {
             Turn = entry.Turn.Copy(),
@@ -241,6 +277,8 @@ public sealed class CombatSemanticHistory
         TurnKey Turn, int ActorIndex, CardType CardType, bool FromHandDraw);
 
     private readonly record struct ActorEventEntry(ActorEvent Kind, TurnKey Turn, int ActorIndex);
+
+    private readonly record struct CardPlayEntry(TurnKey Turn, int ActorIndex, CardType Type, CardModel? Card, bool AutoPlay);
 
     private readonly record struct TurnKey(
         int RoundNumber, CombatSide Side, int?[] PlayerTurnNumbers)

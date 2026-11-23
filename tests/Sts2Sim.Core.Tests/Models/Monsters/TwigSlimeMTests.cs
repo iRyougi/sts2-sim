@@ -79,66 +79,44 @@ public sealed class TwigSlimeMTests : IDisposable
     }
 
     [Fact]
-    public async Task RandomBranch_HasExactStructureAndRuntimeWeightAndRepeatSemantics()
+    public async Task RandomBranch_FixedWitnessesPreserveMaxRepeatsAndRng()
     {
-        int secondPounceCount = 0;
-        var seen = new HashSet<string>();
-        bool sawConsecutivePounces = false;
-
-        for (int seed = 0; seed < 256; seed++)
+        const string sticky = "STICKY_SHOT_MOVE", pounce = "POKEY_POUNCE_MOVE";
+        var witnesses = new[]
+        {
+            (Seed: 0, Moves: new[] { sticky, pounce, sticky, pounce, pounce, sticky, pounce, sticky, pounce, sticky, pounce, sticky, pounce },
+                InitialRng: (9937034638475005148UL, 14376960492370911095UL, 10614205917749785383UL, 9053439162056752296UL)),
+            (Seed: 2, Moves: new[] { sticky, pounce, pounce, sticky, pounce, pounce, sticky, pounce, pounce, sticky, pounce, sticky, pounce },
+                InitialRng: (17159920646715611841UL, 13935912709447806983UL, 14200218110477237111UL, 8194906899183382082UL)),
+        };
+        foreach (var witness in witnesses)
         {
             (TwigSlimeM monster, var room, _) = await Task15MonsterTestFixture.CreateCombatAsync<TwigSlimeM>(
-                0,
-                $"twig-slime-m-random-{seed}",
-                playerCount: 1);
-            var sequence = new List<string> { monster.NextMove!.StateId };
-
-            for (int turn = 0; turn < 12; turn++)
+                0, $"twig-slime-m-random-{witness.Seed}", playerCount: 1);
+            MonsterMoveStateMachine machine = monster.MoveStateMachine!;
+            RandomBranchState branch = Assert.IsType<RandomBranchState>(machine.States["RAND"]);
+            Assert.Collection(
+                branch.States,
+                state => AssertBranch(state, pounce, MoveRepeatType.CanRepeatXTimes, 1f),
+                state => AssertBranch(state, sticky, MoveRepeatType.CannotRepeat, 1f));
+            Assert.Equal(2, branch.States[0].MaxTimes);
+            var rng = room.Engine.State.RunState.Rng.MonsterAi;
+            var initial = rng.ToSerializable();
+            Assert.Equal(0, initial.counter);
+            Assert.Equal(witness.InitialRng, (initial.state0, initial.state1, initial.state2, initial.state3));
+            Assert.Equal(sticky, monster.NextMove!.StateId);
+            Assert.Equal(witness.Moves.Take(1), machine.StateLog.Select(state => state.Id));
+            var expectedRng = rng.CloneExact();
+            for (int turn = 0; turn < witness.Moves.Length - 1; turn++)
             {
-                monster.MoveStateMachine!.OnMovePerformed(monster.NextMove!);
+                expectedRng.NextFloat();
+                machine.OnMovePerformed(monster.NextMove!);
                 monster.RollMove(room.Engine.State.Allies);
-                sequence.Add(monster.NextMove!.StateId);
+                Assert.True(monster.NextMove!.StateId == witness.Moves[turn + 1], $"seed={witness.Seed}, turn={turn}");
+                Assert.Equal(witness.Moves.Take(turn + 2), machine.StateLog.Select(state => state.Id));
+                Assert.Equal(expectedRng.ToSerializable(), rng.ToSerializable());
             }
-
-            Assert.Equal("STICKY_SHOT_MOVE", sequence[0]);
-            Assert.Equal("POKEY_POUNCE_MOVE", sequence[1]);
-            if (sequence[2] == "POKEY_POUNCE_MOVE")
-            {
-                secondPounceCount++;
-            }
-
-            for (int index = 1; index < sequence.Count; index++)
-            {
-                Assert.Contains(sequence[index], new[] { "POKEY_POUNCE_MOVE", "STICKY_SHOT_MOVE" });
-                Assert.False(
-                    sequence[index - 1] == "STICKY_SHOT_MOVE" && sequence[index] == "STICKY_SHOT_MOVE",
-                    string.Join(",", sequence));
-                if (index >= 2)
-                    Assert.False(sequence.Skip(index - 2).Take(3).All(id => id == "POKEY_POUNCE_MOVE"),
-                        string.Join(",", sequence));
-                sawConsecutivePounces |=
-                    sequence[index - 1] == "POKEY_POUNCE_MOVE" && sequence[index] == "POKEY_POUNCE_MOVE";
-            }
-
-            seen.UnionWith(sequence);
         }
-
-        Assert.InRange(secondPounceCount, 100, 156);
-        Assert.True(sawConsecutivePounces);
-        Assert.Equal(
-            new[] { "POKEY_POUNCE_MOVE", "STICKY_SHOT_MOVE" },
-            seen.OrderBy(id => id));
-
-        (TwigSlimeM inspected, _, _) = await Task15MonsterTestFixture.CreateCombatAsync<TwigSlimeM>(
-            0,
-            "twig-slime-m-structure",
-            playerCount: 1);
-        RandomBranchState branch = Assert.IsType<RandomBranchState>(inspected.MoveStateMachine!.States["RAND"]);
-        Assert.Collection(
-            branch.States,
-            state => AssertBranch(state, "POKEY_POUNCE_MOVE", MoveRepeatType.CanRepeatXTimes, 1f),
-            state => AssertBranch(state, "STICKY_SHOT_MOVE", MoveRepeatType.CannotRepeat, 1f));
-        Assert.Equal(2, branch.States[0].MaxTimes);
     }
 
     private static void AssertBranch(

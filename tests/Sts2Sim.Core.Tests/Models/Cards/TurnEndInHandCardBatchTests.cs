@@ -88,6 +88,28 @@ internal sealed class HandMutationOnTurnEndCard : CardModel
     }
 }
 
+// Plan 09-S1-399: isolates the source's dependency graph with a controllable effect pause.
+// This is a source-derived contract probe, not a claim of a native-host gameplay replay.
+internal sealed class PausedTurnEndProbeCard : CardModel
+{
+    public TaskCompletionSource Entered { get; } = new();
+    public TaskCompletionSource Release { get; } = new();
+    public int HandCountAfterPause { get; private set; }
+    public override CardType Type => CardType.Status;
+    public override CardRarity Rarity => CardRarity.Status;
+    public override TargetType TargetType => TargetType.None;
+    public override int MaxUpgradeLevel => 0;
+    protected override int CanonicalEnergyCost => -1;
+    protected override bool HasTurnEndInHandEffect => true;
+
+    protected override async Task OnTurnEndInHand()
+    {
+        Entered.SetResult();
+        await Release.Task;
+        HandCountAfterPause = Owner.PlayerCombatState!.Hand.Cards.Count;
+    }
+}
+
 [Collection("ModelDb")]
 public sealed class TurnEndInHandCardBatchTests : IDisposable
 {
@@ -322,6 +344,90 @@ public sealed class TurnEndInHandCardBatchTests : IDisposable
         {
             Assert.Equal(1, probe.TriggerCount);
         }
+    }
+
+    [Theory]
+    [InlineData("regret-debt")]
+    [InlineData("ethereal-effect")]
+    [InlineData("lethal-effect")]
+    [InlineData("paused-effect")]
+    public async Task TurnEnd_PreservesPhasesAndEnding(string scenario)
+    {
+        var run = new RunState("399-turn-end-" + scenario, new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        var room = new Sts2Sim.Core.Rooms.CombatRoom(
+            () => (MonsterModel)ModelDb.Monster<Sts2Sim.Core.Models.Monsters.WanderingGrunt>().MutableClone());
+        run.PushRoom(room);
+        await room.Enter(run);
+        PlayerCombatState piles = player.PlayerCombatState!;
+        foreach (CardModel card in piles.Hand.Cards.ToArray())
+            CardPileCmd.Add(card, PileType.Draw);
+        ICombatState combat = player.Creature.CombatState!;
+        int playsBefore = piles.CardsPlayedThisCombat;
+
+        if (scenario == "paused-effect")
+        {
+            var first = (PausedTurnEndProbeCard)new PausedTurnEndProbeCard().MutableClone();
+            first.AssignOwner(player);
+            piles.Hand.AddInternal(first);
+            CardModel second = AddCardToHand(player, typeof(Debt));
+            Task turn = CombatEngine.DoTurnEndAsync(combat, player);
+            PileType? secondPileWhilePaused;
+            try
+            {
+                await first.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                secondPileWhilePaused = second.Pile?.Type;
+            }
+            finally
+            {
+                first.Release.TrySetResult();
+                await turn;
+            }
+
+            // Native DoTurnEndCards starts B's move independently of A's effect completion.
+            // In Instant/NonInteractive mode Cmd.Wait is complete: B must already be in Play.
+            Assert.True(secondPileWhilePaused == PileType.Play,
+                $"seed=399-turn-end-{scenario}; native Instant dependency contract expects B in Play while A waits; actual={secondPileWhilePaused}; resumed effect saw hand={first.HandCountAfterPause}");
+            Assert.Equal(0, first.HandCountAfterPause);
+        }
+        else if (scenario == "ethereal-effect")
+        {
+            var effect = (EtherealTurnEndProbeCard)new EtherealTurnEndProbeCard().MutableClone();
+            effect.AssignOwner(player);
+            piles.Hand.AddInternal(effect);
+            await CombatEngine.DoTurnEndAsync(combat, player);
+            Assert.Equal(1, effect.TriggerCount);
+            Assert.Same(piles.ExhaustPile, effect.Pile);
+        }
+        else
+        {
+            CardModel regret = AddCardToHand(player, typeof(Regret));
+            CardModel? debt = null;
+            int hp = player.Creature.CurrentHp;
+            int gold = player.Gold;
+            if (scenario == "lethal-effect")
+                player.Creature.SetCurrentHpInternal(1);
+            else
+                debt = AddCardToHand(player, typeof(Debt));
+            await Hook.BeforeSideTurnEnd(combat, CombatSide.Player, combat.Allies);
+            await CombatEngine.DoTurnEndAsync(combat, player);
+
+            if (scenario == "lethal-effect")
+            {
+                Assert.Equal(0, player.Creature.CurrentHp);
+                Assert.Same(piles.PlayPile, regret.Pile);
+            }
+            else
+            {
+                Assert.Equal(hp - 2, player.Creature.CurrentHp);
+                Assert.Equal(Math.Max(0, gold - 10), player.Gold);
+                Assert.Same(piles.DiscardPile, regret.Pile);
+                Assert.Same(piles.DiscardPile, debt!.Pile);
+                Assert.True(piles.DiscardPile.Cards.ToList().IndexOf(regret) < piles.DiscardPile.Cards.ToList().IndexOf(debt));
+            }
+        }
+        Assert.Equal(playsBefore, piles.CardsPlayedThisCombat);
     }
 
     private static (Player Player, ICombatState CombatState) CreateContext()

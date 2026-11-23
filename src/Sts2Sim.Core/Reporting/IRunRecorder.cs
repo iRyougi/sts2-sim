@@ -69,6 +69,9 @@ public interface IRunRecorder
         PlayerSnapshot finalPlayer,
         IReadOnlyList<EnemySnapshot> finalEnemies);
 
+    /// <summary>Passive post-settlement observation before any generated reward is selected.</summary>
+    void ObserveCombatSettlement(RunState runState, CombatState combatState) { }
+
     void EndCombat(
         bool victory,
         PlayerSnapshot finalPlayer,

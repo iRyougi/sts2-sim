@@ -99,14 +99,44 @@ public static class MapPathPruning
 
     public static List<List<MapPoint[]>> FindMatchingSegments(MapPoint startingMapPoint)
     {
-        List<List<MapPoint>> allPaths = FindAllPaths(startingMapPoint);
-        var segments = new SortedDictionary<string, List<MapPoint[]>>(StringComparer.Ordinal);
-        foreach (List<MapPoint> path in allPaths)
+        var buckets = new Dictionary<ulong, List<SegmentGroup>>();
+        var numbers = new NumberText();
+        var path = new List<MapPoint>();
+
+        // Preserve FindAllPaths' child order and stop at the first Boss. Only the
+        // shared DFS stack is retained; completed paths need no separate lists.
+        void Visit(MapPoint point)
         {
-            AddSegmentsToDictionary(path, segments);
+            path.Add(point);
+            if (point.PointType == MapPointType.Boss)
+            {
+                AddSegments(path, buckets, numbers);
+            }
+            else
+            {
+                foreach (MapPoint child in point.Children)
+                {
+                    Visit(child);
+                }
+            }
+            path.RemoveAt(path.Count - 1);
         }
 
-        return GetDuplicateSegments(segments);
+        Visit(startingMapPoint);
+        var duplicates = new List<SegmentGroup>();
+        foreach (List<SegmentGroup> bucket in buckets.Values)
+        {
+            foreach (SegmentGroup group in bucket)
+            {
+                if (group.Segments.Count > 1)
+                {
+                    duplicates.Add(group);
+                }
+            }
+        }
+        // Numeric coordinate order differs from the original ordinal key order.
+        duplicates.Sort((a, b) => StringComparer.Ordinal.Compare(a.Key, b.Key));
+        return duplicates.Select(group => group.Segments).ToList();
     }
 
     public static List<List<MapPoint>> FindAllPaths(MapPoint current)
@@ -131,7 +161,10 @@ public static class MapPathPruning
         return result;
     }
 
-    private static void AddSegmentsToDictionary(IReadOnlyList<MapPoint> path, IDictionary<string, List<MapPoint[]>> segments)
+    private static void AddSegments(
+        List<MapPoint> path,
+        Dictionary<ulong, List<SegmentGroup>> buckets,
+        NumberText numbers)
     {
         for (int i = 0; i < path.Count - 1; i++)
         {
@@ -148,16 +181,37 @@ public static class MapPathPruning
                     continue;
                 }
 
-                MapPoint[] segment = path.Skip(i).Take(j + 1).ToArray();
-                string key = GenerateSegmentKey(segment);
-                if (!segments.ContainsKey(key))
+                int length = j + 1;
+                var key = new SegmentKeyChars(path, i, length, numbers);
+                ulong hash = HashKey(key);
+                if (!buckets.TryGetValue(hash, out List<SegmentGroup>? bucket))
                 {
-                    segments[key] = new List<MapPoint[]> { segment };
+                    bucket = new List<SegmentGroup>();
+                    buckets.Add(hash, bucket);
                 }
-                else if (!AnyOverlappingSegments(segments[key], segment))
+                SegmentGroup? group = null;
+                foreach (SegmentGroup candidate in bucket)
                 {
-                    segments[key].Add(segment);
+                    // Hashes never establish equality: compare every original
+                    // key character, including culture-specific integer text.
+                    if (KeyEquals(key, candidate.Key))
+                    {
+                        group = candidate;
+                        break;
+                    }
                 }
+                if (group is not null && HasOverlap(group.Segments, path, i, length))
+                {
+                    continue;
+                }
+                var segment = new MapPoint[length];
+                path.CopyTo(i, segment, 0, length);
+                if (group is null)
+                {
+                    group = new SegmentGroup(GenerateSegmentKey(segment));
+                    bucket.Add(group);
+                }
+                group.Segments.Add(segment);
             }
         }
     }
@@ -179,29 +233,138 @@ public static class MapPathPruning
         return sb.ToString();
     }
 
-    private static bool AnyOverlappingSegments(IEnumerable<MapPoint[]> existingSegments, IReadOnlyList<MapPoint> segment) =>
-        existingSegments.Any(existing => OverlappingSegment(existing, segment));
-
-    private static bool OverlappingSegment(IReadOnlyList<MapPoint> a, IReadOnlyList<MapPoint> b)
+    private static bool HasOverlap(List<MapPoint[]> existingSegments, List<MapPoint> path, int offset, int length)
     {
-        if (a.Count < 3 || b.Count < 3)
+        foreach (MapPoint[] existing in existingSegments)
         {
-            return false;
-        }
-
-        for (int i = 1; i <= a.Count - 2; i++)
-        {
-            if (ReferenceEquals(a[i], b[i]))
+            for (int i = 1; i <= existing.Length - 2; i++)
             {
-                return true;
+                // Same-position reference equality, never set intersection.
+                // The complete type key normally fixes length. Preserve the
+                // IReadOnlyList indexing failure for exotic ambiguous number text.
+                if (i >= length)
+                {
+                    throw new ArgumentOutOfRangeException("index");
+                }
+                if (ReferenceEquals(existing[i], path[offset + i]))
+                {
+                    return true;
+                }
             }
         }
-
         return false;
     }
 
-    private static List<List<MapPoint[]>> GetDuplicateSegments(IDictionary<string, List<MapPoint[]>> segments) =>
-        segments.Values.Where(list => list.Count > 1).ToList();
+    private static ulong HashKey(SegmentKeyChars key)
+    {
+        ulong hash = 14695981039346656037UL;
+        while (key.TryNext(out char value))
+        {
+            hash = unchecked((hash ^ value) * 1099511628211UL);
+        }
+        return hash;
+    }
+
+    private static bool KeyEquals(SegmentKeyChars key, string text)
+    {
+        int index = 0;
+        while (key.TryNext(out char value))
+        {
+            if (index >= text.Length || text[index++] != value)
+            {
+                return false;
+            }
+        }
+        return index == text.Length;
+    }
+
+    private sealed class SegmentGroup(string key)
+    {
+        public string Key { get; } = key;
+        public List<MapPoint[]> Segments { get; } = new();
+    }
+
+    private sealed class NumberText
+    {
+        private readonly Dictionary<int, string> _values = new();
+        public string Get(int value)
+        {
+            if (!_values.TryGetValue(value, out string? text))
+            {
+                text = value.ToString();
+                _values.Add(value, text);
+            }
+            return text;
+        }
+    }
+
+    // A non-allocating view of GenerateSegmentKey's character stream. Only an
+    // accepted group's first key is materialized; number text is cached per call.
+    private struct SegmentKeyChars
+    {
+        private readonly List<MapPoint> _path;
+        private readonly int _offset;
+        private readonly NumberText _numbers;
+        private readonly MapCoord _first;
+        private readonly MapCoord _last;
+        private readonly int _headerTokens;
+        private readonly int _tokenCount;
+        private int _tokenIndex;
+        private int _character;
+        private string _text;
+
+        public SegmentKeyChars(List<MapPoint> path, int offset, int length, NumberText numbers)
+        {
+            _path = path;
+            _offset = offset;
+            _numbers = numbers;
+            _first = path[offset].coord;
+            _last = path[offset + length - 1].coord;
+            _headerTokens = _first.row == 0 ? 6 : 8;
+            _tokenCount = _headerTokens + length * 2 - 1;
+            _tokenIndex = -1;
+            _character = 0;
+            _text = string.Empty;
+        }
+
+        public bool TryNext(out char value)
+        {
+            while (_character >= _text.Length)
+            {
+                if (++_tokenIndex >= _tokenCount)
+                {
+                    value = default;
+                    return false;
+                }
+                _text = Token(_tokenIndex);
+                _character = 0;
+            }
+            value = _text[_character++];
+            return true;
+        }
+
+        private string Token(int index)
+        {
+            if (index >= _headerTokens)
+            {
+                int typeIndex = index - _headerTokens;
+                return typeIndex % 2 == 1 ? "," : _numbers.Get((int)_path[_offset + typeIndex / 2].PointType);
+            }
+            if (_first.row == 0)
+            {
+                return index switch
+                {
+                    0 => _numbers.Get(_first.row), 1 => "-", 2 => _numbers.Get(_last.col),
+                    3 => ",", 4 => _numbers.Get(_last.row), _ => "-",
+                };
+            }
+            return index switch
+            {
+                0 => _numbers.Get(_first.col), 1 => ",", 2 => _numbers.Get(_first.row), 3 => "-",
+                4 => _numbers.Get(_last.col), 5 => ",", 6 => _numbers.Get(_last.row), _ => "-",
+            };
+        }
+    }
 
     private static bool PrunePaths(
         MapPoint?[,] grid,

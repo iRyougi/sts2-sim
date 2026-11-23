@@ -11,6 +11,18 @@ public sealed class ByrdonisNest : EventModel
 {
     public override bool IsAllowed(IRunState runState) => runState.Players.All(player => !player.HasEventPet());
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("EAT", [VisibleValue.Int("MaxHp", 7)]),
+        new("TAKE", [VisibleValue.Int("ObtainCount", 1), VisibleValue.Id("Card", "BYRDONIS_EGG")])
+    ]);
+
+    protected override VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) =>
+        option.Key switch
+        {
+            "TAKE" => declared with { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<ByrdonisEgg>())] },
+            _ => base.DescribeVisibleOption(option, displayIndex, declared),
+        };
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {
         var options = new List<EventOption>

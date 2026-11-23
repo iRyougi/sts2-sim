@@ -10,7 +10,17 @@ using Sts2Sim.Core.ValueProps;
 
 public sealed class Tunneler : MonsterModel
 {
-    public bool IsStunned { get; private set; }
+    private bool _isStunned;
+
+    public bool IsStunned
+    {
+        get => _isStunned;
+        set
+        {
+            AssertMutable();
+            _isStunned = value;
+        }
+    }
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 92, 87);
     public override int MaxInitialHp => MinInitialHp;
     private int BiteDamage => Ascension(AscensionLevel.DeadlyEnemies, 15, 13);

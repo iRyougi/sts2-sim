@@ -8,6 +8,13 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class FieldOfManSizedHoles : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("RESIST", [VisibleValue.Int("RemoveCount", 2), VisibleValue.Id("ResistCurse", "NORMALITY"), VisibleValue.Int("CurseCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Normality>())] },
+        new("ENTER_YOUR_HOLE", [VisibleValue.Int("EnchantCount", 1), VisibleValue.Id("Enchantment", "PERFECT_FIT")])
+        { Contents = [VisibleContentProjection.ForEnchantment(ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>()))] },
+    ]);
+
     public override bool IsAllowed(IRunState runState)
     {
         PerfectFit perfectFit = ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>());
@@ -28,10 +35,13 @@ public sealed class FieldOfManSizedHoles : EventModel
         Finish();
     }
 
+    /// <summary>原版 <c>EnterYourHole</c>：<c>CardSelectCmd.FromDeckForEnchantment(Owner, PerfectFit, 1, prefs(1))</c>，
+    /// 候选为牌组顺序中可附魔的牌，由玩家选 1 张。</summary>
     private async Task EnterAsync()
     {
         PerfectFit perfectFit = ModelDb.GetById<PerfectFit>(ModelDb.GetId<PerfectFit>());
-        CardModel? selected = Owner.Deck.Cards.FirstOrDefault(perfectFit.CanEnchant);
+        CardModel? selected = (await CardSelectCmd.SelectCardsAsync(
+            RunState, Owner, Owner.Deck.Cards.Where(perfectFit.CanEnchant), 1, 1, this)).FirstOrDefault();
         if (selected is not null) await CardCmd.Enchant<PerfectFit>(selected, 1m);
         Finish();
     }

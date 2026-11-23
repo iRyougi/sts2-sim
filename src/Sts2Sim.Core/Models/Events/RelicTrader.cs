@@ -12,6 +12,24 @@ public sealed class RelicTrader : EventModel
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: > 0 } &&
         runState.Players.All(p => p.Relics.Count(r => r.IsTradable) >= 5);
 
+    protected override VisibleDecisionMetadata BuildVisibleState()
+    {
+        string[] keys = ["TOP", "MIDDLE", "BOTTOM"];
+        // Only the displayed trades are public; extra pre-generated new relics stay hidden.
+        return new([], [.. Enumerable.Range(0, Math.Min(keys.Length, Math.Min(OwnedRelics.Count, NewRelics.Count))).Select(index =>
+            new VisibleOption(keys[index], [
+                VisibleValue.Id("GiveRelic", OwnedRelics[index].Id.Entry),
+                VisibleValue.Id("ReceiveRelic", NewRelics[index].Id.Entry),
+                VisibleValue.Int("GiveCount", 1), VisibleValue.Int("ReceiveCount", 1),
+            ])
+            {
+                SemanticKey = "TRADE",
+                Contents = [VisibleContentProjection.ForRelic(OwnedRelics[index]) with { Role = "Give" },
+                    VisibleContentProjection.ForRelic(NewRelics[index]) with { Role = "Receive" }]
+            }),
+            new("PROCEED", [])]);
+    }
+
     protected override void CalculateVars()
     {
         var owned = Owner.Relics.Where(r => r.IsTradable).ToList();

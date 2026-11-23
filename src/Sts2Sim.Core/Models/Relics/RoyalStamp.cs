@@ -14,6 +14,10 @@ public sealed class RoyalStamp : RelicModel
         var enchantment = (RoyallyApproved)ModelDb.Get(typeof(RoyallyApproved));
         List<CardModel> eligible = Owner.Deck.Cards.Where(enchantment.CanEnchant).ToList();
         Owner.RunState.Rng.Niche.Shuffle(eligible);
+        Dictionary<CardModel, int> deckIndex = Owner.Deck.Cards
+            .Select((deckCard, index) => (deckCard, index))
+            .ToDictionary(pair => pair.deckCard, pair => pair.index);
+        eligible = eligible.OrderBy(deckCard => deckIndex[deckCard]).ToList();
         CardModel? card = (await CardSelectCmd.SelectCardsAsync(
             Owner.RunState, Owner, eligible, 1, 1, this)).FirstOrDefault();
         if (card is not null)

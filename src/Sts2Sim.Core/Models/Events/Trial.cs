@@ -9,6 +9,25 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class Trial : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("DOUBLE_DOWN", [VisibleValue.Condition("Lethal", "true")]),
+        new("MERCHANT_GUILTY", [VisibleValue.Id("Curse", ModelDb.GetId<Regret>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("RelicCount", 2), VisibleValue.Condition("Relic", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Regret>())] },
+        new("MERCHANT_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Shame>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("UpgradeCount", 2)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Shame>())] },
+        new("NOBLE_GUILTY", [VisibleValue.Int("Heal", 10)]),
+        new("NOBLE_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Regret>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("Gold", 300)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Regret>())] },
+        new("NONDESCRIPT_GUILTY", [VisibleValue.Id("Curse", ModelDb.GetId<Doubt>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("CardRewardCount", 2), VisibleValue.Condition("CardReward", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Doubt>())] },
+        new("NONDESCRIPT_INNOCENT", [VisibleValue.Id("Curse", ModelDb.GetId<Doubt>().Entry), VisibleValue.Int("CurseCount", 1), VisibleValue.Int("TransformCount", 2), VisibleValue.Condition("TransformResult", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Doubt>())] },
+    ])
+    {
+        // #637: narrative entrant number is absent in Core; metadata must not draw Chaotic RNG.
+        CoverageGapIds = CurrentOptions.Any(option => option.Key == "REJECT") ? ["G1.TrialNarrative"] : [],
+    };
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
         new EventOption("ACCEPT", AcceptAsync),
@@ -82,17 +101,18 @@ public sealed class Trial : EventModel
         Finish();
     }
 
-    /// <summary>偏离 #253：原版同一奖励房间包含两个独立三选一卡牌奖励；本仓库的
-    /// RewardsSet 只有一个 Card 槽，因此依原顺序排入两个待领取 RewardsSet。</summary>
+    /// <summary>#1039（销 #253）：同一自定义奖励屏上的两个三选一卡牌奖励，经 <see cref="RewardsCmd.OfferCustom"/>
+    /// 依序生成（原版 <c>Trial.NondescriptGuilty</c>：<c>ForNonCombatWithDefaultOdds</c>、三张）。</summary>
     private async Task NondescriptGuiltyAsync()
     {
         await AddCurseAsync<Doubt>();
+        var rewards = new List<Reward>(2);
         for (int i = 0; i < 2; i++)
         {
-            var reward = new CardReward(Owner, CardRarityOddsType.RegularEncounter);
-            reward.Populate(RunState);
-            OfferRewards(RewardsSet.CreateCustom(Owner, card: reward));
+            rewards.Add(new CardReward(Owner,
+                CardCreationOptions.ForNonCombatWithDefaultOdds([Owner.Character.CardPool]), 3));
         }
+        await RewardsCmd.OfferCustom(Owner, rewards);
         Finish();
     }
 

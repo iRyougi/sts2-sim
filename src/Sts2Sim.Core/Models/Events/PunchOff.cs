@@ -12,6 +12,15 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class PunchOff : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("NAB", [VisibleValue.Id("Curse", "INJURY"), VisibleValue.Int("CurseCount", 1),
+            VisibleValue.Int("RelicCount", 1), VisibleValue.Condition("Relic", "Random")])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Injury>())] },
+        new("I_CAN_TAKE_THEM", [VisibleValue.Condition("StartsCombat", "True")]),
+        // This page's FIGHT description is empty; the layout remains in the ordinary visible state.
+        new("FIGHT", []),
+    ]);
+
     private IReadOnlyList<Reward> _combatRewards = EmptyRewards();
 
     public override bool IsAllowed(IRunState runState) => runState.TotalFloor >= 6;

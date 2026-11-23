@@ -7,6 +7,12 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class Symbiote : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("APPROACH", [VisibleValue.Id("EnchantmentId", "CORRUPTED"), VisibleValue.Scope("CardType", "Attack"), VisibleValue.Int("SelectCount", 1), VisibleValue.Int("DamageBonusPercent", 50), VisibleValue.Int("EnchantmentHpLoss", 2)]),
+        new("APPROACH_LOCKED", [VisibleValue.Condition("RequiredCardType", "Attack")]),
+        new("KILL_WITH_FIRE", [VisibleValue.Int("TransformSelectCount", 1)]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: > 0 };
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()

@@ -17,9 +17,9 @@ public sealed class BygoneEffigy : MonsterModel
 
     private int SlashDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 15, 13);
 
-    public override async Task BeforeCombatStart()
+    public override async Task AfterAddedToRoom()
     {
-        await base.BeforeCombatStart();
+        await base.AfterAddedToRoom();
         await PowerCmd.Apply<SlowPower>(
             Creature.CombatState!,
             Creature,

@@ -226,7 +226,7 @@ public abstract class GeneratedCardModel : CardModel, ICardChoiceValueProvider, 
     private IEnumerable<Creature> DebuffTargets(CardPlay cardPlay)
     {
         return TargetType == TargetType.AllEnemies
-            ? CombatState!.Enemies
+            ? CombatState!.HittableEnemies
             : cardPlay.Target is null ? Array.Empty<Creature>() : new[] { cardPlay.Target };
     }
 }

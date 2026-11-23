@@ -51,6 +51,27 @@ public class TreasureRoomTests : IDisposable
         Assert.Contains(player.Relics, relic => relic is Akabeko);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EnterInternal_RelicChoice_IsAskedAfterGold_AndSkipKeepsGoldWithoutRelic(bool skip)
+    {
+        var runState = new RunState("8F9CPYQ6QYEN", new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
+        runState.AddPlayer(player);
+        int goldBefore = player.Gold, relicsBefore = player.Relics.Count, goldAtAsk = -1;
+        IReadOnlyList<RelicModel>? offered = null;
+        var room = new TreasureRoom(goldAmount: 50);
+        room.ConfigureRelicChoice((p, relics) => { offered = relics; goldAtAsk = p.Gold; return Task.FromResult<int?>(skip ? null : 0); });
+        await room.EnterInternal(runState);
+
+        Assert.IsType<Akabeko>(Assert.Single(offered!));
+        Assert.Equal(goldBefore + 50, goldAtAsk);
+        Assert.Equal(goldBefore + 50, player.Gold);
+        Assert.Equal(relicsBefore + (skip ? 0 : 1), player.Relics.Count);
+        Assert.Equal(skip ? null : offered![0].Id.ToString(), Assert.Single(room.Resolutions).RelicGained);
+    }
+
     [Fact]
     public async Task EnterInternal_WhenSharedPoolIsExhausted_GrantsCirclet()
     {

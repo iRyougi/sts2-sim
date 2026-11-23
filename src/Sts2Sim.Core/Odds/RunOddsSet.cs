@@ -16,6 +16,27 @@ public class RunOddsSet
         UnknownMapPoint = new UnknownMapPointOdds(unknownMapPointRng, hooks);
     }
 
+    internal RunOddsSet CloneExact(Rng rng, IOddsHooks hooks) => new()
+    {
+        UnknownMapPoint = UnknownMapPoint.CloneExact(rng, hooks),
+    };
+
+    internal static RunOddsSet FromVisibleHistory(
+        Rng rng,
+        IOddsHooks hooks,
+        UnknownMapPointBaseRules actOrigin,
+        UnknownMapPointBaseRules currentBase,
+        IReadOnlyList<UnknownMapPointVisit> visits)
+    {
+        var result = new RunOddsSet(rng, hooks);
+        result.UnknownMapPoint.SetPublicBaseRules(visits.Count == 0 ? currentBase : actOrigin);
+        result.UnknownMapPoint.ResetToBase();
+        foreach (UnknownMapPointVisit visit in visits)
+            result.UnknownMapPoint.ApplyVisibleObservation(visit);
+        result.UnknownMapPoint.SetPublicBaseRules(currentBase);
+        return result;
+    }
+
     public SerializableRunOddsSet ToSerializable()
     {
         return new SerializableRunOddsSet

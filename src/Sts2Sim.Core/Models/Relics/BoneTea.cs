@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 
 namespace Sts2Sim.Core.Models.Relics;
@@ -15,12 +16,11 @@ public sealed class BoneTea : RelicModel
 
     public int CombatsLeft => Math.Max(0, _combatsLeft);
 
-    public override Task AfterSideTurnStart(
-        CombatSide side,
-        IReadOnlyList<Creature> participants)
+    // 原版挂在 AfterPlayerTurnStart（抽完手牌后、AfterSideTurnStart 之前），同一时机的遗物先后与随机数消耗顺序才和原版一样
+    public override Task AfterPlayerTurnStart(Player player)
     {
         if (IsUsedUp ||
-            !participants.Contains(Owner.Creature) ||
+            player != Owner ||
             Owner.PlayerCombatState?.TurnNumber != 1)
         {
             return Task.CompletedTask;

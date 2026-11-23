@@ -70,8 +70,10 @@ public class CreatureCmdTests
         public bool IsLiveCombat() => true;
     }
 
-    private sealed class AddFlatDamage(decimal delta) : AbstractModel
+    private sealed class AddFlatDamage(decimal delta) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override decimal ModifyDamageAdditive(
@@ -89,8 +91,10 @@ public class CreatureCmdTests
     private sealed class RemoveDamageModifierAfterDeath(
         Creature firstTarget,
         Creature secondTarget,
-        Action removeListener) : AbstractModel
+        Action removeListener) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override decimal ModifyDamageAdditive(
@@ -109,8 +113,10 @@ public class CreatureCmdTests
         }
     }
 
-    private sealed class MultiplyBlock(decimal factor) : AbstractModel
+    private sealed class MultiplyBlock(decimal factor) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override decimal ModifyBlockMultiplicative(
@@ -124,8 +130,10 @@ public class CreatureCmdTests
         }
     }
 
-    private sealed class RemoveListenerDuringAdditive(Action removeListener) : AbstractModel
+    private sealed class RemoveListenerDuringAdditive(Action removeListener) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override decimal ModifyDamageAdditive(
@@ -141,8 +149,10 @@ public class CreatureCmdTests
         }
     }
 
-    private sealed class MultiplicativeDamageProbe : AbstractModel
+    private sealed class MultiplicativeDamageProbe : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public int CallCount { get; private set; }
@@ -160,8 +170,10 @@ public class CreatureCmdTests
         }
     }
 
-    private sealed class RunLevelDamageProbe(List<string> calls) : AbstractModel
+    private sealed class RunLevelDamageProbe(List<string> calls) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override decimal ModifyDamageAdditive(

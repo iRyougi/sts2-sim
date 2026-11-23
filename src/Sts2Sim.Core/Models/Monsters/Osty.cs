@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.MonsterMoves;
 
 namespace Sts2Sim.Core.Models.Monsters;
@@ -9,6 +10,12 @@ public sealed class Osty : MonsterModel
     public override int MinInitialHp => 1;
 
     public override int MaxInitialHp => 1;
+
+    public override bool IsHealthBarVisible =>
+        (Creature ?? throw new InvalidOperationException("Creature was accessed before it was set.")).IsAlive;
+
+    // 原版先震动 Godot Osty 节点；headless 省略该视觉调用，保留真实缺失判断。
+    public static bool CheckMissingWithAnim(Player owner) => owner.IsOstyMissing;
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {

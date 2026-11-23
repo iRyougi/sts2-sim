@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(HookListenerCacheDiagnostics)' == 'true'">
+    <DefineConstants>$(DefineConstants);HOOK_LISTENER_CACHE_DIAGNOSTICS</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="System.IO.Hashing" Version="9.0.0" />
   </ItemGroup>
@@ -15,6 +19,11 @@
     <InternalsVisibleTo Include="SimFuzz" />
     <InternalsVisibleTo Include="Sts2Sim.Solver.Tests" />
     <InternalsVisibleTo Include="SolverDiff" />
+    <!-- sls2 的搜索服务（engine/Sts2SimServe）：观测编码要读战斗观察者、出牌历史等内部状态 -->
+    <InternalsVisibleTo Include="Sts2SimServe" />
+    <!-- AlphaDefect port host (sts2-stupa adport/host): read-only access to internals for the observation encoder -->
+    <InternalsVisibleTo Include="AdPort.Host" />
+    <InternalsVisibleTo Include="AdPort.Host.Tests" />
   </ItemGroup>
 
 </Project>

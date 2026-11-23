@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Events;
@@ -7,6 +8,11 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class DoorsOfLightAndDark : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("LIGHT", [VisibleValue.Int("Cards", 2), VisibleValue.Scope("Selection", "RandomUpgrade")]),
+        new("DARK", [VisibleValue.Int("RemoveCount", 1)])
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>
     [
         new EventOption("LIGHT", LightAsync),

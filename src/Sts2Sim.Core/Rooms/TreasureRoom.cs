@@ -17,6 +17,14 @@ public sealed class TreasureRoom : AbstractRoom
 
     internal IReadOnlyList<TreasureRoomResolution> Resolutions => _resolutions;
 
+    // Native TreasureRoomRelicSynchronizer lets the player pick a chest relic or skip it (PickRelicLocally(index) /
+    // SkipRelicLocally). Null = no decision source: the relic is taken, as before.
+    private Func<Player, IReadOnlyList<RelicModel>, Task<int?>>? _chooseRelic;
+
+    /// <summary>Routes the chest relic choice to a run decision source (<see cref="IRunDecisionSource.ChooseTreasureRelicAsync"/>).</summary>
+    internal void ConfigureRelicChoice(Func<Player, IReadOnlyList<RelicModel>, Task<int?>> choose) =>
+        _chooseRelic = choose ?? throw new ArgumentNullException(nameof(choose));
+
     // Upstream enters the room (including hooks) before its separate reward synchronization.
     protected override bool EntryHooksBeforeRewards => true;
 
@@ -34,15 +42,44 @@ public sealed class TreasureRoom : AbstractRoom
         _goldAmount = goldAmount;
     }
 
+    internal TreasureRoom CloneForRun(Func<Player, Player> mapPlayer)
+    {
+        TreasureRoom clone = _goldAmount is { } gold ? new TreasureRoom(gold) : new TreasureRoom();
+        clone.CopyEntryStateFrom(this);
+        clone._resolutions = Array.AsReadOnly(_resolutions
+            .Select(result => result with { Player = mapPlayer(result.Player) }).ToArray());
+        return clone;
+    }
+
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
         _resolutions = Array.Empty<TreasureRoomResolution>();
-        var resolutions = new List<TreasureRoomResolution>();
+        var relics = new List<(Player Player, RelicModel? Relic)>();
         foreach (Player player in runState.Players)
         {
             // 偏离 #154：地图上的宝箱节点保持不变；被抑制时仅跳过该玩家的金币与遗物发放。
             if (!Hooks.Hook.ShouldGenerateTreasure(runState, player))
+            {
+                relics.Add((player, null));
+                continue;
+            }
+
+            RelicRarity rarity = RelicFactory.RollRarity(runState.Rng.ForSemanticKey(
+                RunRngType.TreasureRoomRelics,
+                $"{runState.SemanticLocationKey}/treasure/slot=relic"));
+            RelicGrabBag sharedBag = runState.SharedRelicGrabBag
+                ?? throw new InvalidOperationException("Shared relic bag must be initialized before entering treasure.");
+            RelicModel relic = sharedBag.PullFromFront(rarity, runState)
+                ?? ModelDb.Relic<Sts2Sim.Core.Models.Relics.Circlet>();
+            relics.Add((player, relic));
+        }
+
+        // All relics are picked before gold and quest rewards; obtain effects still run afterward.
+        var resolutions = new List<TreasureRoomResolution>();
+        foreach ((Player player, RelicModel? relic) in relics)
+        {
+            if (relic is null)
             {
                 resolutions.Add(new TreasureRoomResolution(player, 0, null));
                 continue;
@@ -60,13 +97,16 @@ public sealed class TreasureRoom : AbstractRoom
                     await quest.OnQuestComplete();
             }
             int goldGained = player.Gold - goldBefore;
-            RelicRarity rarity = RelicFactory.RollRarity(runState.Rng.ForSemanticKey(
-                RunRngType.TreasureRoomRelics,
-                $"{runState.SemanticLocationKey}/treasure/slot=relic"));
-            RelicGrabBag sharedBag = runState.SharedRelicGrabBag
-                ?? throw new InvalidOperationException("Shared relic bag must be initialized before entering treasure.");
-            RelicModel relic = sharedBag.PullFromFront(rarity, runState)
-                ?? ModelDb.Relic<Sts2Sim.Core.Models.Relics.Circlet>();
+            // Native: the chest's gold is granted before relic picking; a skipped relic is not obtained and not returned
+            // to the bag (singleplayer skip ends the voting without awarding it).
+            int? pick = _chooseRelic is null ? 0 : await _chooseRelic(player, new[] { relic });
+            if (pick is not (null or 0))
+                throw new InvalidOperationException($"Treasure relic choice {pick} is outside the offered relics.");
+            if (pick is null)
+            {
+                resolutions.Add(new TreasureRoomResolution(player, goldGained, null));
+                continue;
+            }
             await RelicCmd.Obtain(relic, player);
             resolutions.Add(new TreasureRoomResolution(
                 player,

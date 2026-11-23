@@ -166,10 +166,11 @@ public sealed class Task9SpecialCardTests : IDisposable
         ClearHandAndDraw(player);
         Sts2Sim.Core.Models.Cards.Void voidCard = AddTo<Sts2Sim.Core.Models.Cards.Void>(player, PileType.Hand);
         DefendRegent defend = AddTo<DefendRegent>(player, PileType.Draw, CardPilePosition.Top);
-        player.PlayerCombatState!.Energy = 0;
+        player.PlayerCombatState!.Energy = 2;
 
         await CardPileCmd.Draw(room.Engine.State, 1, player, fromHandDraw: false);
-        Assert.Equal(0, player.PlayerCombatState.Energy);
+        Assert.Equal(2, player.PlayerCombatState.Energy);
+        player.PlayerCombatState.Energy = 0;
         await voidCard.AfterCardDrawn(voidCard, fromHandDraw: false);
 
         Assert.Equal(0, player.PlayerCombatState.Energy);

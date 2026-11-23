@@ -9,7 +9,7 @@ using Sts2Sim.Core.ValueProps;
 namespace Sts2Sim.Core.Models.Powers;
 
 /// <summary>征服者(-力量类，SovereignBlade对其伤害翻倍)。逐字移植（<c>MegaCrit.Sts2.Core.Models.Powers.ConquerorPower</c>），
-/// 每回合自身回合开始时递减1层（复用 <see cref="PowerCmd.TickDownDuration"/>）。</summary>
+/// 每回合自身回合开始时递减1层（原版 PowerCmd.Decrement）。</summary>
 public sealed class ConquerorPower : PowerModel
 {
     public override PowerType Type => PowerType.Debuff;
@@ -31,7 +31,8 @@ public sealed class ConquerorPower : PowerModel
     {
         if (participants.Contains(Owner))
         {
-            await PowerCmd.TickDownDuration(Owner.CombatState!, this);
+            // 原版是 PowerCmd.Decrement（直接减一层），不看 SkipNextDurationTick：敌人回合里刚挂上的减益当回合结束就减
+            await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
         }
     }
 }

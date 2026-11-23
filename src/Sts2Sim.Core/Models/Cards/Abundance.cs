@@ -22,6 +22,8 @@ public sealed class Abundance : CardModel
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords =>
         new[] { CardKeyword.Exhaust };
 
+    protected override void OnUpgrade() => ReduceEnergyCost(1);
+
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         _generatedCandidates = CardFactory.GetDistinctForCombat(
@@ -38,7 +40,7 @@ public sealed class Abundance : CardModel
         CardModel? chosen = _generatedCandidates.FirstOrDefault();
         if (chosen is null) return;
         chosen.AssignOwner(Owner);
-        chosen.MakeTemporaryFreeThisTurn();
+        chosen.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
         await CardPileCmd.Generate(CombatState!, chosen, PileType.Hand);
     }
 

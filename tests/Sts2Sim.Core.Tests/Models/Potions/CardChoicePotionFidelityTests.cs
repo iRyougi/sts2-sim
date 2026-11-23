@@ -77,7 +77,7 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         CardModel selected = Assert.Single(player.PlayerCombatState!.Hand.Cards);
         Assert.Same(source.Candidates[0], selected);
         Assert.All(source.Candidates, card => Assert.Same(player, card.Owner));
-        Assert.True(selected.TemporaryFreeThisTurn);
+        Assert.True(selected.CostsXEnergy || selected.TemporaryCostOverrideThisTurnOrUntilPlayed == 0);     // X 费牌不被本地改费覆盖（同 SetToFreeThisTurn）
         Assert.Equal(0, selected.EnergyCost);
         Assert.All(source.Candidates.Skip(1), card => Assert.Null(card.Pile));
     }
@@ -138,7 +138,7 @@ public sealed class CardChoicePotionFidelityTests : IDisposable
         {
             CardModel selected = Assert.Single(recipient.PlayerCombatState!.Hand.Cards);
             Assert.Same(source.Candidates[0], selected);
-            Assert.True(selected.TemporaryFreeThisTurn);
+            Assert.True((selected.TemporaryCostOverrideThisTurnOrUntilPlayed == 0));
             Assert.Equal(0, selected.EnergyCost);
         }
     }

@@ -13,6 +13,7 @@ public sealed class CardReward : Reward
 
     private readonly object _resolutionLock = new();
     private readonly CardRarityOddsType _oddsType;
+    private readonly bool _isFromCombat = true;
     private readonly IReadOnlyList<CardModel>? _explicitOptions;
     private readonly CardCreationOptions? _creationOptions;
     private readonly CardCreationOptions? _rerollOptions;
@@ -45,9 +46,10 @@ public sealed class CardReward : Reward
     }
 
 
-    public CardReward(Player player, CardRarityOddsType oddsType) : base(player)
+    public CardReward(Player player, CardRarityOddsType oddsType, bool isFromCombat = true) : base(player)
     {
         _oddsType = oddsType;
+        _isFromCombat = isFromCombat;
     }
 
     public CardReward(Player player, CardCreationOptions creationOptions, int optionCount = OptionCount) : base(player)
@@ -119,10 +121,13 @@ public sealed class CardReward : Reward
             }
             if (_explicitOptions is null)
             {
-                creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
+                if (_isFromCombat)
+                {
+                    creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
+                }
                 IReadOnlyList<CardModel> cards = Player.PlayerRng.UsesSemanticKeys
                     ? CardFactory.CreateForReward(Player, OptionCount, creationOptions)
-                    : CardFactory.CreateForReward(Player, OptionCount, _oddsType);
+                    : CardFactory.CreateForEncounterReward(Player, OptionCount, creationOptions);
                 Options = CardFactory.ModifyRewardOptions(runState, Player, cards, creationOptions);
             }
             else Options = CardFactory.ModifyRewardOptions(runState, Player, _explicitOptions, creationOptions);
@@ -210,7 +215,7 @@ public sealed class CardReward : Reward
         }
         catch (Exception exception)
         {
-            // Reward side effects are not transactional. Retain the failed task, never retry them.
+            // fail-open: Reward side effects are not transactional. Retain the failed task, never retry them.
             IsResolved = true;
             completion.SetException(exception);
         }

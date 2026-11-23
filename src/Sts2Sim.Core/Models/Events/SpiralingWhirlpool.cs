@@ -14,6 +14,11 @@ public sealed class SpiralingWhirlpool : EventModel
         runState.Players.All(player => player.Deck.Cards.Any(
             ModelDb.GetById<Spiral>(ModelDb.GetId<Spiral>()).CanEnchant));
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("DRINK", [VisibleValue.Int("Heal", (int)_heal)]),
+        new("OBSERVE", [VisibleValue.Id("EnchantmentId", "SPIRAL"), VisibleValue.Int("SelectCount", 1), VisibleValue.Scope("CardRarity", "Basic"), VisibleValue.Scope("AllowedCardClasses", "Strike/Defend"), VisibleValue.Int("Replay", 1)]),
+    ]);
+
     protected override void CalculateVars() => _heal = Owner.Creature.MaxHp * 0.33m;
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() =>

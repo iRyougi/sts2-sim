@@ -16,6 +16,11 @@ public static class ForgeCmd
     {
         ArgumentNullException.ThrowIfNull(player);
 
+        if (player.Creature.CombatState?.IsOverOrEnding() ?? true)
+        {
+            return;
+        }
+
         if (GetSovereignBlades(player, includeExhausted: false).Count == 0)
         {
             var blade = (SovereignBlade)ModelDb.Card<SovereignBlade>().MutableClone();

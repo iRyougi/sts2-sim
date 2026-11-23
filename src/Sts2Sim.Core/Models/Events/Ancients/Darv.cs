@@ -38,9 +38,5 @@ public sealed class Darv : AncientEventModel
         return options.Take(2).Append(Option(tome)).ToArray();
     }
 
-    private EventOption Option(RelicModel relic) => new(relic.GetType().Name, async () =>
-    {
-        await RelicCmd.Obtain(relic, Owner);
-        Finish();
-    });
+    private EventOption Option(RelicModel relic) => RelicOption(relic, relic.GetType().Name);
 }

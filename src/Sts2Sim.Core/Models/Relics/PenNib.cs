@@ -27,6 +27,8 @@ public sealed class PenNib : RelicModel
         return Task.CompletedTask;
     }
 
+    // sls2：原版在没有正要翻倍的那一下、计数到 9、这张牌不在打出牌堆里时也给 ×2（界面预览：下一张攻击会翻倍）。
+    // 真正结算时牌在打出牌堆里，走下面原来的判断，规则不变；观测编码器算手牌预览时要这一支（储君对拍 SIMRG0001 第 11–15 层手牌伤害少了一半）
     public override decimal ModifyDamageMultiplicative(
         Creature? target,
         decimal amount,
@@ -34,6 +36,9 @@ public sealed class PenNib : RelicModel
         Creature? dealer,
         CardModel? cardSource,
         CardPlay? cardPlay) =>
+        _doubleDamagePlay is null && cardSource is not null && cardSource.Pile?.Type != PileType.Play && _attacksPlayed % 10 == 9 &&
+        (dealer == Owner.Creature || dealer == Owner.Osty) && props.IsPoweredAttack()
+            ? 2m :
         ReferenceEquals(cardPlay, _doubleDamagePlay) &&
         ReferenceEquals(cardSource, cardPlay?.Card) &&
         (dealer == Owner.Creature || dealer == Owner.Osty) &&

@@ -19,8 +19,26 @@ public sealed class DenseVegetation : EventModel
         runState.Players.All(player => player.Creature.CurrentHp > 8m);
 
     private decimal _gold;
+    private int? _visibleHeal;
 
-    protected override void CalculateVars() => _gold = Rng.NextInt(61, 100);
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("TRUDGE_ON", [VisibleValue.Int("Gold", (int)_gold), VisibleValue.Int("HpLoss", 8)]),
+        new("REST", [VisibleValue.Int("Heal", _visibleHeal!.Value), VisibleValue.Condition("ForcedCombat", "true")]),
+    ]);
+
+    protected override void AfterCloned()
+    {
+        base.AfterCloned();
+        _visibleHeal = null;
+    }
+
+    protected override void CalculateVars()
+    {
+        _gold = Rng.NextInt(61, 100);
+        // Display-only native CalculateVars snapshot; the audited modifier fold is pure.
+        _visibleHeal = (int)Sts2Sim.Core.Hooks.Hook.ModifyRestSiteHealAmount(
+            RunState, Owner.Creature, Owner.Creature.MaxHp * 0.3m);
+    }
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]
     {

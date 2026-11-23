@@ -8,6 +8,14 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class TeaMaster : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("BONE_TEA", [VisibleValue.Int("GoldCost", 50), VisibleValue.Id("RelicId", "BONE_TEA"), VisibleValue.Int("Combats", 1), VisibleValue.Scope("UpgradeScope", "StartingHand")]),
+        new("BONE_TEA_LOCKED", [VisibleValue.Int("GoldCost", 50)]),
+        new("EMBER_TEA", [VisibleValue.Int("GoldCost", 150), VisibleValue.Id("RelicId", "EMBER_TEA"), VisibleValue.Int("Combats", 5), VisibleValue.Int("Strength", 2)]),
+        new("EMBER_TEA_LOCKED", [VisibleValue.Int("GoldCost", 150)]),
+        new("TEA_OF_DISCOURTESY", [VisibleValue.Id("RelicId", "TEA_OF_DISCOURTESY"), VisibleValue.Id("AddedCombatCardId", "DAZED"), VisibleValue.Int("AddedCombatCardCount", 2), VisibleValue.Condition("Trigger", "NextCombat")]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: < 2 } &&
         runState.Players.All(p => p.Gold >= 150);
 

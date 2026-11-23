@@ -15,6 +15,50 @@ public abstract class ActMap
 
     protected abstract MapPoint?[,] Grid { get; }
 
+    internal abstract ActMap CloneForRun(
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Random.Rng? replacementRng = null);
+
+    protected (MapPoint?[,] Grid, Dictionary<MapPoint, MapPoint> Points) ClonePointGraph(
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap)
+    {
+        int columns = Grid.GetLength(0);
+        int rows = Grid.GetLength(1);
+        var copied = new MapPoint?[columns, rows];
+        var points = new Dictionary<MapPoint, MapPoint>(ReferenceEqualityComparer.Instance);
+        var pending = new Queue<MapPoint>();
+        MapPoint Copy(MapPoint original)
+        {
+            if (!points.TryGetValue(original, out MapPoint? clone))
+            {
+                clone = original.CloneForRun(modelMap);
+                points.Add(original, clone);
+                pending.Enqueue(original);
+            }
+            return clone;
+        }
+        for (int col = 0; col < columns; col++)
+            for (int row = 0; row < rows; row++)
+                copied[col, row] = Grid[col, row] is { } point ? Copy(point) : null;
+        Copy(StartingMapPoint);
+        Copy(BossMapPoint);
+        if (SecondBossMapPoint is { } secondBoss) Copy(secondBoss);
+        foreach (MapPoint start in startMapPoints) Copy(start);
+        while (pending.TryDequeue(out MapPoint? original))
+        {
+            foreach (MapPoint child in original.Children) Copy(child);
+            foreach (MapPoint parent in original.parents) Copy(parent);
+        }
+        foreach ((MapPoint original, MapPoint clone) in points)
+        {
+            // Each HashSet has its own observable enumeration order. AddChildPoint would
+            // rebuild parent order from another node's traversal instead of copying it.
+            foreach (MapPoint child in original.Children) clone.Children.Add(points[child]);
+            foreach (MapPoint parent in original.parents) clone.parents.Add(points[parent]);
+        }
+        return (copied, points);
+    }
+
     public int GetColumnCount() => Grid.GetLength(0);
 
     public int GetRowCount() => Grid.GetLength(1);

@@ -10,7 +10,7 @@ using Sts2Sim.Core.Runs;
 namespace Sts2Sim.Core.Commands;
 
 /// <summary>
-/// 卡牌升级/转化命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CardCmd</c>）。
+/// 卡牌升级、降级与转化命令。逐字移植调用序（<c>MegaCrit.Sts2.Core.Commands.CardCmd</c>）。
 /// 偏离 #86：<c>Upgrade</c> 省略 <c>CardPreviewStyle</c> 预览高亮参数与存档 history 记录；本项目没有 UI 预览。
 /// </summary>
 public static class CardCmd
@@ -20,19 +20,33 @@ public static class CardCmd
     {
         ArgumentNullException.ThrowIfNull(card);
         var affliction = (T)Models.ModelDb.Affliction<T>().MutableClone();
+        if (card.Pile is { Type: not (PileType.None or PileType.Deck) } &&
+            (card.CombatState?.IsOverOrEnding() ?? true))
+        {
+            return Task.FromResult<T?>(null);
+        }
+
         if (!affliction.CanAfflict(card))
         {
             return Task.FromResult<T?>(null);
         }
 
+        T applied;
         if (card.Affliction is T existing)
         {
             existing.SetAmount(existing.Amount + amount);
-            return Task.FromResult<T?>(existing);
+            applied = existing;
+        }
+        else
+        {
+            card.AttachAffliction(affliction, amount);
+            applied = affliction;
         }
 
-        card.AttachAffliction(affliction, amount);
-        return Task.FromResult<T?>(affliction);
+        // 原版 CardCmd.Afflict 每次成功都记 CardAfflictedEntry；模拟器只记 ChainsOfBindingPower 读取的 Bound 条目。
+        if (applied is Bound && card.CombatState is Combat.CombatState combat)
+            combat.SemanticHistory.Record(combat, Combat.CombatSemanticHistory.ActorEvent.BoundAfflicted, card.Owner);
+        return Task.FromResult<T?>(applied);
     }
 
     public static void ClearAffliction(Models.CardModel card)
@@ -52,10 +66,26 @@ public static class CardCmd
     public static void Upgrade(Models.CardModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
+        if (card.CombatState?.IsEnding() == true)
+        {
+            return;
+        }
+
         if (card.IsUpgradable)
         {
             card.Upgrade();
         }
+    }
+
+    public static void Downgrade(Models.CardModel card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        if (card.CombatState?.IsEnding() == true)
+        {
+            return;
+        }
+
+        card.Downgrade();
     }
 
     /// <summary>Applies Retain only until this turn's hand flush has completed.</summary>
@@ -159,17 +189,17 @@ public static class CardCmd
         Models.CardModel[] discardCards = cardsToDiscard.ToArray();
         (Combat.ICombatState combatState, Player owner, bool departedHand) =
             ValidateDiscardBatch(discardCards);
+        if (combatState.IsOverOrEnding()) return;
         Models.CardModel[] slyCards = discardCards
             .Where(card => card.HasKeyword(CardKeyword.Sly))
             .ToArray();
-        MoveDiscardCards(discardCards);
-
-        await CardPileCmd.Draw(
-            combatState,
-            cardsToDraw,
-            owner,
-            fromHandDraw: false);
-        await BroadcastDiscardHooks(combatState, discardCards);
+        await MoveAndBroadcastDiscardCards(combatState, discardCards);
+        if (cardsToDraw > 0)
+            await CardPileCmd.Draw(
+                combatState,
+                cardsToDraw,
+                owner,
+                fromHandDraw: false);
         await CardPileCmd.NotifyHandDeparture(combatState, owner, departedHand);
         await AutoPlayCmd.FromCards(combatState, owner, slyCards);
     }

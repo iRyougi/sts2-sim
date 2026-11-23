@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Potions;
@@ -11,6 +12,12 @@ namespace Sts2Sim.Core.Models.Events;
 /// 偏离 #164：模拟器没有角色/共享药水池与解锁状态，BOTTLE 从已注册的非 Event C/U/R 药水扁平池均匀抽取。</summary>
 public sealed class Wellspring : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("BOTTLE", [VisibleValue.Int("PotionCount", 1), VisibleValue.Condition("Potion", "Random")]),
+        new("BATHE", [VisibleValue.Int("RemoveCount", 1), VisibleValue.Int("BatheCurses", 1), VisibleValue.Id("Curse", ModelDb.GetId<Guilty>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Guilty>())] },
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]
     {
         new EventOption("BOTTLE", BottleAsync),

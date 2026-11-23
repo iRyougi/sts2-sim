@@ -60,8 +60,10 @@ public class DamageBlockHookTests
         public bool IsLiveCombat() => true;
     }
 
-    private sealed class ProbeModel : AbstractModel
+    private sealed class ProbeModel : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public List<string>? SharedLog { get; init; }

@@ -32,6 +32,11 @@ public sealed class MeteorShower : GeneratedCardModel
                 Spec.Weak,
                 Owner.Creature,
                 this);
+        }
+
+        targets = CombatState!.HittableEnemies.ToArray();
+        foreach (Creature target in targets)
+        {
             await PowerCmd.Apply<VulnerablePower>(
                 CombatState,
                 target,

@@ -38,7 +38,7 @@ public sealed class CombinedRunDecisionSourceTests
 
         await Invoke(combined, decision, cardRequest);
 
-        string expected = decision == "combat" || decision == "cards" && !projectedCombat
+        string expected = decision == "combat"
             ? "combat"
             : "strategy";
         Assert.Equal(expected, Assert.Single(combat.Calls.Concat(strategy.Calls)));
@@ -71,6 +71,7 @@ public sealed class CombinedRunDecisionSourceTests
         Player player = (Player)RuntimeHelpers.GetUninitializedObject(typeof(Player));
         var creature = Creature.CreateStandaloneForTests(10, 10);
         typeof(Player).GetField("<Creature>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(player, creature);
+        // Standalone states without a started engine are not combat decisions.
         creature.CombatState = projectedCombat
             ? new CombatState(runState).Clone()
             : new CombatState(runState);

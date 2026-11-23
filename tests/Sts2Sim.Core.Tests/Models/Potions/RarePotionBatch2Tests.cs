@@ -381,7 +381,7 @@ public sealed class RarePotionBatch2Tests : IDisposable
 
         Assert.Equal(CardPile.MaxCardsInHand, player.PlayerCombatState!.Hand.Cards.Count);
         Assert.Contains(selected, player.PlayerCombatState.DiscardPile.Cards);
-        Assert.True(selected.TemporaryFreeThisTurn);
+        Assert.True((selected.TemporaryCostOverrideThisTurnOrUntilPlayed == 0));
         Assert.Equal(0, selected.EnergyCost);
     }
 

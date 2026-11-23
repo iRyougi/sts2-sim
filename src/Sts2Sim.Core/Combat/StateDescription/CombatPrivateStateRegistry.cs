@@ -35,26 +35,29 @@ internal static class CombatPrivateStateRegistry
         "Nunchaku._attacksPlayed", "Orichalcum._shouldTrigger",
         "OrnamentalFan._attacksThisTurn",
         "Pendulum._turnCounter", "PenNib._attacksPlayed", "Permafrost._triggeredThisCombat",
-        "Pocketwatch._cardsPlayedThisTurn", "Pocketwatch._shouldDrawExtra",
+        "Pocketwatch._cardsPlayedThisTurn", "Pocketwatch._cardsPlayedLastTurn",
         "RainbowRing._playedAttack", "RainbowRing._playedSkill", "RainbowRing._playedPower",
         "RainbowRing._triggeredThisTurn", "RippleBasin._attackPlayedThisTurn",
         "Regalite._usedThisTurn",
         "Shuriken._attacksThisTurn", "SilkenTress._isUsed",
         "StoneCalendar._shouldTriggerThisTurn", "SwordOfStone._eliteVictories",
         "Toolbox._wasUsedThisCombat", "TuningFork._skillsPlayed",
-        "UnsettlingLamp._triggeringCard", "UnsettlingLamp._finished",
-        "Vambrace._triggeredThisCombat", "VenerableTeaSet._isArmed",
+        "UnsettlingLamp._triggeringCard", "UnsettlingLamp._finished", "UnsettlingLamp._doubledTemporaryInternalPowerType",
+        "Vambrace._triggeringCard", "Vambrace._blockGainedThisCombat", "VenerableTeaSet._isArmed",
         "BoneTea._combatsLeft", "EmberTea._combatsLeft", "TeaOfDiscourtesy._combatsLeft",
         "HistoryCourse._lastAttack", "HistoryCourse._lastAttackTurn",
+        "HistoryCourse._previousAttack", "HistoryCourse._previousAttackTurn",
         "FakeHappyFlower._turnsSeen", "FakeOrichalcum._shouldTrigger",
         "FakeVenerableTeaSet._isArmed",
         "WongosMysteryTicket._combatsFinished", "WongosMysteryTicket._gaveRelics",
         "AutomationPower._cardsLeft", "IllusionPower._followUpStateId", "IllusionPower._isReviving",
-        "OrbitPower._energySpent",
+        "OrbitPower._energySpent", "OrbitPower._triggerCount",
         "BattlewornDummyTimeLimitPower._shouldEscape",
         "PaleBlueDotPower._alreadyActivatedThisTurn",
         "PanachePower._alreadyApplied", "PanachePower._cardsLeft",
         "MonologuePower._strengthApplied",
+        "MonologuePower._strength",
+        "Monologue._power",
         "RitualPower._skipFirstEnemyTurnEnd", "SlowPower._cardsPlayedSinceOwnerTurnStart",
         "SwordSagePower._grantedReplays",
         "ReattachPower._isReviving", "TenderPower._cardsPlayedThisTurn",
@@ -79,11 +82,13 @@ internal static class CombatPrivateStateRegistry
         "Axebot._stockAmount", "Fabricator._lastSpawned", "FrogKnight._charged",
         "DampenPower._casters", "DampenPower._downgraded",
         "PossessSpeedPower._stolen", "PossessStrengthPower._stolen",
-        "AdaptablePower._isReviving", "ChainsOfBindingPower._cardsAfflictedThisTurn",
+        "AdaptablePower._isReviving",
         "ChainsOfBindingPower._boundCardPlayedThisTurn", "NemesisPower._shouldApplyIntangible",
         "WitheringPresencePower._cardsPlayed", "WitheringPresencePower.<Target>k__BackingField",
-        "Aeonglass.<AdditionalStrength>k__BackingField",
-        "Aeonglass.<WitherUpgradeCount>k__BackingField", "Queen._hasAmalgamDied",
+        "Aeonglass._additionalStrength",
+        "Aeonglass._witherUpgradeCount", "Queen._hasAmalgamDied", "Queen._amalgam",
+        "CeremonialBeast._beastCryState",
+        "ToughEgg._isHatched", "ToughEgg._afterHatchedState",
         "TestSubject._respawns", "TestSubject._extraMultiClawCount",
         "Wither._fakeUpgradeLevel",
         "MawBank._hasItemBeenBought",
@@ -115,33 +120,29 @@ internal static class CombatPrivateStateRegistry
                 "Pickup replacement has already happened; this saved ID has no future combat read.",
             ["SeaGlass._characterId"] =
                 "The character choice is used only during the already-completed pickup effect and for presentation.",
-            ["CeremonialBeast.<IsStunnedByPlowRemoval>k__BackingField"] =
-                "Presentation flag; the transient STUN_MOVE and its performed state encode the future transition.",
-            ["CeremonialBeast.<IsInSecondPhase>k__BackingField"] =
-                "Presentation flag; no simulator behavior reads it after assignment.",
-            ["Chomper.<ScreamFirst>k__BackingField"] =
+            ["CeremonialBeast._isStunnedByPlowRemoval"] =
+                "Native hurt-animation flag; its presentation reader is omitted in the headless simulator.",
+            ["CeremonialBeast._isInSecondPhase"] =
+                "Native background-animation flag; its presentation reader is omitted in the headless simulator.",
+            ["Chomper._screamFirst"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["Inklet._middleInklet"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["KinFollower._startsWithDance"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
-            ["LouseProgenitor.<Curled>k__BackingField"] =
+            ["LouseProgenitor._curled"] =
                 "Presentation flag; no simulator behavior reads it after assignment.",
             ["Nibbit._isFront"] =
                 "Initial branch input already materialized into the fingerprinted current move.",
             ["Nibbit._isAlone"] =
                 "Initial branch input already materialized into the fingerprinted current move.",
-            ["ThievingHopper.<IsHovering>k__BackingField"] =
+            ["ThievingHopper._isHovering"] =
                 "Presentation flag; FlutterPower and current move state contain all future behavior.",
-            ["ToughEgg._isHatched"] =
-                "Room-entry configuration is materialized before search; later writes have no future reads.",
-            ["ToughEgg.<AfterHatchedState>k__BackingField"] =
-                "Stable reference to NIBBLE_MOVE in the fingerprinted move-state machine.",
-            ["Tunneler.<IsStunned>k__BackingField"] =
+            ["Tunneler._isStunned"] =
                 "Presentation flag; the transient STUNNED move encodes the future transition.",
             ["Wriggler._startStunned"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
-            ["ScrollOfBiting.<StarterMoveIdx>k__BackingField"] =
+            ["ScrollOfBiting._starterMoveIdx"] =
                 "Initial rotation is materialized into the fingerprinted current move state.",
             ["TestSubject._deadState"] =
                 "Stable reference to RESPAWN_MOVE in the fingerprinted move-state machine.",
@@ -169,6 +170,7 @@ internal static class CombatPrivateStateRegistry
 
     private static readonly HashSet<string> DerivedFields =
     [
+        "Queen._burnBrightForMeState", "Queen._enragedState",
         "Alignment.<Spec>k__BackingField",
         "Arsenal.<Spec>k__BackingField",
         "AstralPulse.<Spec>k__BackingField",

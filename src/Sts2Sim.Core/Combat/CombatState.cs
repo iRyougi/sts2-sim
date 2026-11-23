@@ -54,9 +54,25 @@ public sealed partial class CombatState : ICombatState
 
     public IReadOnlyList<Creature> Allies => _allies;
 
+    public IReadOnlyList<Creature> PlayerCreatures => _allies.Where(IsPlayerCreature).ToList();
+
+    // Same membership as PlayerCreatures, without materializing a list on the IsEnding hot path.
+    internal bool HasLivingPlayerCreature()
+    {
+        foreach (Creature creature in _allies)
+        {
+            if (IsPlayerCreature(creature) && creature.IsAlive)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // Model-less standalone creatures are test-only player proxies; production allies are players or pets.
-    public IReadOnlyList<Creature> PlayerCreatures =>
-        _allies.Where(creature => creature.IsPlayer || (!creature.IsMonster && !creature.IsPet)).ToList();
+    private static bool IsPlayerCreature(Creature creature) =>
+        creature.IsPlayer || (!creature.IsMonster && !creature.IsPet);
 
     public IReadOnlyList<Creature> Enemies => _enemies;
 
@@ -244,6 +260,14 @@ public sealed partial class CombatState : ICombatState
         AddCreature(creature);
     }
 
+    /// <summary>Current visible map location shared by live runs and exact combat snapshots; unknown facades have no location.</summary>
+    internal static MapLocation? GetCurrentMapLocation(IRunState runState) => runState switch
+    {
+        Runs.RunState concreteRun => concreteRun.MapLocation,
+        CombatRunStateSnapshot snapshot => snapshot.MapLocation,
+        _ => null,
+    };
+
     /// <summary>
     /// 创建并附着怪物但不加入任一方列表；调用 AddCreature 后才参与目标选择与钩子枚举。
     /// 怪物个体 RNG 按原生公式由 run 种子、当前地图列/行、
@@ -264,12 +288,8 @@ public sealed partial class CombatState : ICombatState
         creature.AssignSlotName(slotName);
         monster.AssignCreature(creature);
         monster.RunRng = RunState.Rng;
-        MapLocation location = RunState switch
-        {
-            Runs.RunState concreteRun => concreteRun.MapLocation,
-            CombatRunStateSnapshot snapshot => snapshot.MapLocation,
-            _ => default,
-        };
+        MapLocation location = GetCurrentMapLocation(RunState) ?? default;
+
         monster.Rng = new Rng((ulong)(
             (long)RunState.Rng.Seed
             + (long)(location.coord?.col ?? 0)
@@ -391,7 +411,7 @@ public sealed partial class CombatState : ICombatState
     {
         // Build the whole dispatch snapshot before any hook runs. Intermediate copies of
         // creature, orb, and pile collections are unnecessary during this synchronous pass.
-        var listeners = new List<AbstractModel>();
+        var listeners = new List<AbstractModel>(EstimateHookListenerCount());
         foreach (Creature creature in _allies)
         {
             AppendCreatureHookListeners(listeners, creature, includePlayerInventory);
@@ -403,6 +423,41 @@ public sealed partial class CombatState : ICombatState
         }
 
         return listeners;
+    }
+
+    // Preallocate to reduce snapshot list growth. Enchantments, afflictions and inventory
+    // are not counted; if capacity is insufficient, the list grows normally.
+    private int EstimateHookListenerCount()
+    {
+        int count = 0;
+        foreach (Creature creature in _allies)
+        {
+            count += EstimateCreatureHookListenerCount(creature);
+        }
+
+        foreach (Creature creature in _enemies)
+        {
+            count += EstimateCreatureHookListenerCount(creature);
+        }
+
+        return count;
+    }
+
+    private static int EstimateCreatureHookListenerCount(Creature creature)
+    {
+        int count = creature.Powers.Count + 1;
+        PlayerCombatState? playerCombatState = creature.Player?.PlayerCombatState;
+        if (playerCombatState is not null)
+        {
+            count += playerCombatState.OrbQueue.Orbs.Count
+                + playerCombatState.Hand.Cards.Count
+                + playerCombatState.DrawPile.Cards.Count
+                + playerCombatState.DiscardPile.Cards.Count
+                + playerCombatState.ExhaustPile.Cards.Count
+                + playerCombatState.PlayPile.Cards.Count;
+        }
+
+        return count;
     }
 
     private static void AppendCreatureHookListeners(

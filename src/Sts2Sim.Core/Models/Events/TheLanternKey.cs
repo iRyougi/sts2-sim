@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Events;
@@ -9,6 +10,14 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class TheLanternKey : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("RETURN_THE_KEY", [VisibleValue.Int("Gold", 100)]),
+        new("KEEP_THE_KEY", [VisibleValue.Int("CardCount", 1), VisibleValue.Condition("RewardTiming", "AfterCombat"), VisibleValue.Id("Card", ModelDb.GetId<LanternKey>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<LanternKey>())] },
+        new("FIGHT", [VisibleValue.Int("CardCount", 1), VisibleValue.Condition("RewardTiming", "AfterCombat"), VisibleValue.Id("Card", ModelDb.GetId<LanternKey>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<LanternKey>())] },
+    ]);
+
     private IReadOnlyList<Reward> _combatRewards = EmptyRewards();
 
     public override EventLayoutType LayoutType => EventLayoutType.Combat;

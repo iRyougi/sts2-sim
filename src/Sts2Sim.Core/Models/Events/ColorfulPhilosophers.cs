@@ -1,22 +1,28 @@
+using System.Collections.Immutable;
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Models.CardPools;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Runs;
-using Sts2Sim.Core.Factories;
 
 namespace Sts2Sim.Core.Models.Events;
 
 /// <summary>
 /// Hive off-color reward event.
 /// Deviation #202: <c>PlayerUnlockState</c> has no unlocked-character/card-pool set, so every registered
-/// playable character is treated as unlocked. Missing CardCreationOptions flags are represented by the
-/// fixed-rarity CardFactory overload, preserving three distinct choices and the Rewards RNG stream.
+/// playable character is treated as unlocked.
 /// </summary>
 public sealed class ColorfulPhilosophers : EventModel
 {
     public override bool IsAllowed(IRunState runState) =>
         ModelDb.All<CharacterModel>().Count(character => character.IsPlayable) > 1;
+
+    protected override VisibleDecisionMetadata BuildVisibleState() => new(
+        [VisibleValue.Int("StatueCount", 3)],
+        CurrentOptions.Select(option => new VisibleOption(option.Key,
+            [VisibleValue.Int("Cards", 3), VisibleValue.Id("Character", option.Key),
+             VisibleValue.Scope("RewardRarities", "Common,Uncommon,Rare")])).ToImmutableArray());
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {
@@ -34,21 +40,21 @@ public sealed class ColorfulPhilosophers : EventModel
             .ToArray();
     }
 
-    private Task OfferAsync(CardPoolModel pool)
+    /// <summary>#1039: one custom rewards screen holding three card rewards (common, uncommon, rare), populated
+    /// in that order by <see cref="RewardsCmd.OfferCustom"/> (game <c>ColorfulPhilosophers.OfferRewards</c>).</summary>
+    private async Task OfferAsync(CardPoolModel pool)
     {
+        var rewards = new List<Reward>(3);
         foreach (CardRarity rarity in new[] { CardRarity.Common, CardRarity.Uncommon, CardRarity.Rare })
         {
-            IReadOnlyList<CardModel> options = CardFactory.CreateForReward(Owner, 3, pool, rarity);
-            var rerollOptions = new CardCreationOptions([pool], CardCreationSource.Other,
+            var options = new CardCreationOptions([pool], CardCreationSource.Other,
                 CardRarityOddsType.Uniform, card => card.Rarity == rarity)
                 .WithFlags(CardCreationFlags.NoRarityModification |
                     CardCreationFlags.NoCardPoolModifications);
-            var cardReward = new CardReward(Owner, options, rerollOptions);
-            cardReward.Populate(RunState);
-            OfferRewards(RewardsSet.CreateCustom(Owner, card: cardReward));
+            rewards.Add(new CardReward(Owner, options, 3));
         }
+        await RewardsCmd.OfferCustom(Owner, rewards);
         Finish();
-        return Task.CompletedTask;
     }
 
     private static int ColorOrder(string id) => id switch

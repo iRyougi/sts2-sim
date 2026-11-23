@@ -31,7 +31,7 @@ internal static class CardChoicePotionEffect
         CardModel? selected = (await CardSelectCmd.SelectCardsAsync(combatState, recipient, generated, 0, 1, source, cancelable: true)).FirstOrDefault();
         if (selected is not null)
         {
-            selected.MakeTemporaryFreeThisTurn();
+            selected.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
             await CardPileCmd.Generate(combatState, selected, PileType.Hand, creator);
         }
     }

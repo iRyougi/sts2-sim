@@ -19,8 +19,7 @@ public sealed class LuckyFysh : RelicModel
     {
         _ = clonedBy;
         if (card.Owner != Owner ||
-            card.Pile?.Type != PileType.Deck ||
-            oldPileType == PileType.Deck)
+            card.Pile?.Type != PileType.Deck)
         {
             return Task.CompletedTask;
         }

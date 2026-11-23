@@ -170,6 +170,9 @@ public sealed class RunEngine
 
         while (floorsVisited < maxFloors)
         {
+            if (!ReferenceEquals(_runState.Map.GetPoint(current.coord), current))
+                throw new InvalidOperationException($"Current map point {current.coord} does not belong to the current map; the map was replaced before travel.");
+
             IReadOnlyList<MapPoint> travelable = MapTravel.GetTravelablePointsFrom(_runState, current).ToList();
             if (travelable.Count == 0)
             {
@@ -196,7 +199,13 @@ public sealed class RunEngine
                 ? ConfigureCombatObserver(combatToObserve)
                 : null;
             _runState.PushRoom(room);
-            try { await room.Enter(_runState); }
+            try
+            {
+                using IDisposable? entryRewards = room is MerchantRoom merchant
+                    ? merchant.BeginEntryRewardResolution(rewards => ResolveRewardsAsync(rewards))
+                    : null;
+                await room.Enter(_runState);
+            }
             catch
             {
                 if (room is EventRoom failedEventRoom)
@@ -225,7 +234,7 @@ public sealed class RunEngine
                     }
                     catch
                     {
-                        // Preserve the original event/forced-combat failure.
+                        // fail-open: Preserve the original event/forced-combat failure.
                     }
 
                     try
@@ -237,7 +246,7 @@ public sealed class RunEngine
                     }
                     catch
                     {
-                        // Preserve the original event/forced-combat failure.
+                        // fail-open: Preserve the original event/forced-combat failure.
                     }
 
                     throw;
@@ -318,6 +327,9 @@ public sealed class RunEngine
 
                     recorderFloorsVisited++;
                 }
+
+                // Ancient choices such as GoldenCompass may replace the generated map.
+                current = _runState.Map.StartingMapPoint;
 
                 if (_runState.IsGameOver)
                 {

@@ -36,7 +36,7 @@ public sealed class HeirloomHammer : CardModel, ICardDamageVariableProvider
             1, 1, this, cancelable: false)).FirstOrDefault();
         if (selected is not null)
         {
-            var clone = (CardModel)selected.MutableClone();
+            CardModel clone = selected.CreateClone();     // 原版 CreateClone：保留改费等可变状态
             await CardPileCmd.Generate(combatState, clone, PileType.Hand);
         }
     }

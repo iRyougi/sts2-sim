@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Enchantments;
@@ -8,6 +9,11 @@ namespace Sts2Sim.Core.Models.Events;
 /// 在无头事件状态机中保留 Heal 9、玩家选择升级、首张附魔占位及空候选完成语义。</summary>
 public sealed class SapphireSeed : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("EAT", [VisibleValue.Int("Heal", 9), VisibleValue.Int("UpgradeSelectCount", 1)]),
+        new("PLANT", [VisibleValue.Id("EnchantmentId", "SOWN"), VisibleValue.Int("SelectCount", 1), VisibleValue.Int("Energy", 1), VisibleValue.Condition("EnergyTrigger", "FirstPlayEachCombat")]),
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]
     {
         new EventOption("EAT", EatAsync),
@@ -26,10 +32,13 @@ public sealed class SapphireSeed : EventModel
         Finish();
     }
 
+    /// <summary>原版 <c>Plant</c>：<c>CardSelectCmd.FromDeckForEnchantment(deck.Where(Sown.CanEnchant), Sown, 1, prefs(1))</c>，
+    /// 牌组顺序，由玩家选 1 张。</summary>
     private async Task PlantAsync()
     {
         Sown sown = ModelDb.GetById<Sown>(ModelDb.GetId<Sown>());
-        CardModel? card = Owner.Deck.Cards.FirstOrDefault(sown.CanEnchant);
+        CardModel? card = (await CardSelectCmd.SelectCardsAsync(
+            RunState, Owner, Owner.Deck.Cards.Where(sown.CanEnchant), 1, 1, this)).FirstOrDefault();
         if (card is not null)
         {
             await CardCmd.Enchant<Sown>(card, 1m);

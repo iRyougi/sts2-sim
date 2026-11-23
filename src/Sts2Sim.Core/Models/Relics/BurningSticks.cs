@@ -28,7 +28,7 @@ public sealed class BurningSticks : RelicModel
             return;
         }
 
-        CardModel copy = (CardModel)card.MutableClone();
+        CardModel copy = card.CreateClone();     // 原版 CreateClone：保留改费等可变状态
         await CardPileCmd.Generate(card.CombatState!, copy, PileType.Hand);
         _wasUsedThisCombat = true;
     }

@@ -20,7 +20,7 @@ public sealed class WhiteStar : RelicModel
             return;
         }
 
-        var cards = new CardReward(player, CardRarityOddsType.BossEncounter);
+        var cards = new CardReward(player, CardRarityOddsType.BossEncounter, isFromCombat: false);
         cards.Populate(player.RunState);
         rewards.Add(cards);
     }

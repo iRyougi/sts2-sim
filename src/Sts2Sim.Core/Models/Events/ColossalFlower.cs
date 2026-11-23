@@ -17,6 +17,14 @@ namespace Sts2Sim.Core.Models.Events
         public override bool IsAllowed(IRunState runState) =>
             runState.Players.All(player => player.Creature.CurrentHp >= 19);
 
+        protected override VisibleDecisionMetadata BuildVisibleState() => new([], _dig < 2
+            ? [new("EXTRACT_CURRENT_PRIZE", [VisibleValue.Int($"Prize{_dig + 1}", Gold[_dig])]),
+               new("REACH_DEEPER", [VisibleValue.Int("Damage", Damage[_dig])])]
+            : [new("EXTRACT_INSTEAD", [VisibleValue.Int("Prize3", Gold[_dig])]),
+               new("POLLINOUS_CORE", [VisibleValue.Int("Damage", Damage[_dig]),
+                   VisibleValue.Id("Relic", "POLLINOUS_CORE"), VisibleValue.Int("RelicCount", 1)])
+                   { Contents = [VisibleContentProjection.ForRelic(ModelDb.Relic<PollinousCore>())] }]);
+
         protected override IReadOnlyList<EventOption> GenerateInitialOptions() => DigOptions();
 
         private IReadOnlyList<EventOption> DigOptions() => new[]

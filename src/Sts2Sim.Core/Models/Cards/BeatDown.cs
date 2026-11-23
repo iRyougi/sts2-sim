@@ -1,12 +1,13 @@
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Helpers;
+using Sts2Sim.Core.Hooks;
 
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>弃牌堆洗出3张攻击牌自动打出(随机目标)。逐字移植（<c>MegaCrit.Sts2.Core.Models.Cards.BeatDown</c>），
-/// 按原版过滤 Unplayable 攻击并 StableShuffle。偏离 #104：RandomEnemy 候选显式从
-/// CombatTargets 选目标；原版只对 AnyEnemy 显式抽目标，其他类型传 null 交给底层定标。</summary>
+/// 按原版过滤 Unplayable 攻击并 StableShuffle，只对 AnyEnemy 显式抽目标；
+/// RandomEnemy 等其它类型传 null，由卡牌效果自行选择目标。</summary>
 public sealed class BeatDown : CardModel
 {
     private int _count = 3;
@@ -30,17 +31,33 @@ public sealed class BeatDown : CardModel
 
         foreach (CardModel card in candidates.Take(_count))
         {
-            Creature? target = null;
-            if (card.TargetType is TargetType.AnyEnemy or TargetType.RandomEnemy)
+            if (CombatState!.IsOverOrEnding())
             {
-                target = CombatState!.RunState.Rng.CombatTargets.NextItem(CombatState.HittableEnemies);
-                if (target is null)
-                {
-                    break;
-                }
+                break;
             }
 
-            await card.AutoPlayAsync(target);
+            Creature? target = null;
+            if (card.TargetType == TargetType.AnyEnemy)
+            {
+                target = CombatState!.RunState.Rng.CombatTargets.NextItem(CombatState.HittableEnemies);
+            }
+
+            // Native BeatDown chooses its explicit target before CardCmd.AutoPlay's owner guard.
+            if (card.Owner.Creature.IsDead)
+            {
+                continue;
+            }
+            // Native CardCmd.AutoPlay checks vetoes before refusing an unresolved AnyEnemy target.
+            // A reviving primary enemy can keep combat live while HittableEnemies is empty.
+            if (card.HasKeyword(CardKeyword.Unplayable) ||
+                !Hook.ShouldPlay(CombatState!, card, isAutoPlay: true) ||
+                card.TargetType == TargetType.AnyEnemy && target is null)
+            {
+                await card.MoveToResultPileWithoutPlaying(CombatState!);
+                continue;
+            }
+
+            await card.AutoPlayPrevalidatedWithResultAsync(target);
         }
     }
 

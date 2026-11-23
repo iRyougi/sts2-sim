@@ -9,7 +9,8 @@ public static partial class GloryEncounters
     [
         new(() => [(Monster<Axebot>(), "front")], null, false, "AxebotsNormal"),
         new(() => [(Monster<DevotedSculptor>(), null)], null, true, "DevotedSculptorWeak"),
-        new(() => [(Monster<Fabricator>(), "fabricator")], null, false, "FabricatorNormal"),
+        // 原版 FabricatorNormal.Slots：造出的机器人按槽位插在制造者两侧
+        new(() => [(Monster<Fabricator>(), "fabricator")], null, false, "FabricatorNormal") { Slots = ["bot1", "bot2", "fabricator", "bot3", "bot4"] },
         new(() => [(Monster<FrogKnight>(), null)], null, false, "FrogKnightNormal"),
         new(() => [(Monster<GlobeHead>(), null)], null, false, "GlobeHeadNormal"),
         new(() => [(Monster<MechaKnight>(), null)], null, false, "MechaKnightElite"),

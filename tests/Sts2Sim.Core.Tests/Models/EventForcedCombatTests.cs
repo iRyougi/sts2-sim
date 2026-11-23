@@ -10,6 +10,7 @@ using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Exceptions;
+using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Potions;
 using Sts2Sim.Core.Models.Relics;
@@ -275,7 +276,7 @@ public sealed class EventForcedCombatTests : IDisposable
             typeof(ForcedCombatContractEvent), typeof(ForcesCombatEvent), typeof(ForcesCombatFactoryFailureEvent),
             typeof(ForcesCombatEnterFailureEvent), typeof(FinishesWithoutCombatEvent),
             typeof(ForcedCombatLifecycleMonster), typeof(ForcedCombatEnterFailureMonster),
-            typeof(WanderingGrunt),
+            typeof(WanderingGrunt), typeof(DenseVegetation),
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(AfterCombatEndProbeCard),
             typeof(Sts2Sim.Core.Models.Powers.WeakPower), typeof(Sts2Sim.Core.Models.Powers.VulnerablePower),
@@ -305,7 +306,7 @@ public sealed class EventForcedCombatTests : IDisposable
     }
 
     [Fact]
-    public void PendingForcedCombat_CloneStartsEmptyWithoutConsumingSource()
+    public async Task PendingForcedCombat_CloneStartsEmptyWithoutConsumingSource()
     {
         var source = (ForcedCombatContractEvent)ModelDb.Event<ForcedCombatContractEvent>().MutableClone();
         Func<MonsterModel> factory = () => (MonsterModel)ModelDb.Monster<WanderingGrunt>().MutableClone();
@@ -317,6 +318,32 @@ public sealed class EventForcedCombatTests : IDisposable
         Assert.False(clone.HasPendingForcedCombat);
         Assert.Same(factory, source.DequeuePendingForcedCombat());
         Assert.Throws<InvalidOperationException>(() => clone.DequeuePendingForcedCombat());
+
+        // DenseVegetation uses the slotted batch path rather than the single-monster request.
+        var run = new RunState("ordinary-slotted-event-clone", new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
+        run.AddPlayer(player);
+        var slottedSource = (DenseVegetation)ModelDb.Event<DenseVegetation>().MutableClone();
+        slottedSource.AssignOwner(player);
+        slottedSource.BeginEvent(run);
+        await slottedSource.ChooseOption(slottedSource.CurrentOptions.Single(option => option.Key == "REST"));
+        await slottedSource.ChooseOption(Assert.Single(slottedSource.CurrentOptions));
+
+        var slottedClone = (DenseVegetation)slottedSource.MutableClone();
+
+        Assert.True(slottedSource.HasPendingForcedCombat);
+        Assert.False(slottedClone.HasPendingForcedCombat);
+        Assert.False(slottedClone.IsFinished);
+        slottedClone.AssignOwner(player);
+        slottedClone.BeginEvent(run);
+        await slottedClone.ChooseOption(slottedClone.CurrentOptions.Single(option => option.Key == "REST"));
+        EventOption fight = Assert.Single(slottedClone.CurrentOptions);
+        Assert.Equal("FIGHT", fight.Key);
+        await slottedClone.ChooseOption(fight);
+
+        Assert.True(slottedClone.IsFinished);
+        Assert.True(slottedClone.HasPendingForcedCombat);
+        Assert.True(slottedSource.HasPendingForcedCombat);
     }
 
     [Fact]

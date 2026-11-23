@@ -10,6 +10,12 @@ namespace Sts2Sim.Core.Models.Events;
 
 public sealed class TheLegendsWereTrue : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("NAB_THE_MAP", [VisibleValue.Int("CardCount", 1), VisibleValue.Id("Card", ModelDb.GetId<SpoilsMap>().Entry)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<SpoilsMap>())] },
+        new("SLOWLY_FIND_AN_EXIT", [VisibleValue.Int("Damage", 8), VisibleValue.Int("PotionCount", 1), VisibleValue.Condition("Potion", "Random")]),
+    ]);
+
     public override bool IsAllowed(IRunState runState) => runState is RunState { CurrentActIndex: 0 } &&
         runState.Players.All(p => p.Deck.Cards.Count > 0 && p.Creature.CurrentHp >= 10);
 

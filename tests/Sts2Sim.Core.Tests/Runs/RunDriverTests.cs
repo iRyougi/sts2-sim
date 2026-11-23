@@ -339,6 +339,81 @@ public class RunDriverTests : IDisposable
 
     public void Dispose() => ModelDb.ResetForTests();
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Act_entry_boundary_roundtrip_continues_ancient_once(bool visited, bool compass)
+    {
+        var run = new RunState("m6a1-entry", new Sts2Sim.Core.Content.ActDefinition[]
+            { new Overgrowth(), new Hive(), new Glory() }, 10);
+        var player = Player.CreateForNewRun(ModelDb.Character<Silent>(), run);
+        run.AddPlayer(player);
+        run.AdvanceToNextAct();
+        player.Creature.SetCurrentHpInternal(20);
+        if (visited) run.AddVisitedMapCoord(run.Map.StartingMapPoint.coord);
+        int entered = 0;
+        AbstractRoom Ancient(RunState state) => new ActEntryAncientRoom(async () =>
+        {
+            entered++;
+            if (compass) await Sts2Sim.Core.Commands.RelicCmd.Obtain(ModelDb.Relic<GoldenCompass>(), state.Players[0]);
+        });
+        var boundary = await new RunDriver(run, new FirstChoiceDecisionSource(), Ancient)
+            .ContinueToActEntryAsync(1, 0);
+        Assert.True(boundary.ReachedBoundary && entered == 0 && player.Creature.CurrentHp == 20,
+            $"seed=m6a1-entry act=1 visited={visited} compass={compass}: entered Ancient before query");
+        var snapshot = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ExportActEntry(run);
+        string json = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ExportActEntryJson(run);
+        var document = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+        foreach (string field in document.Select(p => p.Key).ToArray())
+        {
+            var incomplete = document.DeepClone().AsObject();
+            incomplete.Remove(field);
+            Assert.Throws<System.Text.Json.JsonException>(() =>
+                Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(incomplete.ToJsonString()));
+        }
+        var unknown = document.DeepClone().AsObject();
+        unknown["UnknownField"] = 0;
+        Assert.Throws<System.Text.Json.JsonException>(() =>
+            Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(unknown.ToJsonString()));
+        var missingRng = document.DeepClone().AsObject();
+        missingRng["RunRng"]!["Rngs"]!.AsObject().First().Value!.AsObject().Remove("state0");
+        Assert.Throws<System.Text.Json.JsonException>(() =>
+            Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(missingRng.ToJsonString()));
+        var dead = document.DeepClone().AsObject(); dead["Player"]!["CurrentHp"] = 0;
+        Assert.Throws<Sts2Sim.Core.Runs.Transplant.TransplantMappingException>(() =>
+            Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(dead.ToJsonString()));
+        RunState restored = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(json);
+        Assert.Equal(RunEntryPhase.InitializedBeforeAncient, restored.EntryPhase);
+        var rngJson = new System.Text.Json.JsonSerializerOptions { IncludeFields = true };
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(run.Rng.ToSerializable(), rngJson),
+            System.Text.Json.JsonSerializer.Serialize(restored.Rng.ToSerializable(), rngJson));
+        Assert.Equal(run.Players[0].Deck.Cards.Select(c => c.Id), restored.Players[0].Deck.Cards.Select(c => c.Id));
+        Assert.Equal(restored.EntryPhase, restored.CloneExact().EntryPhase);
+        var reseeded = restored.CloneReseeded(566);
+        Assert.Equal(restored.EntryPhase, reseeded.EntryPhase);
+        Assert.NotEqual(restored.Rng.Seed, reseeded.Rng.Seed);
+        document["SchemaVersion"] = -1;
+        Assert.Throws<Sts2Sim.Core.Runs.Transplant.TransplantMappingException>(() =>
+            Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(document.ToJsonString()));
+        var resume = new RunDriver(restored, new FirstChoiceDecisionSource(), Ancient);
+        await resume.ContinueAsync(0);
+        Assert.Equal(1, entered);
+        Assert.Equal(RunEntryPhase.ReadyForMap, restored.EntryPhase);
+        if (compass) Assert.IsType<GoldenPathActMap>(restored.Map);
+        Assert.Same(restored.Map.StartingMapPoint, restored.CurrentMapPoint);
+        await resume.ContinueAsync(0);
+        Assert.Equal(1, entered);
+    }
+
+    private sealed class ActEntryAncientRoom(Func<Task> enter) : AbstractRoom
+    {
+        public override RoomType RoomType => RoomType.Event;
+        public override ModelId? ModelId => null;
+        public override Task EnterInternal(RunState? state) => enter();
+        public override Task Exit(RunState? state) => Task.CompletedTask;
+    }
     private static MapPoint PickFirstByCoord(IEnumerable<MapPoint> points) =>
         points.OrderBy(p => p.coord.col).First();
 
@@ -674,8 +749,10 @@ public class RunDriverTests : IDisposable
         PickFirstByCoord(runState.Map.StartingMapPoint.Children).PointType = MapPointType.Unknown;
     }
 
-    [Fact]
-    public async Task RunAsync_DrivesSelectedAct1EventToCompletionUsingDecisionSourceOption()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task RunAsync_DrivesSelectedAct1EventToCompletionUsingDecisionSourceOption(int initialHp)
     {
         RunState runState = NewRunState("room-factory-b");
         MakeFirstReachableRoomAnEvent(runState);
@@ -686,6 +763,40 @@ public class RunDriverTests : IDisposable
 
         Assert.Equal(1, result.FloorsVisited);
         Assert.Equal(1, decisionSource.EventDecisionCount);
+
+        // #527: the lethal option completes, but a dead player must not see its next page.
+        string seed = $"event-death-527-{initialHp}";
+        RunState lethalRun = NewRunState(seed);
+        Player player = lethalRun.Players[0];
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - initialHp, default);
+        lethalRun.AddVisitedMapCoord(lethalRun.Map.StartingMapPoint.coord);
+        var room = new EventRoom(() => (EventModel)ModelDb.Event<SlipperyBridge>().MutableClone());
+        lethalRun.PushRoom(room);
+        await room.Enter(lethalRun);
+        int goldBefore = player.Gold;
+        var lethalDecisions = new EventDecisionSource(options =>
+        {
+            Assert.True(!lethalRun.IsGameOver,
+                $"seed={seed} initialHp={initialHp} hp={player.Creature.CurrentHp}: requested an option after death");
+            // A queued offer on the lethal choice must not be awarded after death.
+            if (player.Creature.CurrentHp <= 4)
+                Assert.True(room.Event.TryOfferRewardsFromCurrentEvent(lethalRun,
+                    RewardsSet.CreateCustom(player, gold: new GoldReward(50, player))));
+            return options.Single(option => option.Key.Contains("HOLD_ON"));
+        });
+
+        RunDriver.Result lethalResult = await new RunDriver(lethalRun, lethalDecisions).ContinueAsync(1);
+
+        Assert.True(lethalResult.Outcome == RunOutcome.PlayerDefeated,
+            $"seed={seed} initialHp={initialHp} hp={player.Creature.CurrentHp}: outcome={lethalResult.Outcome}");
+        Assert.Equal(initialHp == 1 ? 1 : 2, lethalDecisions.EventDecisionCount);
+        Assert.Equal(0, player.Creature.CurrentHp);
+        Assert.Equal(initialHp == 1 ? 2 : 3, room.Event.Rng.Counter);
+        Assert.False(room.Event.IsFinished);
+        Assert.Equal(2, room.Event.CurrentOptions.Count);
+        Assert.True(room.Event.HasPendingRewardOffers);
+        Assert.Equal(goldBefore, player.Gold);
+        Assert.Null(lethalRun.CurrentRoom);
     }
 
     [Fact]

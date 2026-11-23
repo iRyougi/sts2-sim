@@ -106,7 +106,7 @@ public sealed class CardSelectionMigrationATests : IDisposable
             relic.AssignOwner(player);
             model = relic;
             expected = hand;
-            await relic.AfterSideTurnStart(CombatSide.Player, new[] { player.Creature });
+            await relic.AfterPlayerTurnStart(player);     // 原版暖手套挂在 AfterPlayerTurnStart
         }
         else if (effect is "LiquidMemories" or "TouchOfInsanity" or "DropletOfPrecognition")
         {

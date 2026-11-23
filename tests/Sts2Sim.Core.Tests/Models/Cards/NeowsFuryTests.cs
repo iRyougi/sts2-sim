@@ -7,6 +7,7 @@ using Sts2Sim.Core.Models.Cards;
 
 namespace Sts2Sim.Core.Tests.Models.Cards;
 
+
 [Collection("ModelDb")]
 public sealed class NeowsFuryTests : IDisposable
 {
@@ -41,9 +42,13 @@ public sealed class NeowsFuryTests : IDisposable
             CardPileCmd.Add(card, PileType.Discard);
         }
         decimal hpBefore = room.Engine.State.Enemies[0].CurrentHp;
+        // 原版从弃牌堆选 0..上限 张：这里的决策源取前几张（上限 2、升级 3）
+        var selection = new LegacySelectionDecisionSource();
+        room.Engine.State.CardSelectionSource = selection;
 
         await fury.PlayAsync(room.Engine.State.Enemies[0]);
 
+        Assert.Equal(0, Assert.Single(selection.Requests).MinCount);
         Assert.Equal(expectedDamage, hpBefore - room.Engine.State.Enemies[0].CurrentHp);
         Assert.Equal(discard.Take(expectedRetrieved),
             player.PlayerCombatState!.Hand.Cards.Where(discard.Contains));

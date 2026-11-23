@@ -33,6 +33,9 @@ public sealed class AbundanceTests : IDisposable
         Assert.Equal(TargetType.Self, card.TargetType);
         Assert.Equal(new[] { CardKeyword.Exhaust }, card.Keywords);
         Assert.False(card.CanBeGeneratedInCombat);
+
+        card.Upgrade();
+        Assert.Equal(0, card.EnergyCost);
     }
 
     [Theory]
@@ -53,7 +56,7 @@ public sealed class AbundanceTests : IDisposable
         Assert.Equal(3, abundance.GeneratedCandidates.Select(card => card.GetType()).Distinct().Count());
         CardModel chosen = abundance.GeneratedCandidates[0];
         Assert.Contains(chosen, player.PlayerCombatState!.Hand.Cards);
-        Assert.True(chosen.TemporaryFreeThisTurn);
+        Assert.True((chosen.TemporaryCostOverrideThisTurnOrUntilPlayed == 0));
         Assert.Equal(0, chosen.EnergyCost);
     }
 

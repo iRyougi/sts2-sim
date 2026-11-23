@@ -2,6 +2,7 @@ using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
+using Sts2Sim.Core.Entities.Rngs;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Characters;
@@ -46,6 +47,7 @@ public sealed class MerchantRoomTests : IDisposable
         {
             typeof(Regent), typeof(RoomMerchantCharacter), typeof(StrikeRegent), typeof(DefendRegent), typeof(Sts2Sim.Core.Models.Cards.FallingStar), typeof(Sts2Sim.Core.Models.Cards.Venerate), typeof(Sts2Sim.Core.Models.Powers.WeakPower), typeof(Sts2Sim.Core.Models.Powers.VulnerablePower), typeof(DivineRight),
             typeof(MerchantTestAttack), typeof(Vajra), typeof(Circlet), typeof(StrengthPotion),
+            typeof(Sozu), typeof(TheCourier), typeof(PurchaseHookProbe), typeof(AscendersBane),
         });
     }
 
@@ -209,26 +211,61 @@ public sealed class MerchantRoomTests : IDisposable
         Assert.False(entry.Purchased);
     }
 
-    [Fact]
-    public async Task Buy_Potion_RejectsFullSlotsWithoutChangingGoldEntryOrPotionOwner()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Buy_Potion_FailureLeavesGoldShelfSlotsHooksAndRngUnchanged(bool useSozu)
     {
-        (RunState runState, Player player) = CreateRun("merchant-room-potion-capacity");
+        const string seed = "merchant-room-potion-failure";
+        (RunState runState, Player player) = CreateRun(seed, ascensionLevel: 10);
+        Assert.Equal(2, player.MaxPotionCount);
         player.Gold = 99999;
+        var probe = (PurchaseHookProbe)ModelDb.Relic<PurchaseHookProbe>().MutableClone();
+        probe.AssignOwner(player);
+        player.AddRelicInternal(probe);
+        var courier = (TheCourier)ModelDb.Relic<TheCourier>().MutableClone();
+        courier.AssignOwner(player);
+        player.AddRelicInternal(courier);
+        if (useSozu)
+        {
+            var sozu = (Sozu)ModelDb.Relic<Sozu>().MutableClone();
+            sozu.AssignOwner(player);
+            player.AddRelicInternal(sozu);
+        }
+        else
+        {
+            for (int index = 0; index < player.MaxPotionCount; index++)
+                player.AddPotionInternal(ModelDb.Potion<StrengthPotion>());
+        }
         var room = new MerchantRoom();
         await room.EnterInternal(runState);
         MerchantPotionEntry entry = room.Inventory.Potions[0];
-        for (int index = 0; index < player.MaxPotionCount; index++)
-        {
-            player.AddPotionInternal(ModelDb.Potion<StrengthPotion>());
-        }
+        PotionModel shelfPotion = entry.Potion;
+        var shelvesBefore = room.Inventory.Potions.ToArray();
+        var slotsBefore = player.PotionSlots.ToArray();
+        var runCounters = Enum.GetValues<RunRngType>().Select(type => runState.Rng.GetRng(type).Counter).ToArray();
+        var playerCounters = Enum.GetValues<PlayerRngType>().Select(type => player.PlayerRng.GetRng(type).Counter).ToArray();
         int goldBefore = player.Gold;
+        int priceBefore = entry.Price;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => room.Buy(entry, player));
+        var (success, price) = await room.TryBuyPotionWithPriceAsync(entry, player);
+
+        Assert.False(success);
+        Assert.Equal(0, price);
 
         Assert.Equal(goldBefore, player.Gold);
+        Assert.Equal(priceBefore, entry.Price);
+        Assert.Equal(shelvesBefore, room.Inventory.Potions);
+        Assert.Equal(slotsBefore, player.PotionSlots);
+        Assert.Same(shelfPotion, entry.Potion);
         Assert.False(entry.Purchased);
-        Assert.Null(entry.Potion.Owner);
-        Assert.DoesNotContain(player.PotionSlots, potion => ReferenceEquals(entry.Potion, potion));
+        Assert.Null(shelfPotion.Owner);
+        Assert.Equal(1, probe.ProcurementChecks);
+        Assert.Equal(0, probe.PotionsProcured);
+        Assert.Equal(0, probe.ItemsPurchased);
+        Assert.Equal(0, probe.RefillChecks);
+        Assert.Equal(runCounters, Enum.GetValues<RunRngType>().Select(type => runState.Rng.GetRng(type).Counter));
+        Assert.Equal(playerCounters, Enum.GetValues<PlayerRngType>().Select(type => player.PlayerRng.GetRng(type).Counter));
     }
 
     [Fact]
@@ -290,9 +327,9 @@ public sealed class MerchantRoomTests : IDisposable
         Assert.Equal(1, player.CardRemovalsUsed);
     }
 
-    private static (RunState runState, Player player) CreateRun(string seed, bool useTestPool = false)
+    private static (RunState runState, Player player) CreateRun(string seed, bool useTestPool = false, int ascensionLevel = 0)
     {
-        var runState = new RunState(seed, new Overgrowth());
+        var runState = new RunState(seed, new Overgrowth(), ascensionLevel);
         Player player = Player.CreateForNewRun(useTestPool ? ModelDb.Character<RoomMerchantCharacter>() : ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
         return (runState, player);
@@ -337,5 +374,37 @@ public sealed class MerchantRoomTests : IDisposable
 
         Assert.False(oldEntry.Purchased);
         Assert.True(currentEntry.Purchased);
+    }
+    private sealed class PurchaseHookProbe : RelicModel
+    {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+        public int ProcurementChecks { get; private set; }
+        public int PotionsProcured { get; private set; }
+        public int ItemsPurchased { get; private set; }
+        public int RefillChecks { get; private set; }
+
+        public override bool ShouldProcurePotion(PotionModel potion, Player player)
+        {
+            ProcurementChecks++;
+            return true;
+        }
+
+        public override Task AfterPotionProcured(PotionModel potion)
+        {
+            PotionsProcured++;
+            return Task.CompletedTask;
+        }
+
+        public override Task AfterItemPurchased(Player player, MerchantEntry itemPurchased, int goldSpent)
+        {
+            ItemsPurchased++;
+            return Task.CompletedTask;
+        }
+
+        public override bool ShouldRefillMerchantEntry(MerchantEntry entry, Player player)
+        {
+            RefillChecks++;
+            return false;
+        }
     }
 }

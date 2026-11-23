@@ -196,22 +196,37 @@ public class MerchantInventoryTests : IDisposable
     public void Generate_OnlyConsumesRelicsThroughExpectedBackOfBagDraws()
     {
         const string seed = "merchant-inventory-bag";
-        var expectedRun = new RunState(seed, new Overgrowth());
-        Player expectedPlayer = Player.CreateForNewRun(ModelDb.Character<Regent>(), expectedRun);
-        expectedRun.AddPlayer(expectedPlayer);
-
-        MerchantInventory expectedInventory = MerchantInventory.Generate(expectedPlayer);
+        ModelDb.ResetForTests();
+        ModelDb.Init(ContentRegistry.AllTypes);
         Player actualPlayer = GeneratePlayer(seed);
+        var expected = actualPlayer.RelicGrabBag.ExportForTransplant().Buckets
+            .ToDictionary(pair => pair.Key, pair => pair.Value.ToList());
+        var shared = ((RunState)actualPlayer.RunState).SharedRelicGrabBag!;
+        var expectedShared = shared.ExportForTransplant().Buckets
+            .ToDictionary(pair => pair.Key, pair => pair.Value.ToList());
+        Assert.All(expected.Values, bucket => Assert.True(bucket.Count > 1,
+            "Fixture needs distinct front/back candidates, not single-item buckets."));
         MerchantInventory inventory = MerchantInventory.Generate(actualPlayer);
 
+        Assert.Equal(3, inventory.Relics.Count);
         Assert.All(inventory.Relics, entry => Assert.True(entry.Relic.IsCanonical));
-        Assert.Equal(expectedInventory.Relics.Select(entry => (entry.Relic.Id, entry.Price)), inventory.Relics.Select(entry => (entry.Relic.Id, entry.Price)));
-        foreach (RelicRarity rarity in new[] { RelicRarity.Common, RelicRarity.Uncommon, RelicRarity.Rare, RelicRarity.Shop })
+        Assert.Equal(RelicRarity.Shop, inventory.Relics[2].Relic.Rarity);
+        foreach (MerchantRelicEntry entry in inventory.Relics)
         {
-            Assert.Equal(
-                DrainFromBack(expectedPlayer.RelicGrabBag, rarity),
-                DrainFromBack(actualPlayer.RelicGrabBag, rarity));
+            List<string> bucket = expected[entry.Relic.Rarity.ToString()];
+            int index = bucket.FindLastIndex(id =>
+            {
+                RelicModel relic = ModelDb.GetById<RelicModel>(ModelId.Deserialize(id));
+                return relic.IsAllowedInShops && relic.IsAllowed(actualPlayer.RunState);
+            });
+            Assert.True(index >= 0, $"seed={seed}, rarity={entry.Relic.Rarity}: no eligible candidate");
+            Assert.Equal(bucket[index], entry.Relic.Id.ToString());
+            bucket.RemoveAt(index);
+            foreach (List<string> sharedBucket in expectedShared.Values)
+                sharedBucket.RemoveAll(id => id == entry.Relic.Id.ToString());
         }
+        AssertRemainingBag(actualPlayer.RelicGrabBag, expected);
+        AssertRemainingBag(shared, expectedShared);
     }
 
     [Fact]
@@ -257,14 +272,12 @@ public class MerchantInventoryTests : IDisposable
         return player;
     }
 
-    private static IReadOnlyList<ModelId> DrainFromBack(RelicGrabBag bag, RelicRarity rarity)
+    private static void AssertRemainingBag(RelicGrabBag bag, Dictionary<string, List<string>> expected)
     {
-        var ids = new List<ModelId>();
-        while (bag.PullFromBack(rarity) is RelicModel relic)
-        {
-            ids.Add(relic.Id);
-        }
-        return ids;
+        var actual = bag.ExportForTransplant().Buckets;
+        Assert.Equal(expected.Keys.Order(), actual.Keys.Order());
+        foreach ((string rarity, List<string> ids) in expected)
+            Assert.Equal(ids, actual[rarity]);
     }
 
     private static bool IsDiscounted(MerchantCardEntry entry) => entry.Price < MinPrice(entry.Card);

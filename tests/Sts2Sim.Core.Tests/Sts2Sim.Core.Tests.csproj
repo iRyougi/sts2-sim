@@ -13,6 +13,8 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../Shared/RunCloneGraphSnapshot.cs" Link="Shared/RunCloneGraphSnapshot.cs" />
+    <Compile Include="../Shared/HiddenFutureCounterfactual.cs" Link="Shared/HiddenFutureCounterfactual.cs" />
     <ProjectReference Include="..\..\src\Sts2Sim.Core\Sts2Sim.Core.csproj" />
   </ItemGroup>
 </Project>

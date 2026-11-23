@@ -49,7 +49,7 @@ public sealed class AttackContext : IAsyncDisposable
         }
         catch (Exception exception) when (exception is not DecisionSuspendedException)
         {
-            // 偏离：权威实现通过 Log.Error 记录此异常；Core 当前没有日志抽象或日志依赖，
+            // fail-open: 偏离：权威实现通过 Log.Error 记录此异常；Core 当前没有日志抽象或日志依赖，
             // 因此先保持权威异常隔离语义并最小吞并，待仓库统一引入 logger 后再接入记录。
         }
     }

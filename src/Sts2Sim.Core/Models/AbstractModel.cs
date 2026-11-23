@@ -304,6 +304,12 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return Task.CompletedTask;
     }
 
+    /// <summary>原版 <c>AfterSideTurnEndLate</c>：所有监听者的 AfterSideTurnEnd 都结算完之后再逐个调用（瓦解在这里扣血，排在格挡盾之后）。</summary>
+    public virtual Task AfterSideTurnEndLate(CombatSide side, IEnumerable<Creature> participants)
+    {
+        return Task.CompletedTask;
+    }
+
     public virtual Task AfterEnergyReset(Player player)
     {
         return Task.CompletedTask;
@@ -428,7 +434,7 @@ public abstract class AbstractModel : IComparable<AbstractModel>
         return false;
     }
 
-    /// <summary>Notifies run-level listeners after a card permanently enters its owner's deck.</summary>
+    /// <summary>Notifies run/combat listeners after a card changes pile type.</summary>
     public virtual Task AfterCardChangedPiles(
         CardModel card,
         PileType oldPileType,
@@ -436,6 +442,11 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     {
         return Task.CompletedTask;
     }
+
+    public virtual Task AfterCardChangedPilesLate(
+        CardModel card, PileType oldPileType, AbstractModel? clonedBy) => Task.CompletedTask;
+
+    public virtual bool ShouldEtherealTrigger(CardModel card) => true;
 
     public virtual Task BeforeCardPlayed(CardPlay cardPlay)
     {

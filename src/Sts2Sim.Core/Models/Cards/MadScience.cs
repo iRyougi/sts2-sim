@@ -123,7 +123,7 @@ public sealed class MadScience : CardModel, ICardDamageVariableProvider
         {
             return;
         }
-        generated.MakeTemporaryFreeThisTurn();
+        generated.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
         await CardPileCmd.Generate(CombatState, generated, PileType.Hand);
     }
 

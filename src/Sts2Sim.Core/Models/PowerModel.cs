@@ -30,6 +30,8 @@ public abstract class PowerModel : AbstractModel, ICombatStateDescriptionContrib
 
     public abstract PowerStackType StackType { get; }
 
+    public virtual int DisplayAmount => Amount;
+
     public virtual bool AllowNegative => false;
 
     public bool SkipNextDurationTick

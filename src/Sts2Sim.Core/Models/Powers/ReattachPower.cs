@@ -18,7 +18,7 @@ public sealed class ReattachPower : PowerModel
 
     public override Task AfterDeath(Creature target)
     {
-        if (!ReferenceEquals(target, Owner) || AreAllOtherSegmentsDead())
+        if (!ReferenceEquals(target, Owner) || (AreAllOtherSegmentsDead() && Owner.IsDead))
         {
             return Task.CompletedTask;
         }

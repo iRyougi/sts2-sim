@@ -28,21 +28,13 @@ public class UnknownMapPointOdds : AbstractOdds
         RoomType.Shop,
     };
 
-    private readonly Dictionary<RoomType, float> _baseOdds = new()
-    {
-        [RoomType.Monster] = baseMonsterOdds,
-        [RoomType.Elite] = baseEliteOdds,
-        [RoomType.Treasure] = baseTreasureOdds,
-        [RoomType.Shop] = baseShopOdds,
-    };
+    private readonly Dictionary<RoomType, float> _baseOdds;
+    private readonly Dictionary<RoomType, float> _nonEventOdds;
 
-    private readonly Dictionary<RoomType, float> _nonEventOdds = new()
-    {
-        [RoomType.Monster] = baseMonsterOdds,
-        [RoomType.Elite] = baseEliteOdds,
-        [RoomType.Treasure] = baseTreasureOdds,
-        [RoomType.Shop] = baseShopOdds,
-    };
+    // Rule configuration, not the cumulative hidden roll state. SetBaseOdds is the public
+    // configuration boundary; ResetToBase establishes the publicly reproducible act origin.
+    public UnknownMapPointBaseRules PublicBaseRules { get; private set; } = UnknownMapPointBaseRules.Default;
+    public UnknownMapPointBaseRules PublicResetBaseRules { get; private set; } = UnknownMapPointBaseRules.Default;
 
     public float MonsterOdds
     {
@@ -74,11 +66,62 @@ public class UnknownMapPointOdds : AbstractOdds
         : base(0f, rng)
     {
         _hooks = hooks;
+        _baseOdds = CreateDefaultOdds();
+        _nonEventOdds = CreateDefaultOdds();
+    }
+
+    private UnknownMapPointOdds(UnknownMapPointOdds source, Rng rng, IOddsHooks hooks)
+        : base(source.CurrentValue, rng)
+    {
+        _hooks = hooks;
+        _baseOdds = new Dictionary<RoomType, float>(source._baseOdds);
+        _nonEventOdds = new Dictionary<RoomType, float>(source._nonEventOdds);
+        PublicBaseRules = source.PublicBaseRules;
+        PublicResetBaseRules = source.PublicResetBaseRules;
+    }
+
+    internal UnknownMapPointOdds CloneExact(Rng rng, IOddsHooks hooks) => new(this, rng, hooks);
+
+    private static Dictionary<RoomType, float> CreateDefaultOdds() => new()
+    {
+        [RoomType.Monster] = baseMonsterOdds,
+        [RoomType.Elite] = baseEliteOdds,
+        [RoomType.Treasure] = baseTreasureOdds,
+        [RoomType.Shop] = baseShopOdds,
+    };
+
+    internal void SetPublicBaseRules(UnknownMapPointBaseRules rules)
+    {
+        foreach (RoomType type in _rollOrder)
+            SetBaseOdds(type, rules.For(type));
+    }
+
+    internal UnknownMapPointBaseRules CapturePublicUnrolledIncreases()
+    {
+        UnknownMapPointBaseRules rules = PublicBaseRules;
+        return new(
+            _hooks.ModifyOddsIncreaseForUnrolledRoomType(RoomType.Monster, rules.Monster),
+            _hooks.ModifyOddsIncreaseForUnrolledRoomType(RoomType.Elite, rules.Elite),
+            _hooks.ModifyOddsIncreaseForUnrolledRoomType(RoomType.Treasure, rules.Treasure),
+            _hooks.ModifyOddsIncreaseForUnrolledRoomType(RoomType.Shop, rules.Shop));
+    }
+
+    internal void ApplyVisibleObservation(UnknownMapPointVisit observation)
+    {
+        SetPublicBaseRules(observation.Rules.BaseOdds);
+        foreach (RoomType type in _rollOrder)
+        {
+            if (observation.ActualRoomType == type)
+                _nonEventOdds[type] = observation.Rules.BaseOdds.For(type);
+            else if (observation.Rules.Allows(type))
+                _nonEventOdds[type] += observation.Rules.UnrolledIncreases.For(type);
+        }
     }
 
     public void SetBaseOdds(RoomType roomType, float baseOdds)
     {
         _baseOdds[roomType] = baseOdds;
+        PublicBaseRules = PublicBaseRules.With(roomType, baseOdds);
     }
 
     /// <summary>偏离 #327：不移植上游 <c>Roll</c> 开头的首局新手引导分支
@@ -133,9 +176,57 @@ public class UnknownMapPointOdds : AbstractOdds
 
     public void ResetToBase()
     {
+        PublicResetBaseRules = PublicBaseRules;
         foreach (RoomType roomType in _rollOrder)
         {
             _nonEventOdds[roomType] = _baseOdds[roomType];
         }
     }
 }
+
+/// <summary>Publicly configured base or a rule-derived increment; never a sampled roll/accumulator.</summary>
+public readonly record struct UnknownMapPointBaseRules(float Monster, float Elite, float Treasure, float Shop)
+{
+    public static UnknownMapPointBaseRules Default => new(
+        UnknownMapPointOdds.baseMonsterOdds, UnknownMapPointOdds.baseEliteOdds,
+        UnknownMapPointOdds.baseTreasureOdds, UnknownMapPointOdds.baseShopOdds);
+
+    internal float For(RoomType type) => type switch
+    {
+        RoomType.Monster => Monster,
+        RoomType.Elite => Elite,
+        RoomType.Treasure => Treasure,
+        RoomType.Shop => Shop,
+        _ => throw new ArgumentOutOfRangeException(nameof(type)),
+    };
+
+    internal UnknownMapPointBaseRules With(RoomType type, float value) => type switch
+    {
+        RoomType.Monster => this with { Monster = value },
+        RoomType.Elite => this with { Elite = value },
+        RoomType.Treasure => this with { Treasure = value },
+        RoomType.Shop => this with { Shop = value },
+        // SetBaseOdds already permits keys outside the fixed roll order. They remain
+        // in the Exact dictionary; they never participate in this four-type roulette.
+        _ => this,
+    };
+}
+
+/// <summary>Actual then-visible map filters and inventory rules at the chosen Unknown node.</summary>
+public readonly record struct UnknownMapPointPublicRules(
+    UnknownMapPointBaseRules BaseOdds,
+    UnknownMapPointBaseRules UnrolledIncreases,
+    bool PreviousPointHadShop,
+    bool AllChildrenAreShops,
+    bool HasJuzuBracelet,
+    bool GoldenPathForCurrentAct,
+    bool HasActThreeLanternKey)
+{
+    internal bool Allows(RoomType type) =>
+        (type == RoomType.Event || !GoldenPathForCurrentAct && !HasActThreeLanternKey) &&
+        !(type == RoomType.Monster && HasJuzuBracelet) &&
+        !(type == RoomType.Shop && (PreviousPointHadShop || AllChildrenAreShops));
+}
+
+/// <summary>One successfully entered Unknown room's visible result, with no RNG/roll value.</summary>
+public readonly record struct UnknownMapPointVisit(RoomType ActualRoomType, UnknownMapPointPublicRules Rules);

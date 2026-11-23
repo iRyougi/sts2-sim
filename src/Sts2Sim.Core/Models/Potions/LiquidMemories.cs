@@ -18,7 +18,7 @@ public sealed class LiquidMemories : PotionModel
             target.Player!.PlayerCombatState!.DiscardPile, 1, 1, this, cancelable: false)).FirstOrDefault();
         if (selected is not null)
         {
-            selected.MakeTemporaryFreeThisTurn();
+            selected.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
             CardPileCmd.Add(selected, PileType.Hand);
         }
 

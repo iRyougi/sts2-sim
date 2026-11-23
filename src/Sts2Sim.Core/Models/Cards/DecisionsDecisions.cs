@@ -36,10 +36,16 @@ public sealed class DecisionsDecisions : CardModel
         }
 
         // 上游统一传 target:null 且引擎自行定标；本项目引擎要求需要目标的卡必须有非空目标
-        // （同偏离 #104）。被重复打出的技能牌可能是敌方单体目标，目标池空时按 BeatDown 的同款
-        // 处理直接停止重复，而不是带 null 打出去。Plan 08b-6 Task 8 在种子 789 撞到该路径。
+        // （同偏离 #104）。被重复打出的技能牌可能是敌方单体目标，目标池空时
+        // 直接停止重复，而不是带 null 打出去。Plan 08b-6 Task 8 在种子 789 撞到该路径。
         for (int i = 0; i < _repeat; i++)
         {
+            // CardCmd.AutoPlay rejects terminal attempts before vetoes, movement or target RNG.
+            if (CombatState!.IsOverOrEnding() || selected.Owner.Creature.IsDead)
+            {
+                continue;
+            }
+
             // Native CardCmd.AutoPlay rejects the card before choosing a random target.
             // A vetoed attempt still passes through the play pile to its result pile.
             if (selected.Keywords.Contains(CardKeyword.Unplayable) ||

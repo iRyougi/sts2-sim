@@ -68,6 +68,15 @@ public sealed partial class RunState
             if (!AddVisitedMapCoord(new MapCoord(dto.Col, dto.Row)))
                 throw new TransplantMappingException($"VisitedMapCoords[{index}]", "Duplicate coordinate.");
         }
+        // This legacy transplant format has map visits but no Unknown result/rule records.
+        // A fresh act (including native archive training starts) has zero such visits and is supported.
+        _visibleMapVisits.Clear();
+        _unknownMapPointEntriesThisAct = _visitedMapCoords.Count(coord =>
+            Map.GetPoint(coord)?.PointType == MapPointType.Unknown);
+        // Legacy combat transplants carry neither per-act Ancient types nor their completeness.
+        // Do not reconstruct supposedly visible Ancient history from the old hidden root seed.
+        _visitedAncientTypes.Clear();
+        _hasVisibleAncientHistory = false;
         if (!snapshot.IsInjected)
         {
             MapCoord targetCoord = new(snapshot.TargetNode!.Col, snapshot.TargetNode.Row);

@@ -100,6 +100,27 @@ public sealed class StandardActMap : ActMap
         Grid = MapPostProcessing.StraightenPaths(Grid);
     }
 
+    private StandardActMap(
+        StandardActMap source,
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Rng? replacementRng)
+    {
+        _mapLength = source._mapLength;
+        _rng = replacementRng ?? source._rng.CloneExact();
+        _pointTypeCounts = source._pointTypeCounts.CloneForRun();
+        (MapPoint?[,] grid, Dictionary<MapPoint, MapPoint> points) = source.ClonePointGraph(modelMap);
+        Grid = grid;
+        StartingMapPoint = points[source.StartingMapPoint];
+        BossMapPoint = points[source.BossMapPoint];
+        SecondBossMapPoint = source.SecondBossMapPoint is { } secondBoss ? points[secondBoss] : null;
+        foreach (MapPoint point in source.startMapPoints)
+            startMapPoints.Add(points[point]);
+    }
+
+    internal override ActMap CloneForRun(
+        IReadOnlyDictionary<Models.AbstractModel, Models.AbstractModel> modelMap,
+        Rng? replacementRng = null) => new StandardActMap(this, modelMap, replacementRng);
+
     private MapPoint GetOrCreatePoint(int col, int row)
     {
         MapPoint? point = GetPoint(col, row);

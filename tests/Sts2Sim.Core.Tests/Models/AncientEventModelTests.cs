@@ -30,8 +30,10 @@ file sealed class StubAncient : AncientEventModel
     };
 }
 
-file sealed class AncientHookProbe(bool shouldAllow) : AbstractModel
+file sealed class AncientHookProbe(bool shouldAllow) : RelicModel
 {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
     public int InvocationCount { get; private set; }
 
     public override bool ShouldReceiveCombatHooks => false;

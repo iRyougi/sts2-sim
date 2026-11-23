@@ -11,7 +11,17 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class Chomper : MonsterModel
 {
-    public bool ScreamFirst { get; set; }
+    private bool _screamFirst;
+
+    public bool ScreamFirst
+    {
+        get => _screamFirst;
+        set
+        {
+            AssertMutable();
+            _screamFirst = value;
+        }
+    }
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 63, 60);
     public override int MaxInitialHp => Ascension(AscensionLevel.ToughEnemies, 67, 64);
     private int ClampDamage => Ascension(AscensionLevel.DeadlyEnemies, 9, 8);

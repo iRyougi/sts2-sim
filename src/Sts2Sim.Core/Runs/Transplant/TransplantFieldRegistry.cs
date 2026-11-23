@@ -46,11 +46,11 @@ public static class TransplantFieldRegistry
         "Kunai._attacksThisTurn", "Kusarigama._attacksThisTurn",
         "LetterOpener._skillsThisTurn", "MiniRegent._triggeredThisTurn",
         "Permafrost._triggeredThisCombat", "Pocketwatch._cardsPlayedThisTurn",
-        "Pocketwatch._shouldDrawExtra", "RainbowRing._playedAttack",
+        "Pocketwatch._cardsPlayedLastTurn", "RainbowRing._playedAttack",
         "RainbowRing._playedSkill", "RainbowRing._playedPower",
         "RainbowRing._triggeredThisTurn", "Regalite._usedThisTurn",
-        "Shuriken._attacksThisTurn", "UnsettlingLamp._triggeringCard",
-        "UnsettlingLamp._finished", "Vambrace._triggeredThisCombat",
+        "Shuriken._attacksThisTurn", "UnsettlingLamp._triggeringCard", "UnsettlingLamp._doubledTemporaryInternalPowerType",
+        "UnsettlingLamp._finished", "Vambrace._triggeringCard", "Vambrace._blockGainedThisCombat",
         "LavaLamp._tookDamageThisCombat",
         "PaelsEye._eligibleForExtraTurn", "RippleBasin._attackPlayedThisTurn",
         "StoneCalendar._shouldTriggerThisTurn", "Toolbox._wasUsedThisCombat",
@@ -102,9 +102,21 @@ public static class TransplantFieldRegistry
                 if (type.Name == "SpoilsMap" && field.Name == "<SpoilsCoord>k__BackingField")
                     (fieldClass, reason) = (TransplantFieldClass.Snapshot,
                         "Host exports the unsaved live coordinate explicitly at combat entry.");
-                if (type.Name == "Whistle" && field.Name == "_damage")
+                // Native Fetch queries this combat's CardPlayFinished history. These simulator
+                // caches are cleared when the next combat's card copies are created.
+                if (type.Name == "Fetch" && field.Name is
+                        "_finishedRound" or "_finishedSide" or "_finishedTurnNumbers")
+                    (fieldClass, reason) = (TransplantFieldClass.ResetAtCombatStart,
+                        "Native history is combat-local; fresh combat copies reset the Fetch cache.");
+                // Native Rampage/Thrash/Claw mutate combat copies, not their persistent DeckVersion.
+                if ((type.Name is "Whistle" or "Rampage" or "Thrash" or "Claw" && field.Name == "_damage") ||
+                    (type.Name == "Claw" && field.Name == "_increase"))
                     (fieldClass, reason) = (TransplantFieldClass.Derived,
-                        "Derived from canonical card vars and upgrade level.");
+                        "Persistent deck values derive from canonical card vars and upgrade level.");
+                // Native Monologue's Power var is always 1; upgrading only adds Retain.
+                if (type.Name == "Monologue" && field.Name == "_power")
+                    (fieldClass, reason) = (TransplantFieldClass.Derived,
+                        "Persistent deck Power derives from the canonical Monologue var; no saved mutation.");
                 result.Add(Key(field), (fieldClass, reason));
             }
         }
@@ -136,6 +148,7 @@ public static class TransplantFieldRegistry
     private static readonly string[] RunBoundaryFields =
     [
         "_selectingMapEventBeforeHistoryAppend", "_currentRooms", "_nextEncounterForTransplant",
+        "_activeRewardOffers", "<ForcedCombatResumeOutcome>k__BackingField",
     ];
 
     private static readonly string[] PlayerSnapshotFields =
@@ -169,6 +182,18 @@ public static class TransplantFieldRegistry
             "Regenerated from the seed and ordered act definitions before RNG state is restored.");
         AddDeclaredFields(result, typeof(RunState), RunBoundaryFields, TransplantFieldClass.ResetAtCombatStart,
             "No active room or pending transition exists at the export boundary.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["_visibleMapVisits", "_unknownMapPointEntriesThisAct"], TransplantFieldClass.Derived,
+            "Legacy imports leave Unknown result history empty and derive the entered count from map visits; reseeding explicitly rejects missing history.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["_visitedAncientTypes", "_hasVisibleAncientHistory"], TransplantFieldClass.Derived,
+            "Legacy imports have no visible Ancient type history; types remain empty, completeness is false, and reseeding explicitly rejects it.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["<IsImaginationClone>k__BackingField"], TransplantFieldClass.Ignored,
+            "Clone provenance marker has no simulator consumer; imports construct a new non-imagination run.");
+        AddDeclaredFields(result, typeof(RunState),
+            ["<EntryPhase>k__BackingField"], TransplantFieldClass.Derived,
+            "Legacy combat imports retain Legacy continuation; the separate act-entry codec persists the explicit phase.");
         AddDeclaredFields(result, typeof(Player), PlayerSnapshotFields, TransplantFieldClass.Snapshot,
             "Preserved in PlayerSnapshot or explicitly validated before export.");
         AddDeclaredFields(result, typeof(Player), PlayerDerivedFields, TransplantFieldClass.Derived,

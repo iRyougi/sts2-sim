@@ -17,7 +17,11 @@ public sealed class SandpitPower : PowerModel
     {
         if (side != CombatSide.Enemy || !Owner.Powers.Contains(this)) return;
         await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
-        if (!Owner.Powers.Contains(this) && !Owner.IsDead && Target is { IsDead: false })
+    }
+
+    public override async Task AfterRemoved(Creature oldOwner)
+    {
+        if (!oldOwner.IsDead && Target is { IsDead: false })
         {
             await CreatureCmd.Kill(Target);
         }

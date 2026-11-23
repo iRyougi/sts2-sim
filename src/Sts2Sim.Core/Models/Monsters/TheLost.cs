@@ -13,8 +13,10 @@ public sealed class TheLost : MonsterModel
     public override int MaxInitialHp => MinInitialHp;
     private int Lasers => Value(AscensionLevel.DeadlyEnemies, 5, 4);
 
-    public override Task BeforeCombatStart() =>
-        PowerCmd.Apply<PossessStrengthPower>(Creature.CombatState!, Creature, 1m, null, null);
+    public override async Task AfterAddedToRoom()
+    {
+        await PowerCmd.Apply<PossessStrengthPower>(Creature.CombatState!, Creature, 1m, null, null);
+    }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {

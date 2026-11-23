@@ -71,11 +71,7 @@ namespace Sts2Sim.Core.Models.Events
         {
             if (relicType != typeof(SeaGlass)) return RelicOption(relicType, relicType.Name);
             SeaGlass relic = ForCharacter(seaGlassCharacter ?? Owner.Character);
-            return new EventOption(nameof(SeaGlass), async () =>
-            {
-                await RelicCmd.Obtain(relic, Owner);
-                Finish();
-            });
+            return RelicOption(relic, nameof(SeaGlass));
         }
 
         private static SeaGlass ForCharacter(CharacterModel character)

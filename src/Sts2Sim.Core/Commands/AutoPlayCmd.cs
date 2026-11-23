@@ -185,12 +185,8 @@ public static class AutoPlayCmd
         Creature? fixedTarget,
         bool spendResources)
     {
-        foreach (CardModel card in cards)
-        {
-            CardPileCmd.Add(card, PileType.Play);
-        }
-
-        return await PlayCardsCore(combatState, player, cards, fixedTarget, spendResources);
+        return await PlayCardsCore(combatState, player, cards, fixedTarget, spendResources,
+            moveToPlay: true);
     }
 
     private static async Task<IReadOnlyList<CardPlay>> PlayCardsCore(
@@ -199,7 +195,8 @@ public static class AutoPlayCmd
         IReadOnlyList<CardModel> cards,
         Creature? fixedTarget,
         bool spendResources = false,
-        bool? forceExhaust = null)
+        bool? forceExhaust = null,
+        bool moveToPlay = false)
     {
         var results = new List<CardPlay>(cards.Count);
 
@@ -213,6 +210,17 @@ public static class AutoPlayCmd
             // Native CardPileCmd.AutoPlayFromDrawPile assigns this per card immediately
             // before AutoPlay, including false to clear any earlier one-shot override.
             if (forceExhaust.HasValue) card.ExhaustOnNextPlay = forceExhaust.Value;
+
+            // Native sets the one-shot exhaust flag before CardCmd.AutoPlay refuses a terminal attempt.
+            // Cards preloaded into Play stay there; later cards still receive their exhaust flag.
+            if (combatState.IsOverOrEnding())
+            {
+                continue;
+            }
+
+            // Generic CardCmd.AutoPlay attempts reject terminal combat before entering a pile.
+            // Only the draw-pile command preloads the complete batch.
+            if (moveToPlay) CardPileCmd.Add(card, PileType.Play);
 
             if (card.HasKeyword(CardKeyword.Unplayable))
             {

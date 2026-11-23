@@ -17,7 +17,7 @@ public sealed class BulletTime : CardModel
         {
             if (!card.CostsXEnergy)
             {
-                card.MakeTemporaryFreeThisTurn();
+                card.SetToFreeThisTurn();     // 原版 SetToFreeThisTurn：本回合内或打出一次之前免费（打出后恢复原价）
             }
         }
 

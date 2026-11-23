@@ -10,7 +10,17 @@ using Sts2Sim.Core.ValueProps;
 
 public sealed class LouseProgenitor : MonsterModel
 {
-    public bool Curled { get; set; }
+    private bool _curled;
+
+    public bool Curled
+    {
+        get => _curled;
+        set
+        {
+            AssertMutable();
+            _curled = value;
+        }
+    }
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 138, 134);
     public override int MaxInitialHp => Ascension(AscensionLevel.ToughEnemies, 141, 136);
     private int WebDamage => Ascension(AscensionLevel.DeadlyEnemies, 10, 9);

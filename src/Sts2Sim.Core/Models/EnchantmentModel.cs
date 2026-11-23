@@ -71,13 +71,9 @@ public abstract class EnchantmentModel : AbstractModel, ICombatStateDescriptionC
 
     public virtual decimal EnchantDamageMultiplicative(decimal amount, ValueProp props) => 1m;
 
-    public override decimal ModifyDamageAdditive(Creature? target, decimal amount, ValueProp props,
-        Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) =>
-        ReferenceEquals(cardSource, _owner) ? EnchantDamageAdditive(amount, props) : 0m;
-
-    public override decimal ModifyDamageMultiplicative(Creature? target, decimal amount, ValueProp props,
-        Creature? dealer, CardModel? cardSource, CardPlay? cardPlay) =>
-        ReferenceEquals(cardSource, _owner) ? EnchantDamageMultiplicative(amount, props) : 1m;
+    // sls2：附魔的伤害加成与倍数不作为监听者参与（原来在力量等加法修正之后才乘，本能 ×2 时打击 6 + 力量 4 算成 20，原版是 6 × 2 + 4 = 16）。
+    // 原版 Hook.ModifyDamage 先用 cardSource.Enchantment 的 EnchantDamageAdditive、EnchantDamageMultiplicative 改卡面伤害，再走全部监听者；
+    // 现在同样放在 Hook.ModifyDamage 的开头。
 
     public virtual bool CanEnchant(CardModel card)
     {

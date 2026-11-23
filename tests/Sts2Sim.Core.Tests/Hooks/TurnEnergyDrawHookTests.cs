@@ -80,8 +80,10 @@ public class TurnEnergyDrawHookTests
         public int TotalFloor => 0;
     }
 
-    private sealed class EnergySpentProbe : AbstractModel
+    private sealed class EnergySpentProbe : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public int CallCount { get; private set; }
@@ -96,8 +98,10 @@ public class TurnEnergyDrawHookTests
         }
     }
 
-    private sealed class TurnStartPassProbe(string name, List<string> log) : AbstractModel
+    private sealed class TurnStartPassProbe(string name, List<string> log) : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public override Task AfterSideTurnStart(
@@ -117,8 +121,10 @@ public class TurnEnergyDrawHookTests
         }
     }
 
-    private sealed class ProbeModel : AbstractModel
+    private sealed class ProbeModel : RelicModel
     {
+        public override Sts2Sim.Core.Entities.Relics.RelicRarity Rarity => Sts2Sim.Core.Entities.Relics.RelicRarity.Common;
+
         public override bool ShouldReceiveCombatHooks => true;
 
         public string Name { get; init; } = "probe";

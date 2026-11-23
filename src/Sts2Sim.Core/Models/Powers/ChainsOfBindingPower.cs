@@ -12,12 +12,11 @@ using Sts2Sim.Core.Models.Afflictions;
 /// that same amount, and allows only one Bound card play per turn.
 /// </summary>
 /// <remarks>
-/// The native power counts this turn's <c>CardAfflictedEntry</c> rows for Bound; this is its only Bound source, so
-/// a per-turn counter reset at the owner's side turn end gives the same count.
+/// 原版 <c>AfterCardDrawn</c> 数本回合（<c>HappenedThisTurn</c>，到换边才翻转）该玩家的 Bound <c>CardAfflictedEntry</c>。
+/// 回合末 <c>BeforeSideTurnEnd</c> 之后、换边之前抽到的牌仍算在刚结束的回合里，不能另起计数（#1042）。
 /// </remarks>
 public sealed class ChainsOfBindingPower : PowerModel
 {
-    private int _cardsAfflictedThisTurn;
     private bool _boundCardPlayedThisTurn;
 
     public override PowerType Type => PowerType.Debuff;
@@ -25,18 +24,17 @@ public sealed class ChainsOfBindingPower : PowerModel
 
     public override async Task AfterCardDrawn(CardModel card, bool fromHandDraw)
     {
-        if (Owner.CombatState?.CurrentSide != Owner.Side ||
+        if (Owner.CombatState is not CombatState combat ||
+            combat.CurrentSide != Owner.Side ||
             !ReferenceEquals(card.Owner, Owner.Player) ||
-            _cardsAfflictedThisTurn >= Amount ||
-            card.Affliction is not null)
+            card.Affliction is not null ||
+            combat.SemanticHistory.CountThisTurn(
+                combat, CombatSemanticHistory.ActorEvent.BoundAfflicted, Owner.Player!) >= Amount)
         {
             return;
         }
 
-        if (await CardCmd.Afflict<Bound>(card, Amount) is not null)
-        {
-            _cardsAfflictedThisTurn++;
-        }
+        await CardCmd.Afflict<Bound>(card, Amount);
     }
 
     public override Task BeforeCardPlayed(CardPlay cardPlay)
@@ -63,7 +61,6 @@ public sealed class ChainsOfBindingPower : PowerModel
             return Task.CompletedTask;
         }
 
-        _cardsAfflictedThisTurn = 0;
         _boundCardPlayedThisTurn = false;
         foreach (CardModel card in Owner.Player!.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards))
         {
@@ -80,7 +77,6 @@ public sealed class ChainsOfBindingPower : PowerModel
         ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
         global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
     {
-        builder.Append(_cardsAfflictedThisTurn);
         builder.Append(_boundCardPlayedThisTurn);
     }
 }

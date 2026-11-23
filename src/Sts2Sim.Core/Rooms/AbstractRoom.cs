@@ -20,6 +20,14 @@ public abstract class AbstractRoom
 
     public int? Id { get; private set; }
 
+    // The fork has already entered this room. Copy only entry identity/state;
+    // re-entering would consume a room id, dispatch hooks, and recount an Ancient.
+    internal void CopyEntryStateFrom(AbstractRoom source)
+    {
+        _hasEntered = source._hasEntered;
+        Id = source.Id;
+    }
+
     protected virtual bool EntryHooksBeforeRewards => false;
 
     public async Task Enter(RunState? runState)
@@ -43,9 +51,9 @@ public abstract class AbstractRoom
             // Ordinary event selection already advances its cursor in RunState.AcceptEvent.
             if (runState is not null && runState.CurrentRoomCount == 1 &&
                 ReferenceEquals(runState.CurrentRoom, this) &&
-                this is EventRoom { Event: AncientEventModel })
+                this is EventRoom { Event: AncientEventModel ancient })
             {
-                runState.RecordAncientRoomVisit();
+                runState.RecordAncientRoomVisit(ancient.GetType());
             }
         }
     }

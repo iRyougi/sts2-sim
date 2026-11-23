@@ -1,4 +1,5 @@
 using Sts2Sim.Core.Combat;
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
@@ -28,14 +29,11 @@ public sealed class Bread : RelicModel
             return Task.CompletedTask;
         }
 
+        // AlphaDefect fidelity-01: the turn number now increments before the energy reset (as in the game),
+        // so turn 2 already gets the +1 max energy; the former one-point bridge is removed.
         if (Owner.PlayerCombatState.TurnNumber == 1)
         {
-            Owner.PlayerCombatState.LoseEnergy(2m);
-        }
-        else if (Owner.PlayerCombatState.TurnNumber == 2)
-        {
-            // Bridge only the first transition: reset precedes the turn increment.
-            Owner.PlayerCombatState.GainEnergy(1m);
+            return PlayerCmd.LoseEnergy(2m, Owner);
         }
 
         return Task.CompletedTask;

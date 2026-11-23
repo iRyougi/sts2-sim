@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 
@@ -7,6 +8,11 @@ namespace Sts2Sim.Core.Models.Events;
 /// MAINTAIN_CONTROL 分支的 aromaPrinciple 纯本地化文本；无玩法影响。</summary>
 public sealed class AromaOfChaos : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("LET_GO", [VisibleValue.Int("TransformCount", 1)]),
+        new("MAINTAIN_CONTROL", [VisibleValue.Int("UpgradeCount", 1)])
+    ]);
+
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]
     {
         new EventOption("LET_GO", LetGoAsync),

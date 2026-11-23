@@ -15,13 +15,7 @@ public sealed class Imbued : EnchantmentModel
     public override bool CanEnchant(CardModel card) =>
         base.CanEnchant(card) && card.Type == CardType.Skill;
 
-    public override void ModifyShuffleOrder(Player player, List<CardModel> cards, bool isInitialShuffle)
-    {
-        if (!isInitialShuffle || player != Owner.Owner || !cards.Remove(Owner))
-            return;
-
-        cards.Add(Owner);
-    }
+    // 原版 Imbued 没有 ModifyShuffleOrder：开局放到底部由 Player.ArrangeDrawPileForFirstHand 在第 1 回合抽牌前做。
 
     public override Task AfterAutoPrePlayPhaseEntered(Player player)
     {

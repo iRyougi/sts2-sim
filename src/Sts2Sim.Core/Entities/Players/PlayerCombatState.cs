@@ -65,10 +65,27 @@ public sealed class PlayerCombatState(Player player)
             StarsGainedThisTurn += amount;
         }
 
-        Stars = (int)Math.Max(Stars + amount, 0m);
+        SetStars((int)Math.Max(Stars + amount, 0m));
     }
 
-    public void LoseStars(decimal amount) => Stars = (int)Math.Max(Stars - amount, 0m);
+    public void LoseStars(decimal amount) => SetStars((int)Math.Max(Stars - amount, 0m));
+
+    /// <summary>sls2：同游戏 PlayerCombatState.Stars 的 setter——星数每次实际变化，战斗历史记一条 StarsModifiedEntry（变化量），
+    /// 观测格式 20 的星统计（STAT:STARS）从这些记录数：本回合 / 本场得到与失去的星。这里不建历史，直接累计。</summary>
+    void SetStars(int value)
+    {
+        int d = value - Stars;
+        Stars = value;
+        if (d > 0) { StarsGainedThisTurnLog += d; StarsGainedThisCombatLog += d; }
+        else if (d < 0) { StarsLostThisTurnLog -= d; StarsLostThisCombatLog -= d; }
+    }
+
+    /// <summary>sls2（观测格式 20）：本回合 / 本场星数实际增加、减少的合计（同游戏战斗历史里 StarsModifiedEntry 的正负两部分）。
+    /// 本回合的两项在回合结束清理时归零（游戏按 HappenedThisTurn：同一轮、同一方）。</summary>
+    public int StarsGainedThisTurnLog { get; private set; }
+    public int StarsLostThisTurnLog { get; private set; }
+    public int StarsGainedThisCombatLog { get; private set; }
+    public int StarsLostThisCombatLog { get; private set; }
 
     /// <summary>本回合已获得的星愿量（LunarBlast类"计算值"卡使用）。逐字移植：真实游戏靠战斗历史日志
     /// （<c>CombatManager.History</c>）回查,本项目没有完整历史日志系统,改用逐回合重置的计数器,偏离 #101。</summary>
@@ -229,6 +246,8 @@ public sealed class PlayerCombatState(Player player)
         }
 
         StarsGainedThisTurn = 0m;
+        StarsGainedThisTurnLog = 0;
+        StarsLostThisTurnLog = 0;
         SkillCardsPlayedThisTurn = 0;
         AttackCardsPlayedThisTurn = 0;
         ShivsPlayedThisTurn = 0;
@@ -253,6 +272,10 @@ public sealed class PlayerCombatState(Player player)
             Phase = Phase,
             TurnNumber = TurnNumber,
             StarsGainedThisTurn = StarsGainedThisTurn,
+            StarsGainedThisTurnLog = StarsGainedThisTurnLog,
+            StarsLostThisTurnLog = StarsLostThisTurnLog,
+            StarsGainedThisCombatLog = StarsGainedThisCombatLog,
+            StarsLostThisCombatLog = StarsLostThisCombatLog,
             SkillCardsPlayedThisTurn = SkillCardsPlayedThisTurn,
             AttackCardsPlayedThisTurn = AttackCardsPlayedThisTurn,
             ShivsPlayedThisTurn = ShivsPlayedThisTurn,
@@ -278,6 +301,7 @@ public sealed class PlayerCombatState(Player player)
                 target.AddInternal(clonedCard);
                 cardMap.Add(card, clonedCard);
             }
+            target.KnownTop = source.KnownTop;      // sls2：已知的抽牌堆顶部张数照抄（牌的先后同原来）
         }
 
         return clone;

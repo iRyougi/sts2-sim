@@ -54,7 +54,9 @@ public static class RewardsCmd
         {
             throw new InvalidOperationException("Custom rewards require a current event, rest site, or merchant.");
         }
-        return Task.CompletedTask;
+        return player.RunState.CurrentRoom is MerchantRoom currentMerchant
+            ? currentMerchant.ResolveEntryRewardOfferAsync(offer)
+            : Task.CompletedTask;
     }
 
     private static void PopulateWithSemanticSlot(

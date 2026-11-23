@@ -44,7 +44,7 @@ public sealed class ArtOfWar : RelicModel
     public override Task AfterEnergyReset(Player player)
     {
         if (player == Owner &&
-            player.PlayerCombatState?.TurnNumber >= 1 &&
+            player.PlayerCombatState?.TurnNumber > 1 &&     // 原版 TurnNumber > 1（回合数在重置能量前已加一）
             _previousTurnHadNoAttack)
         {
             player.PlayerCombatState.GainEnergy(1m);

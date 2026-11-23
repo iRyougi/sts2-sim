@@ -180,7 +180,7 @@ public static class ReportWriter
             }
             catch
             {
-                // Best-effort cleanup: never mask the original failure with a cleanup failure.
+                // fail-open: Best-effort cleanup: never mask the original failure with a cleanup failure.
             }
 
             throw;

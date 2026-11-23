@@ -261,10 +261,6 @@ public sealed class Player
         }
         PlayerCombatState!.DrawPile.RandomizeOrderInternal(shuffleRng);
         List<CardModel> initialOrder = PlayerCombatState.DrawPile.Cards.ToList();
-        var bottomDesignatedCards = new HashSet<CardModel>(
-            initialOrder.Where(card => card.Enchantments.Any(
-                enchantment => enchantment.ShouldStartAtBottomOfDrawPile)),
-            ReferenceEqualityComparer.Instance);
         foreach (EnchantmentModel enchantment in initialOrder
                      .SelectMany(card => card.Enchantments)
                      .ToList())
@@ -275,14 +271,31 @@ public sealed class Player
         {
             PlayerCombatState.DrawPile.MoveToBottomInternal(card);
         }
+    }
 
-        // 偏离 #87：多张 Innate 卡移到牌堆顶时，未核实真实游戏中的相对顺序。
-        foreach (CardModel innateCard in PlayerCombatState.DrawPile.Cards
-                     .Where(card => card.HasKeyword(CardKeyword.Innate) && !bottomDesignatedCards.Contains(card))
-                     .ToList())
+    /// <summary>原版 <c>CombatManager.SetupPlayerTurn</c> 第 1 回合抽牌前（BeforeHandDraw、ModifyHandDraw 之后）：
+    /// 附魔要求开局在底部的牌（灌注）移到底部，其余固有牌依次移到顶部，返回移到顶部的张数。
+    /// 原版不在 <c>PopulateCombatState</c> 里做这一步：进房间的钩子（如碎石器按抽牌堆顺序 StableShuffle 选牌升级）
+    /// 看到的是没挪过固有牌的抽牌堆，提前挪会让同名副本在不稳定排序里换位，升级落到另一张副本上。</summary>
+    public int ArrangeDrawPileForFirstHand()
+    {
+        CardPile pile = PlayerCombatState!.DrawPile;
+        List<CardModel> bottom = pile.Cards
+            .Where(card => card.Enchantments.Any(enchantment => enchantment.ShouldStartAtBottomOfDrawPile))
+            .ToList();
+        foreach (CardModel card in bottom)
         {
-            PlayerCombatState.DrawPile.MoveToTopInternal(innateCard);
+            pile.MoveToBottomInternal(card);
         }
+        List<CardModel> innate = pile.Cards
+            .Where(card => card.HasKeyword(CardKeyword.Innate))
+            .Except(bottom)
+            .ToList();
+        foreach (CardModel card in innate)
+        {
+            pile.MoveToTopInternal(card);
+        }
+        return innate.Count;
     }
 
     public Task AfterCombatEnd()
@@ -424,7 +437,13 @@ public sealed class Player
 
     internal Player CloneForCombat(
         IRunState runState,
-        IDictionary<CardModel, CardModel> cardMap)
+        IDictionary<CardModel, CardModel> cardMap) =>
+        CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.Clone());
+
+    private Player CloneOwnedState(
+        IRunState runState,
+        IDictionary<CardModel, CardModel> cardMap,
+        PlayerRngSet clonedRng, RelicGrabBag clonedRelicBag)
     {
         // Character is a canonical ModelDb instance and therefore deliberately shared.
         var clone = new Player(Character, Creature.CurrentHp, Creature.MaxHp, MaxEnergy, Gold, UnlockState)
@@ -432,15 +451,16 @@ public sealed class Player
             RunState = runState,
             IsActiveForHooks = IsActiveForHooks,
             CardRemovalsUsed = CardRemovalsUsed,
+            CanUseOrRemovePotions = CanUseOrRemovePotions,
             BaseOrbSlotCount = BaseOrbSlotCount,
-            PlayerRng = PlayerRng.CloneExact(),
+            PlayerRng = clonedRng,
         };
         clone.Odds = PlayerOddsSet.FromSerializable(
             Odds.ToSerializable(),
             clone.PlayerRng,
             runState.Ascension,
             new HookOddsAdapter(runState));
-        clone.RelicGrabBag = RelicGrabBag.Clone();
+        clone.RelicGrabBag = clonedRelicBag;
 
         clone._potionSlots.Clear();
         foreach (PotionModel? potion in _potionSlots)
@@ -473,6 +493,27 @@ public sealed class Player
         clone.PlayerCombatState = PlayerCombatState?.CloneForCombat(clone, cardMap);
         return clone;
     }
+    internal Player CloneForRun(RunState runState, IDictionary<CardModel, CardModel> cardMap)
+    {
+        Player clone = CloneForCombat(runState, cardMap);
+        clone.Creature.RestoreCumulativeHpLostFrom(Creature);
+        clone.Creature.CombatId = Creature.CombatId;
+        return clone;
+    }
+
+    internal Player CloneReseededForRun(RunState runState, IDictionary<CardModel, CardModel> cardMap)
+    {
+        PlayerRngSet fresh = PlayerRng.UsesSemanticKeys
+            ? PlayerRngSet.CreateKeyed(runState.Rng.Seed) : new PlayerRngSet(runState.Rng.Seed);
+        RelicGrabBag bag = RelicGrabBag.CloneReshuffled(runState.Rng.ForSemanticKey(
+            Sts2Sim.Core.Entities.Rngs.RunRngType.UpFront,
+            $"imagination/relic_bag/player={runState.Players.Count}"));
+        Player clone = CloneOwnedState(runState, cardMap, fresh, bag);
+        clone.Creature.RestoreCumulativeHpLostFrom(Creature);
+        clone.Creature.CombatId = Creature.CombatId;
+        return clone;
+    }
+
 
     internal async Task RollbackCombatStartAsync()
     {
@@ -484,7 +525,7 @@ public sealed class Player
             }
             catch
             {
-                // Preserve the combat-entry exception; best-effort removal continues for remaining powers.
+                // fail-open: Preserve the combat-entry exception; best-effort removal continues for remaining powers.
             }
         }
 

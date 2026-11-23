@@ -37,6 +37,7 @@ public sealed class CombatEngine
             IsInProgress = IsInProgress,
             IsStarting = IsStarting,
             Won = Won,
+            _pendingLoss = _pendingLoss,
         };
         return clone;
     }
@@ -55,18 +56,39 @@ public sealed class CombatEngine
     /// <summary>Native setup window: combat hooks run before IsInProgress becomes true.</summary>
     public bool IsStarting { get; private set; }
 
-    /// <summary>Native IsEnding: victory/pending loss while combat is still in progress.
-    /// Single-player pending loss uses the same all-player-dead condition as CheckWinCondition.</summary>
-    public bool IsEnding => IsInProgress && (HasLost || HasWon);
+    /// <summary>原版 <c>CombatManager.IsCombatEnding</c>：战斗进行中且已有待定败北（<c>PendingLoss</c>）或主要敌人全灭。
+    /// 待定败北只在玩家死亡确认后由 <c>CreatureCmd.Kill</c> → <c>LoseCombat</c> 设定；玩家生命归零但防死效果
+    /// （例如 Lizard Tail）尚未结算的窗口里战斗不算正在结束，这段时间的受伤照常记进战斗历史（#1049）。</summary>
+    public bool IsEnding => IsInProgress && (_pendingLoss || HasWon);
+
+    private bool _pendingLoss;
+
+    /// <summary>原版 <c>CombatManager.LoseCombat</c>：玩家死亡确认、全体玩家都已死亡时标记待定败北。</summary>
+    internal void LoseCombat()
+    {
+        if (IsInProgress)
+            _pendingLoss = true;
+    }
 
     public bool IsOverOrEnding => IsEnding || !IsInProgress;
 
-    private bool HasLost => !State.PlayerCreatures.Any(creature => creature.IsAlive);
+    private bool HasLost => !State.HasLivingPlayerCreature();
 
     private bool HasWon => !State.Enemies.Any(enemy => enemy.IsAlive && enemy.IsPrimaryEnemy) &&
         !Hook.ShouldStopCombatFromEnding(State);
 
     public bool Won { get; private set; }
+
+    /// <summary>Deviation #331: conclude a model-sampled combat in an imagination world only.</summary>
+    public void ConcludeForImagination(bool won)
+    {
+        if (State.RunState is not Sts2Sim.Core.Runs.RunState { IsImaginationClone: true })
+            throw new InvalidOperationException("Combat outcome injection is imagination-only.");
+        if (!IsInProgress) throw new InvalidOperationException("Combat is not in progress.");
+        IsInProgress = false;
+        Won = won;
+    }
+
 
     /// <summary>战斗开局：把每个玩家的牌库洗进抽牌堆、初始化怪物 AI,然后进入玩家首回合。</summary>
     public Task StartCombatAsync() => StartCombatAsync(afterSetup: null);
@@ -317,7 +339,6 @@ public sealed class CombatEngine
                 if (!card.HasKeyword(CardKeyword.Retain) && !retainWholeHand)
                 {
                     flushed.Add(card);
-                    CardPileCmd.Add(card, PileType.Discard);
                 }
                 else
                 {
@@ -325,6 +346,8 @@ public sealed class CombatEngine
                 }
             }
 
+            if (flushed.Count > 0)
+                await CardPileCmd.AddAsync(State, flushed, PileType.Discard);
             await Hook.AfterFlush(State, player, flushed, retained);
             player.PlayerCombatState.EndOfTurnCleanup();
         }
@@ -354,8 +377,8 @@ public sealed class CombatEngine
     }
 
     /// <summary>原版 <c>CombatManager.DoTurnEnd</c> / <c>DoTurnEndCards</c>：按手牌顺序把牌分两类——有回合末效果的，
-    /// 以及其余的虚无牌；先把虚无牌逐张消耗，再把回合末效果牌逐张移入打出区、结算效果，然后放到弃牌堆底
-    /// （本身是虚无的则消耗）。之后才在阶段二弃掉剩下的手牌，所以弃牌堆里回合末效果牌排在当回合其他手牌之前。</summary>
+    /// 以及其余的虚无牌；先把虚无牌逐张消耗，再独立启动效果牌入 Play。每张效果等待自身入 Play 和前一张完整结果，
+    /// 然后进 Discard（本身是虚无的则消耗）。整批完成后才在阶段二弃掉剩余手牌。映射 NonInteractive/Instant 无动画等待模式。</summary>
     internal static async Task DoTurnEndAsync(ICombatState combatState, Player player)
     {
         PlayerCombatState state = player.PlayerCombatState!;
@@ -370,9 +393,8 @@ public sealed class CombatEngine
             {
                 turnEndCards.Add(card);
             }
-            else if (card.HasKeyword(CardKeyword.Ethereal))
+            else if (card.HasKeyword(CardKeyword.Ethereal) && Hook.ShouldEtherealTrigger(combatState, card))
             {
-                // 原版还要求 Hook.ShouldEtherealTrigger，正式版里没有任何模型重写它，恒为真。
                 etherealCards.Add(card);
             }
         }
@@ -382,24 +404,44 @@ public sealed class CombatEngine
             await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true);
         }
 
+        Task? previousResult = null;
+        var all = new List<Task>();
+        float delay = 0f;
+        int index = 0;
         foreach (CardModel card in turnEndCards)
         {
-            CardPileCmd.Add(card, PileType.Play);
+            Task move = AddTurnEndCardToPlayPileWithDelay(card, delay);
+            Task wait = previousResult is null ? move : Task.WhenAll(move, previousResult);
+            Task<CardPileAddResult?> result = ResolveTurnEndCardEffects(card, wait);
+            // Native TweenTurnEndCardToResultPile only awaits this result and a visual tween.
+            // No gameplay work follows the success check; headless retains the result dependency.
+            all.Add(result);
+            previousResult = result;
+            delay += 0.8f * (1f - (float)index / (index + 3f));
+            index++;
+        }
+        await Task.WhenAll(all);
+
+        Task<CardPileAddResult> AddTurnEndCardToPlayPileWithDelay(CardModel card, float visualDelay)
+        {
+            // Cmd.Wait is immediate in NonInteractive/Instant mode. Keep delay calculation,
+            // without introducing wall-clock scheduling into the simulator.
+            _ = visualDelay;
+            return CardPileCmd.AddAsync(combatState, card, PileType.Play);
+        }
+
+        async Task<CardPileAddResult?> ResolveTurnEndCardEffects(CardModel card, Task wait)
+        {
+            await wait;
             await card.ResolveTurnEndInHandEffect();
-            card.InvokeExecutionFinished();
-            if (card.HasKeyword(CardKeyword.Ethereal))
-            {
-                await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true);
-            }
-            else
-            {
-                CardPileCmd.Add(card, PileType.Discard, CardPilePosition.Bottom);
-            }
+            return card.HasKeyword(CardKeyword.Ethereal)
+                ? await CardPileCmd.Exhaust(combatState, card, causedByEthereal: true)
+                : await CardPileCmd.AddAsync(combatState, card, PileType.Discard, CardPilePosition.Bottom);
         }
     }
 
     /// <summary>
-    /// 胜负判定,逐字移植 <c>CombatManager.IsEnding</c> 的单人简化版（无多人加时/待定败北的竞态规避)：
+    /// 胜负判定,对应 <c>CombatManager.CheckWinCondition</c> 的单人简化版（无多人加时的竞态规避）；正在结束的判定见 <see cref="IsEnding"/>：
     /// 玩家全灭优先判负；否则若还有存活的主要敌人则未结束；若 <c>Hook.ShouldStopCombatFromEnding</c> 拦截则未结束；
     /// 否则判胜。
     /// </summary>
@@ -431,6 +473,9 @@ public sealed class CombatEngine
     private async Task SetupPlayerTurnAsync(Player player)
     {
         player.PlayerCombatState!.Phase = PlayerTurnPhase.Start;
+        // 原版在换边（SwitchSides）时就把回合数加一，重置能量之前已经是新回合：
+        // 帕埃尔之肉等按回合数改能量上限的效果在重置能量时就要看到新回合数
+        player.PlayerCombatState!.TurnNumber++;
         if (Hook.ShouldPlayerResetEnergy(State, player))
         {
             player.PlayerCombatState!.ResetEnergy();
@@ -442,11 +487,16 @@ public sealed class CombatEngine
 
         await Hook.AfterEnergyReset(State, player);
 
-        player.PlayerCombatState!.TurnNumber++;
         await Hook.BeforeHandDraw(State, player);
         decimal handDrawCount = Hook.ModifyHandDraw(State, player, BaseHandDrawCount,
             out IEnumerable<AbstractModel> modifiers);
         await Hook.AfterModifyingHandDraw(State, modifiers);
+        if (player.PlayerCombatState!.TurnNumber == 1)
+        {
+            // 原版第 1 回合：先排固有牌与灌注牌，再保证固有牌都能抽进手（不超过手牌上限）
+            int innate = player.ArrangeDrawPileForFirstHand();
+            handDrawCount = Math.Min(Math.Max(handDrawCount, innate), CardPile.MaxCardsInHand);
+        }
         await CardPileCmd.Draw(State, (int)handDrawCount, player, fromHandDraw: true);
     }
 
@@ -561,7 +611,7 @@ public sealed class CombatEngine
         }
         catch
         {
-            // Preserve the original core or observer callback exception.
+            // fail-open: Preserve the original core or observer callback exception.
         }
     }
 

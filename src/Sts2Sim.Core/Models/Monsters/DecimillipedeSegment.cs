@@ -10,6 +10,7 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 public abstract class DecimillipedeSegment : MonsterModel
 {
     private int _starterMoveIdx;
+    private MoveState _deadState = null!;
 
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 46, 40);
     public override int MaxInitialHp => Ascension(AscensionLevel.ToughEnemies, 52, 46);
@@ -27,7 +28,15 @@ public abstract class DecimillipedeSegment : MonsterModel
         }
     }
 
-    public MoveState DeadState { get; private set; } = null!;
+    public MoveState DeadState
+    {
+        get => _deadState;
+        private set
+        {
+            AssertMutable();
+            _deadState = value;
+        }
+    }
 
     public override async Task AfterAddedToRoom()
     {

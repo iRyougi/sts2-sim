@@ -223,6 +223,7 @@ public sealed class OstySummonTests : IDisposable
     public async Task SummonReviveAndGrow_MatchSource(string scenario)
     {
         (Player player, CombatRoom room, OstyHookProbe probe) = await OstyFixture.EnterCombat($"osty-summon-{scenario}");
+        Assert.True(Osty.CheckMissingWithAnim(player));
         if (scenario == "modified-to-zero")
         {
             probe.SummonOverride = 0m;
@@ -231,6 +232,7 @@ public sealed class OstySummonTests : IDisposable
             Assert.Equal(0m, none.Amount);
             Assert.Empty(probe.Calls);
             Assert.DoesNotContain(room.Engine.State.Allies, creature => creature.Monster is Osty);
+            Assert.True(Osty.CheckMissingWithAnim(player));
             return;
         }
 
@@ -239,12 +241,22 @@ public sealed class OstySummonTests : IDisposable
         Assert.Same(player, osty.PetOwner);
         Assert.NotNull(osty.GetPower<DieForYouPower>());
         Assert.Equal((5, 5), (osty.MaxHp, osty.CurrentHp));
+        Assert.True(osty.Monster!.IsHealthBarVisible);
+        Assert.False(Osty.CheckMissingWithAnim(player));
 
         switch (scenario)
         {
             case "first":
                 Assert.True(player.IsOstyAlive);
                 Assert.Equal(new[] { "summon:5" }, probe.Calls);
+                Assert.True(ModelDb.Monster<WanderingGrunt>().IsHealthBarVisible);
+                Assert.False(ModelDb.Monster<Sts2Sim.Core.Models.Monsters.Byrdpip>().IsHealthBarVisible);
+                Assert.False(ModelDb.Monster<Sts2Sim.Core.Models.Monsters.PaelsLegion>().IsHealthBarVisible);
+                Assert.Equal("Creature was accessed before it was set.",
+                    Assert.Throws<InvalidOperationException>(() =>
+                    {
+                        _ = ModelDb.Monster<Osty>().IsHealthBarVisible;
+                    }).Message);
                 break;
             case "grow":
                 await OstyCmd.Summon(player, 3m, null);
@@ -255,11 +267,15 @@ public sealed class OstySummonTests : IDisposable
             case "revive":
                 await CreatureCmd.Kill(osty);
                 Assert.True(player.IsOstyMissing);
+                Assert.False(osty.Monster!.IsHealthBarVisible);
+                Assert.True(Osty.CheckMissingWithAnim(player));
                 SummonResult revived = await OstyCmd.Summon(player, 4m, null);
                 Assert.Same(osty, revived.Osty);
                 Assert.Equal((4, 4), (osty.MaxHp, osty.CurrentHp));
                 Assert.Single(osty.Powers.OfType<DieForYouPower>());
                 Assert.Equal(new[] { "summon:5", "revived", "summon:4" }, probe.Calls);
+                Assert.True(osty.Monster!.IsHealthBarVisible);
+                Assert.False(Osty.CheckMissingWithAnim(player));
                 break;
         }
     }

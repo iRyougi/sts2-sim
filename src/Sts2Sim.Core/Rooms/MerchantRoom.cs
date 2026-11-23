@@ -20,10 +20,59 @@ public sealed class MerchantRoom : AbstractRoom
     private bool _isActive;
     private readonly object _rewardLock = new();
     private readonly Queue<RewardsSet> _rewardOffers = new();
+    private Func<RewardsSet, Task>? _entryRewardResolver;
+    private int _entryRewardResolutionDepth;
 
     public bool HasPendingRewards
     {
         get { lock (_rewardLock) return _rewardOffers.Any(HasUnresolvedRewards); }
+    }
+
+    internal bool IsResolvingEntryRewards => _entryRewardResolver is not null;
+
+    // Native RewardsSet.Offer waits inside the entry hook's purchase. Bind only
+    // while entering; ordinary player purchases keep the pending-offer adaptation.
+    internal IDisposable BeginEntryRewardResolution(Func<RewardsSet, Task> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        Func<RewardsSet, Task>? previous = _entryRewardResolver;
+        _entryRewardResolver = resolver;
+        return new EntryRewardResolutionScope(this, previous);
+    }
+
+    internal async Task ResolveEntryRewardOfferAsync(RewardsSet rewards)
+    {
+        Func<RewardsSet, Task>? resolver = _entryRewardResolver;
+        if (resolver is null) return;
+        _entryRewardResolutionDepth++;
+        try
+        {
+            await resolver(rewards);
+            if (HasUnresolvedRewards(rewards))
+                throw new InvalidOperationException("Entry reward selection left unresolved merchant rewards.");
+        }
+        finally
+        {
+            _entryRewardResolutionDepth--;
+        }
+    }
+
+    private void ThrowIfResolvingEntryRewards()
+    {
+        if (_entryRewardResolutionDepth != 0)
+            throw new InvalidOperationException("Resolve merchant entry rewards before purchasing or leaving.");
+    }
+
+    private sealed class EntryRewardResolutionScope(
+        MerchantRoom owner, Func<RewardsSet, Task>? previous) : IDisposable
+    {
+        private bool _disposed;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            owner._entryRewardResolver = previous;
+        }
     }
 
     internal bool CanOfferRewards(Player player) => _isActive &&
@@ -74,9 +123,36 @@ public sealed class MerchantRoom : AbstractRoom
             ?? throw new InvalidOperationException("Merchant inventory has not been generated for this player.");
     }
 
+    internal MerchantRoom CloneForRun(
+        RunState runState, Func<Player, Player> mapPlayer,
+        Func<MerchantInventory, MerchantInventory> mapInventory,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Action<AbstractRoom, AbstractRoom> registerRoom)
+    {
+        if (_purchaseGate.CurrentCount != 1 || _entryRewardResolver is not null)
+            throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                "Merchant purchase or entry reward resolution is still executing.");
+        var clone = new MerchantRoom
+        {
+            _inventoryRunState = _inventoryRunState is null ? null : runState,
+            _displayPlayer = _displayPlayer is null ? null : mapPlayer(_displayPlayer),
+            _isActive = _isActive,
+            IsInventoryOpen = IsInventoryOpen,
+        };
+        registerRoom(this, clone);
+        clone.CopyEntryStateFrom(this);
+        foreach ((Player player, MerchantInventory inventory) in _inventories)
+            clone._inventories.Add(mapPlayer(player), mapInventory(inventory));
+        lock (_rewardLock)
+            foreach (RewardsSet offer in _rewardOffers)
+                clone._rewardOffers.Enqueue(mapOffer(offer));
+        return clone;
+    }
+
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
@@ -97,19 +173,21 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    public Task Buy(MerchantCardEntry entry, Player player) => BuyWithPriceAsync(entry, player);
+    public Task Buy(MerchantCardEntry entry, Player player, bool ignoreCost = false) =>
+        BuyWithPriceAsync(entry, player, ignoreCost);
 
     /// <summary>Buys a card and returns the charged price for reporting consumers.</summary>
-    public async Task<int> BuyWithPriceAsync(MerchantCardEntry entry, Player player)
+    public async Task<int> BuyWithPriceAsync(MerchantCardEntry entry, Player player, bool ignoreCost = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
             MerchantInventory inventory = InventoryFor(player);
-            ValidatePurchase(entry, player, inventory.Cards);
-            int price = entry.Price;
+            ValidatePurchase(entry, player, inventory.Cards, ignoreCost);
+            int price = ignoreCost ? 0 : entry.Price;
 
             var card = (CardModel)entry.Card.MutableClone();
             card.AssignOwner(player);
@@ -127,19 +205,21 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    public Task Buy(MerchantRelicEntry entry, Player player) => BuyWithPriceAsync(entry, player);
+    public Task Buy(MerchantRelicEntry entry, Player player, bool ignoreCost = false) =>
+        BuyWithPriceAsync(entry, player, ignoreCost);
 
     /// <summary>Buys a relic and returns the charged price for reporting consumers.</summary>
-    public async Task<int> BuyWithPriceAsync(MerchantRelicEntry entry, Player player)
+    public async Task<int> BuyWithPriceAsync(MerchantRelicEntry entry, Player player, bool ignoreCost = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
             MerchantInventory inventory = InventoryFor(player);
-            ValidatePurchase(entry, player, inventory.Relics);
-            int price = entry.Price;
+            ValidatePurchase(entry, player, inventory.Relics, ignoreCost);
+            int price = ignoreCost ? 0 : entry.Price;
 
             await RelicCmd.Obtain(entry.Relic, player);
             await PlayerCmd.LoseGold(price, player);
@@ -155,39 +235,39 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    public Task Buy(MerchantPotionEntry entry, Player player) => BuyWithPriceAsync(entry, player);
+    public Task Buy(MerchantPotionEntry entry, Player player, bool ignoreCost = false) =>
+        TryBuyPotionWithPriceAsync(entry, player, ignoreCost);
 
-    /// <summary>Buys a potion and returns the charged price for reporting consumers.</summary>
-    public async Task<int> BuyWithPriceAsync(MerchantPotionEntry entry, Player player)
+    /// <summary>Attempts to buy a potion; failed procurement leaves the shelf and gold unchanged.</summary>
+    public async Task<(bool Success, int Price)> TryBuyPotionWithPriceAsync(
+        MerchantPotionEntry entry,
+        Player player,
+        bool ignoreCost = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
             MerchantInventory inventory = InventoryFor(player);
-            ValidatePurchase(entry, player, inventory.Potions);
-            if (!player.PotionSlots.Contains(null))
-            {
-                throw new InvalidOperationException("No empty potion slot available.");
-            }
-
+            ValidatePurchase(entry, player, inventory.Potions, ignoreCost);
             if (entry.Potion.Owner is not null)
             {
                 throw new InvalidOperationException("The merchant potion already has an owner.");
             }
 
-            int price = entry.Price;
+            int price = ignoreCost ? 0 : entry.Price;
             if (!await PotionCmd.TryToProcure(entry.Potion, player))
             {
-                throw new InvalidOperationException("Potion acquisition was vetoed.");
+                return (false, 0);
             }
             await PlayerCmd.LoseGold(price, player);
             entry.MarkPurchased();
             RefillIfNeeded(entry, player, inventory);
             await Hook.AfterItemPurchased(player.RunState, player, entry, price);
             inventory.RefreshCardCreationResults();
-            return price;
+            return (true, price);
         }
         finally
         {
@@ -195,19 +275,20 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    public Task BuyCardRemoval(CardModel cardToRemove, Player player) =>
-        BuyCardRemovalWithPriceAsync(cardToRemove, player);
+    public Task BuyCardRemoval(CardModel cardToRemove, Player player, bool ignoreCost = false) =>
+        BuyCardRemovalWithPriceAsync(cardToRemove, player, ignoreCost);
 
     /// <summary>Buys card removal and returns the charged price for reporting consumers.</summary>
-    public async Task<int> BuyCardRemovalWithPriceAsync(CardModel cardToRemove, Player player)
+    public async Task<int> BuyCardRemovalWithPriceAsync(CardModel cardToRemove, Player player, bool ignoreCost = false)
     {
         ArgumentNullException.ThrowIfNull(cardToRemove);
         ArgumentNullException.ThrowIfNull(player);
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {
             MerchantCardRemovalEntry entry = InventoryFor(player).CardRemoval;
-            ValidatePurchase(entry, player, new[] { entry });
+            ValidatePurchase(entry, player, new[] { entry }, ignoreCost);
             if (!player.Deck.Cards.Contains(cardToRemove))
             {
                 throw new InvalidOperationException("Card is not in the player's deck.");
@@ -217,7 +298,7 @@ public sealed class MerchantRoom : AbstractRoom
                 throw new InvalidOperationException("Eternal cards cannot be removed from the persistent deck.");
             }
 
-            int price = entry.Price;
+            int price = ignoreCost ? 0 : entry.Price;
             await CardPileCmd.RemoveFromDeck(player, cardToRemove);
             player.IncrementCardRemovalsUsed();
             await PlayerCmd.LoseGold(price, player);
@@ -240,7 +321,9 @@ public sealed class MerchantRoom : AbstractRoom
         }
     }
 
-    private void ValidatePurchase<TEntry>(TEntry entry, Player player, IEnumerable<TEntry> inventory)
+    // 原版 MerchantEntry.OnTryPurchaseUnsynchronized(inventory, ignoreCost)：ignoreCost 跳过金币检查与扣款，
+    // AfterItemPurchased 收到的 goldSpent 为 0（LordsParasol 用它免费买下全店，#1047）。
+    private void ValidatePurchase<TEntry>(TEntry entry, Player player, IEnumerable<TEntry> inventory, bool ignoreCost = false)
         where TEntry : MerchantEntry
     {
         if (HasPendingRewards) throw new InvalidOperationException("Resolve merchant rewards before purchasing another item.");
@@ -262,7 +345,7 @@ public sealed class MerchantRoom : AbstractRoom
             throw new InvalidOperationException("This item has already been purchased.");
         }
 
-        if (player.Gold < entry.Price)
+        if (!ignoreCost && player.Gold < entry.Price)
         {
             throw new InvalidOperationException("Not enough gold for this purchase.");
         }
@@ -270,6 +353,7 @@ public sealed class MerchantRoom : AbstractRoom
 
     public override async Task Exit(RunState? runState)
     {
+        ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try
         {

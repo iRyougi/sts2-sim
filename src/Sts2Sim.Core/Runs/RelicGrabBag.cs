@@ -78,6 +78,23 @@ public sealed class RelicGrabBag
             pair => pair.Key,
             pair => pair.Value.ToList()));
 
+    internal RelicGrabBag CloneReshuffled(Rng rng)
+    {
+        ArgumentNullException.ThrowIfNull(rng);
+        RelicRarity[] rarities = _buckets.Keys.ToArray();
+        Array.Sort(rarities);
+        var buckets = new Dictionary<RelicRarity, List<RelicModel>>(rarities.Length);
+        foreach (RelicRarity rarity in rarities)
+        {
+            var bucket = new List<RelicModel>(_buckets[rarity]);
+            bucket.Sort(static (left, right) =>
+                StringComparer.Ordinal.Compare(left.Id.Entry, right.Id.Entry));
+            rng.Shuffle(bucket);
+            buckets.Add(rarity, bucket);
+        }
+        return new RelicGrabBag(buckets);
+    }
+
     internal RelicBagSnapshot ExportForTransplant() => new(
         _buckets.ToDictionary(
             pair => pair.Key.ToString(),

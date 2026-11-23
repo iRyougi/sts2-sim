@@ -11,13 +11,43 @@ public sealed class CeremonialBeast : MonsterModel
 {
     private const int PlowStrength = 2;
 
+    private bool _isStunnedByPlowRemoval;
+    private bool _isInSecondPhase;
+    private MoveState _beastCryState = null!;
+
     public override int MinInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 262, 252);
 
     public override int MaxInitialHp => MinInitialHp;
 
-    public bool IsStunnedByPlowRemoval { get; private set; }
+    private bool IsStunnedByPlowRemoval
+    {
+        get => _isStunnedByPlowRemoval;
+        set
+        {
+            AssertMutable();
+            _isStunnedByPlowRemoval = value;
+        }
+    }
 
-    public bool IsInSecondPhase { get; private set; }
+    public bool IsInSecondPhase
+    {
+        get => _isInSecondPhase;
+        private set
+        {
+            AssertMutable();
+            _isInSecondPhase = value;
+        }
+    }
+
+    public MoveState BeastCryState
+    {
+        get => _beastCryState;
+        set
+        {
+            AssertMutable();
+            _beastCryState = value;
+        }
+    }
 
     private int PlowAmount => AscensionValue(AscensionLevel.DeadlyEnemies, 160, 150);
 
@@ -29,18 +59,11 @@ public sealed class CeremonialBeast : MonsterModel
 
     private int CrushStrength => AscensionValue(AscensionLevel.DeadlyEnemies, 4, 3);
 
-    public void SetStunned()
+    public Task SetStunned()
     {
-        AssertMutable();
-        if (Creature.CombatState is null || Creature.IsDead)
-        {
-            return;
-        }
-
         IsStunnedByPlowRemoval = true;
         IsInSecondPhase = true;
-        MoveState stun = (MoveState)MoveStateMachine!.States["STUN_MOVE"];
-        SetMoveImmediate(stun, forceTransition: true);
+        return Task.CompletedTask;
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
@@ -61,7 +84,7 @@ public sealed class CeremonialBeast : MonsterModel
         {
             MustPerformOnceBeforeTransitioning = true,
         };
-        var beastCry = new MoveState(
+        BeastCryState = new MoveState(
             "BEAST_CRY_MOVE",
             BeastCryMove,
             new DebuffIntent());
@@ -76,12 +99,12 @@ public sealed class CeremonialBeast : MonsterModel
             new BuffIntent());
         stamp.FollowUpState = plow;
         plow.FollowUpState = plow;
-        stun.FollowUpState = beastCry;
-        beastCry.FollowUpState = stomp;
+        stun.FollowUpState = BeastCryState;
+        BeastCryState.FollowUpState = stomp;
         stomp.FollowUpState = crush;
-        crush.FollowUpState = beastCry;
+        crush.FollowUpState = BeastCryState;
         return new MonsterMoveStateMachine(
-            new MonsterState[] { stamp, plow, stun, beastCry, stomp, crush },
+            new MonsterState[] { plow, stamp, stun, BeastCryState, stomp, crush },
             stamp);
     }
 
@@ -106,7 +129,7 @@ public sealed class CeremonialBeast : MonsterModel
             cardSource: null);
     }
 
-    private Task StunnedMove(IReadOnlyList<Creature> targets)
+    public Task StunnedMove(IReadOnlyList<Creature> targets)
     {
         IsStunnedByPlowRemoval = false;
         return Task.CompletedTask;
@@ -139,6 +162,42 @@ public sealed class CeremonialBeast : MonsterModel
             CrushStrength,
             Creature,
             cardSource: null);
+    }
+
+    internal override void RestoreCombatCloneReferencesFrom(
+        MonsterModel source,
+        IReadOnlyDictionary<Creature, Creature> creatureMap)
+    {
+        var beast = (CeremonialBeast)source;
+        if (beast._beastCryState is not { } savedState)
+        {
+            _beastCryState = null!;
+            return;
+        }
+
+        if (beast.MoveStateMachine is null ||
+            !beast.MoveStateMachine.States.TryGetValue(savedState.StateId, out MonsterState? sourceState) ||
+            !ReferenceEquals(sourceState, savedState) ||
+            MoveStateMachine is null ||
+            !MoveStateMachine.States.TryGetValue(savedState.StateId, out MonsterState? clonedState) ||
+            clonedState is not MoveState clonedMove)
+        {
+            throw new InvalidOperationException(
+                $"CeremonialBeast saved move {savedState.StateId} is not present in its combat state graph.");
+        }
+
+        BeastCryState = clonedMove;
+    }
+
+    internal override void AppendCombatStateDescription(
+        ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
+        global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
+    {
+        builder.Append(_beastCryState is not null);
+        if (_beastCryState is { } savedState)
+        {
+            builder.Append(savedState.StateId);
+        }
     }
 
     private int AscensionValue(AscensionLevel level, int ascensionValue, int fallbackValue) =>

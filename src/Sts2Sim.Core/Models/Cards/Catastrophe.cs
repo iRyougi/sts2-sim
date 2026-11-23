@@ -38,6 +38,13 @@ public sealed class Catastrophe : CardModel
                 continue;
             }
 
+            // Native CardCmd.AutoPlay checks this before moving cards or choosing targets.
+            // Keep selecting on later iterations, as native Catastrophe does, but do not play.
+            if (CombatState!.IsOverOrEnding() || picked.Owner.Creature.IsDead)
+            {
+                continue;
+            }
+
             // Native CardCmd.AutoPlay moves an Unplayable fallback pick to its result pile
             // without running OnPlay. This direct AutoPlayAsync path needs the same guard.
             if (picked.Keywords.Contains(CardKeyword.Unplayable))

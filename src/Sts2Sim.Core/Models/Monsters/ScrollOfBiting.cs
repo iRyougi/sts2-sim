@@ -9,15 +9,25 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class ScrollOfBiting : MonsterModel
 {
-    public int StarterMoveIdx { get; set; }
+    private int _starterMoveIdx;
+
+    public int StarterMoveIdx
+    {
+        get => _starterMoveIdx;
+        set
+        {
+            AssertMutable();
+            _starterMoveIdx = value;
+        }
+    }
     public override int MinInitialHp => Value(AscensionLevel.ToughEnemies, 33, 30);
     public override int MaxInitialHp => Value(AscensionLevel.ToughEnemies, 39, 37);
     private int Chomp => Value(AscensionLevel.DeadlyEnemies, 16, 14);
     private int Chew => Value(AscensionLevel.DeadlyEnemies, 6, 5);
 
-    public override async Task BeforeCombatStart()
+    public override async Task AfterAddedToRoom()
     {
-        await base.BeforeCombatStart();
+        await base.AfterAddedToRoom();
         await PowerCmd.Apply<PaperCutsPower>(Creature.CombatState!, Creature, 2m, Creature, null);
     }
 

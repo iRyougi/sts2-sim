@@ -55,7 +55,8 @@ public sealed class Overgrowth : ActDefinition
     {
         new(CreateMonster<BygoneEffigy>, tags: null, isWeak: false, name: "BygoneEffigy") { IdEntry = "BYGONE_EFFIGY_ELITE" },
         new(CreateMonster<Byrdonis>, tags: null, isWeak: false, name: "Byrdonis") { IdEntry = "BYRDONIS_ELITE" },
-        new(() => [(CreateMonster<PhrogParasite>(), "phrog")], tags: null, isWeak: false, name: "PhrogParasite") { IdEntry = "PHROG_PARASITE_ELITE" },
+        // 原版 PhrogParasiteElite.Slots：寄生体死后放出的蠕虫按槽位排在后面
+        new(() => [(CreateMonster<PhrogParasite>(), "phrog")], tags: null, isWeak: false, name: "PhrogParasite") { Slots = ["phrog", "wriggler1", "wriggler2", "wriggler3", "wriggler4"], IdEntry = "PHROG_PARASITE_ELITE" },
     };
 
     protected override IReadOnlyList<EncounterDefinition> BossEncounters { get; } = new List<EncounterDefinition>

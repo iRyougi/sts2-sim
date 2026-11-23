@@ -17,7 +17,9 @@ public sealed class OneForAll : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay play)
     {
-        foreach (Player player in CombatState?.Players ?? [])
+        Player[] players = CombatState?.Creatures.Where(creature => creature.IsPlayer)
+            .Select(creature => creature.Player!).ToArray() ?? [];
+        foreach (Player player in players)
             await PowerCmd.Apply<OneForAllPower>(CombatState!, player.Creature,
                 _amount, Owner.Creature, this);
     }

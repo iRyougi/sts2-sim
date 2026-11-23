@@ -24,11 +24,11 @@ public sealed class AutoPlayCardTests : IDisposable
         {
             typeof(Regent), typeof(StrikeRegent), typeof(DefendRegent), typeof(FallingStar), typeof(Venerate),
             typeof(Sts2Sim.Core.Models.Relics.DivineRight),
-            typeof(WanderingGrunt),
+            typeof(WanderingGrunt), typeof(TestSubject), typeof(AdaptablePower), typeof(EnragePower), typeof(StrengthPower),
             typeof(IAmInvincible), typeof(MakeItSo), typeof(Catastrophe), typeof(BeatDown),
             typeof(DecisionsDecisions), typeof(Bombardment), typeof(Clash), typeof(Neutralize), typeof(Dash),
-            typeof(Ricochet),
-            typeof(WeakPower),
+            typeof(Ricochet), typeof(DaggerSpray),
+            typeof(WeakPower), typeof(TheBomb), typeof(TheBombPower), typeof(SerpentFormPower), typeof(BurstPower),
         });
     }
 
@@ -128,6 +128,47 @@ public sealed class AutoPlayCardTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Catastrophe_LastEnemyKilled_LeavesLaterPickInDrawPile(bool upgraded, bool unplayable)
+    {
+        (Player player, CombatRoom room) = await CreateCombatAsync("catastrophe-last-enemy");
+        foreach (CardModel c in player.PlayerCombatState!.DrawPile.Cards.ToList())
+            CardPileCmd.Add(c, PileType.Discard);
+
+        // Shuffle seed 8 selects Ricochet first from this two-card list.
+        player.RunState.Rng.MockRng(RunRngType.Shuffle, 8uL);
+        AddTo<Ricochet>(player, PileType.Draw);
+        TheBomb bomb = AddTo<TheBomb>(player, PileType.Draw);
+        if (unplayable) bomb.AddKeywordInternal(CardKeyword.Unplayable);
+        StrikeRegent fallback = AddTo<StrikeRegent>(player, PileType.Draw);
+        fallback.AddKeywordInternal(CardKeyword.Unplayable);
+        Catastrophe card = AddToHand<Catastrophe>(player);
+        if (upgraded) card.Upgrade();
+        Creature enemy = room.Engine.State.HittableEnemies.Single();
+        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        int playsBefore = player.PlayerCombatState.CardsPlayedThisTurn;
+        int energyBefore = player.PlayerCombatState.Energy;
+        int shuffleBefore = player.RunState.Rng.Shuffle.Counter;
+
+        await card.PlayAsync(target: null);
+
+        Assert.True(room.Engine.IsEnding);
+        Assert.True(enemy.IsDead);
+        Assert.Equal(2, player.PlayerCombatState.DrawPile.Cards.Count);
+        Assert.Contains(bomb, player.PlayerCombatState.DrawPile.Cards);
+        Assert.Contains(fallback, player.PlayerCombatState.DrawPile.Cards);
+        Assert.Null(player.Creature.GetPower<TheBombPower>());
+        Assert.Equal(playsBefore + 2, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(energyBefore - 2, player.PlayerCombatState.Energy);
+        // Native Catastrophe still selects on later iterations before AutoPlay refuses.
+        Assert.Equal(shuffleBefore + (upgraded && unplayable ? 2 : 1),
+            player.RunState.Rng.Shuffle.Counter);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task BeatDown_AutoPlaysThreeAttacksFromDiscard(bool includeUnplayableAttack)
@@ -160,25 +201,69 @@ public sealed class AutoPlayCardTests : IDisposable
         Assert.Equal(7, player.PlayerCombatState.Energy);
         if (unplayable is not null)
             Assert.Contains(unplayable, player.PlayerCombatState.DiscardPile.Cards);
+
+        // Native BeatDown passes null for RandomEnemy: Ricochet draws only its four hit targets.
+        (Player randomPlayer, CombatRoom randomRoom) = await CreateCombatAsync("beat-down-ricochet-rng");
+        AddTo<Ricochet>(randomPlayer, PileType.Discard);
+        Creature randomEnemy = randomRoom.Engine.State.HittableEnemies.Single();
+        int randomHpBefore = randomEnemy.CurrentHp;
+        int targetsBefore = randomPlayer.RunState.Rng.CombatTargets.Counter;
+        await AddToHand<BeatDown>(randomPlayer).PlayAsync(target: null);
+        Assert.Equal(randomHpBefore - 12, randomEnemy.CurrentHp);
+        Assert.Equal(targetsBefore + 4, randomPlayer.RunState.Rng.CombatTargets.Counter);
     }
 
-    [Fact]
-    public async Task BeatDown_StopsWhenNoHittableEnemyRemains()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BeatDown_StopsWhenNoHittableEnemyRemains(bool upgraded)
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("beat-down-last-enemy");
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
-            AddTo<StrikeRegent>(player, PileType.Discard);
+            AddTo<DaggerSpray>(player, PileType.Discard);
         }
 
         Creature enemy = room.Engine.State.HittableEnemies.Single();
         enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
         BeatDown card = AddToHand<BeatDown>(player);
+        if (upgraded) card.Upgrade();
+        int playsBefore = player.PlayerCombatState!.CardsPlayedThisTurn;
+        int targetsBefore = player.RunState.Rng.CombatTargets.Counter;
 
         await card.PlayAsync(target: null);
 
         Assert.True(enemy.IsDead);
         Assert.Empty(room.Engine.State.HittableEnemies);
+        Assert.Equal(playsBefore + 2, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(targetsBefore, player.RunState.Rng.CombatTargets.Counter);
+
+        // A dead TestSubject is still awaiting revival: empty targets do not imply combat ending.
+        var revivalRun = new RunState("beat-down-reviving-target", new Overgrowth());
+        Player revivalPlayer = Player.CreateForNewRun(ModelDb.Character<Regent>(), revivalRun);
+        revivalRun.AddPlayer(revivalPlayer);
+        var revivalRoom = new CombatRoom(() => (TestSubject)ModelDb.Monster<TestSubject>().MutableClone());
+        await revivalRoom.Enter(revivalRun);
+        Creature subject = revivalRoom.Engine.State.HittableEnemies.Single();
+        subject.LoseHpInternal(subject.CurrentHp - 1, default);
+        await AddToHand<StrikeRegent>(revivalPlayer).PlayAsync(subject);
+        Assert.True(subject.GetPower<AdaptablePower>()!.IsReviving);
+        Assert.False(revivalRoom.Engine.IsOverOrEnding);
+        Assert.Empty(revivalRoom.Engine.State.HittableEnemies);
+        foreach (CardModel c in revivalPlayer.PlayerCombatState!.DiscardPile.Cards.ToList())
+            CardPileCmd.Remove(c);
+        StrikeRegent first = AddTo<StrikeRegent>(revivalPlayer, PileType.Discard);
+        StrikeRegent second = AddTo<StrikeRegent>(revivalPlayer, PileType.Discard);
+        first.ExhaustOnNextPlay = second.ExhaustOnNextPlay = true;
+        BeatDown revivalCard = AddToHand<BeatDown>(revivalPlayer);
+        if (upgraded) revivalCard.Upgrade();
+        int revivalPlaysBefore = revivalPlayer.PlayerCombatState.CardsPlayedThisTurn;
+
+        await revivalCard.PlayAsync(target: null);
+
+        Assert.Equal(revivalPlaysBefore + 1, revivalPlayer.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Contains(first, revivalPlayer.PlayerCombatState.ExhaustPile.Cards);
+        Assert.Contains(second, revivalPlayer.PlayerCombatState.ExhaustPile.Cards);
     }
 
     [Fact]
@@ -187,13 +272,61 @@ public sealed class AutoPlayCardTests : IDisposable
         (Player player, _) = await CreateCombatAsync("decisions-decisions");
         var selection = new LegacySelectionDecisionSource();
         ((Sts2Sim.Core.Combat.CombatState)player.Creature.CombatState!).CardSelectionSource = selection;
+        foreach (CardModel existing in player.PlayerCombatState!.AllPiles.SelectMany(pile => pile.Cards).ToList())
+            CardPileCmd.Remove(existing);
+        DefendRegent[] draw = Enumerable.Range(0, 3)
+            .Select(_ => AddTo<DefendRegent>(player, PileType.Draw)).ToArray();
+        player.PlayerCombatState.GainStars(6);
         DecisionsDecisions card = AddToHand<DecisionsDecisions>(player);
         int blockBefore = player.Creature.Block;
+        int startedBefore = player.PlayerCombatState.CardPlaysStartedThisTurn;
+        int finishedBefore = player.PlayerCombatState.CardsPlayedThisTurn;
 
         await card.PlayAsync(target: null);
 
-        int defendPlays = (player.Creature.Block - blockBefore) / 5;
-        Assert.True(defendPlays == 0 || defendPlays == 3);
+        Assert.Equal(blockBefore + 15, player.Creature.Block);
+        Assert.Equal(startedBefore + 4, player.PlayerCombatState.CardPlaysStartedThisTurn);
+        Assert.Equal(finishedBefore + 4, player.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(draw.Skip(1), player.PlayerCombatState.Hand.Cards);
+        Assert.Same(draw[0], Assert.Single(player.PlayerCombatState.DiscardPile.Cards));
+        Assert.Same(card, Assert.Single(player.PlayerCombatState.ExhaustPile.Cards));
+
+        // The first selected skill's AfterCardPlayed kills the last enemy; later repeats must stop.
+        (Player endingPlayer, CombatRoom endingRoom) = await CreateCombatAsync("decisions-ending-bomb");
+        foreach (CardModel c in endingPlayer.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards).ToList())
+            CardPileCmd.Remove(c);
+        TheBomb bomb = AddToHand<TheBomb>(endingPlayer);
+        DecisionsDecisions endingCard = AddToHand<DecisionsDecisions>(endingPlayer);
+        endingRoom.Engine.State.CardSelectionSource = new LegacySelectionDecisionSource();
+        Creature enemy = endingRoom.Engine.State.HittableEnemies.Single();
+        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        await PowerCmd.Apply<SerpentFormPower>(endingRoom.Engine.State, endingPlayer.Creature,
+            1m, endingPlayer.Creature, null);
+
+        await endingCard.PlayAsync(target: null);
+
+        Assert.True(enemy.IsDead);
+        Assert.Equal(2, endingPlayer.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Equal(PileType.Discard, bomb.Pile!.Type);
+        Assert.Single(endingPlayer.Creature.Powers.OfType<TheBombPower>());
+
+        // #686: a manual Burst replay must stop the same way (it used to dereference a null TheBombPower).
+        (Player burstPlayer, CombatRoom burstRoom) = await CreateCombatAsync("burst-ending-bomb");
+        foreach (CardModel c in burstPlayer.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards).ToList())
+            CardPileCmd.Remove(c);
+        TheBomb burstBomb = AddToHand<TheBomb>(burstPlayer);
+        Creature burstEnemy = burstRoom.Engine.State.HittableEnemies.Single();
+        burstEnemy.LoseHpInternal(burstEnemy.CurrentHp - 1, default);
+        await PowerCmd.Apply<SerpentFormPower>(burstRoom.Engine.State, burstPlayer.Creature,
+            1m, burstPlayer.Creature, null);
+        await PowerCmd.Apply<BurstPower>(burstRoom.Engine.State, burstPlayer.Creature,
+            1m, burstPlayer.Creature, null);
+
+        await burstBomb.PlayAsync(target: null);
+
+        Assert.True(burstEnemy.IsDead);
+        Assert.Equal(1, burstPlayer.PlayerCombatState.CardsPlayedThisTurn);
+        Assert.Single(burstPlayer.Creature.Powers.OfType<TheBombPower>());
     }
 
     [Fact]

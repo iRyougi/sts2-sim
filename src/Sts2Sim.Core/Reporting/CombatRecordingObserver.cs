@@ -300,6 +300,7 @@ internal sealed class CombatRecordingObserver : ICombatObserver
         }
 
         _finalCombatState = CaptureAction();
+        _recorder.ObserveCombatSettlement(_runState, _room.Engine.State);
     }
 
     public void EndCombat(bool victory, IReadOnlyList<RewardsSet> rewardSets)

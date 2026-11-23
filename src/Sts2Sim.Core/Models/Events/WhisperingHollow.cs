@@ -16,6 +16,11 @@ public sealed class WhisperingHollow : EventModel
 
     private decimal _cost;
 
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("GOLD", [VisibleValue.Int("Gold", (int)_cost), VisibleValue.Int("PotionCount", 2), VisibleValue.Condition("Potion", "Random")]),
+        new("HUG", [VisibleValue.Int("HpLoss", 9), VisibleValue.Int("TransformCount", 1), VisibleValue.Condition("TransformResult", "Random")]),
+    ]);
+
     protected override void CalculateVars() => _cost = 35m + Rng.NextInt(-9, 10);
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions() => new[]

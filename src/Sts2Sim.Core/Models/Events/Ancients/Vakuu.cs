@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models.Relics;
+using Sts2Sim.Core.Runs;
 
 namespace Sts2Sim.Core.Models.Events;
 
@@ -12,6 +13,9 @@ public sealed class Vakuu : AncientEventModel
 
     public override IReadOnlyList<RelicModel> AllPossibleOptions => Pool1.Concat(Pool2).Concat(Pool3)
         .Select(type => (RelicModel)ModelDb.Get(type).MutableClone()).ToArray();
+
+    protected override VisibleDecisionMetadata BuildVisibleState() =>
+        base.BuildVisibleState() with { CoverageGapIds = ["G3.VakuuVisits"] };
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {

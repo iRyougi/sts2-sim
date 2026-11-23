@@ -269,7 +269,7 @@ public sealed class HiveFidelityRound2ExistingTests : IDisposable
         await PowerCmd.Apply<NoDrawPower>(room.Engine.State, player.Creature, 1m, player.Creature, null);
         await CardPileCmd.Draw(room.Engine.State, 5, player, fromHandDraw: true);
 
-        await Hook.AfterSideTurnStart(room.Engine.State, CombatSide.Player, [player.Creature]);
+        await Hook.AfterPlayerTurnStart(room.Engine.State, player);     // 原版暖手套挂在 AfterPlayerTurnStart
 
         Assert.Empty(player.PlayerCombatState!.Hand.Cards);
         Assert.Equal(2, Assert.Single(player.Creature.Powers.OfType<StrengthPower>()).Amount);

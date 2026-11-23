@@ -20,6 +20,8 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
 
     public abstract int MaxInitialHp { get; }
 
+    public virtual bool IsHealthBarVisible => true;
+
     public Rng Rng { get; set; } = null!;
 
     public RunRngSet RunRng { get; set; } = null!;
@@ -148,6 +150,12 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
             source.MoveStateMachine,
             source.NextMove,
             this);
+    }
+
+    internal virtual void RestoreCombatCloneReferencesFrom(
+        MonsterModel source,
+        IReadOnlyDictionary<Creature, Creature> creatureMap)
+    {
     }
 
     internal virtual void AppendCombatStateDescription(

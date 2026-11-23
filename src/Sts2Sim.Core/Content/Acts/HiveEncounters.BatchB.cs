@@ -16,7 +16,8 @@ public static partial class HiveEncounters
             (Monster<SlumberingBeetle>(), "third")], [EncounterTag.Workers], false, "SlumberingBeetleNormal"),
         new(() => [(Monster<SpinyToad>(), null)], null, false, "SpinyToadNormal"),
         new(() => [(Monster<TheInsatiable>(), null)], null, false, "TheInsatiableBoss"),
-        new(() => [(Monster<TheObscura>(), "obscura")], null, false, "TheObscuraNormal"),
+        // 原版 TheObscuraNormal.Slots：召唤的幻影（Parafright）排在本体前面
+        new(() => [(Monster<TheObscura>(), "obscura")], null, false, "TheObscuraNormal") { Slots = ["illusion", "obscura"] },
         new(() => [(Monster<ThievingHopper>(), null)], [EncounterTag.Thieves], true, "ThievingHopperWeak"),
         new(() => [(Monster<Tunneler>(), null)], [EncounterTag.Burrower], true, "TunnelerWeak"),
     ];

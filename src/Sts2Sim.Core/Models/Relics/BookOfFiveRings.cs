@@ -22,8 +22,7 @@ public sealed class BookOfFiveRings : RelicModel
         _ = clonedBy;
         if (Owner.Creature.IsDead ||
             card.Owner != Owner ||
-            card.Pile?.Type != PileType.Deck ||
-            oldPileType == PileType.Deck)
+            card.Pile?.Type != PileType.Deck)
         {
             return;
         }

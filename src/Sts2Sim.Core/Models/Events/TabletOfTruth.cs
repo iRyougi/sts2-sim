@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.ValueProps;
@@ -8,6 +9,15 @@ namespace Sts2Sim.Core.Models.Events;
 /// 偏离 #126：缓存成本致死分支复用 run-level LoseHp 防死/死亡 lifecycle。</summary>
 public sealed class TabletOfTruth : EventModel
 {
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("SMASH", [VisibleValue.Int("Heal", 20)]),
+        new("DECIPHER", _decipherCount == 4
+            ? [VisibleValue.Int("MaxHpLoss", (int)_currentCost), VisibleValue.Scope("UpgradeScope", "All"),
+                VisibleValue.Key("DescriptionKey", "TABLET_OF_TRUTH.pages.DECIPHER_4.options.DECIPHER.description")]
+            : [VisibleValue.Int("MaxHpLoss", (int)_currentCost), VisibleValue.Int("RandomUpgradeCount", 1),
+                VisibleValue.Key("DescriptionKey", _decipherCount == 0 ? "TABLET_OF_TRUTH.pages.INITIAL.options.DECIPHER_1.description" : $"TABLET_OF_TRUTH.pages.DECIPHER_{_decipherCount}.options.DECIPHER.description")]),
+    ]);
+
     private int _decipherCount;
     private decimal _currentCost = 3m;
 

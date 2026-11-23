@@ -58,46 +58,50 @@ public sealed class MawlerTests : IDisposable
     }
 
     [Fact]
-    public async Task RandomBranch_AcrossSeedExhaustion_UsesRoarAtMostOnceAndNeverImmediatelyRepeatsAttacks()
+    public void RandomBranch_FixedWitnessesPreserveOneTimeRoarAttackExclusionAndRng()
     {
-        var seen = new HashSet<string>();
-
-        for (int seed = 0; seed < 64; seed++)
+        const string claw = "CLAW_MOVE", rip = "RIP_AND_TEAR_MOVE", roar = "ROAR_MOVE";
+        var witnesses = new[]
         {
-            (_, Mawler monster, IReadOnlyList<Sts2Sim.Core.Entities.Creatures.Creature> targets) =
-                Task14MonsterTestFixture.CreateCombat<Mawler>(0, $"mawler-{seed}");
-            var sequence = new List<string> { monster.NextMove!.StateId };
-
-            for (int turn = 0; turn < 18; turn++)
+            (Seed: 0, Moves: new[] { claw, rip, claw, rip, claw, rip, claw, roar, claw, rip, claw, rip, claw, rip, claw, rip, claw, rip, claw },
+                InitialRng: (11856283367011444143UL, 7891399967802905058UL, 3327063325768060044UL, 14531752814712566229UL)),
+            (Seed: 1, Moves: new[] { claw, roar, rip, claw, rip, claw, rip, claw, rip, claw, rip, claw, rip, claw, rip, claw, rip, claw, rip },
+                InitialRng: (7815036943064807240UL, 13472159203972151296UL, 8917842485399916633UL, 4939493687961313665UL)),
+        };
+        foreach (var witness in witnesses)
+        {
+            (var combat, Mawler monster, var targets) =
+                Task14MonsterTestFixture.CreateCombat<Mawler>(0, $"mawler-{witness.Seed}");
+            MonsterMoveStateMachine machine = monster.MoveStateMachine!;
+            RandomBranchState branch = Assert.IsType<RandomBranchState>(machine.States["RAND"]);
+            Assert.Collection(branch.States,
+                state => AssertBranch(state, rip, MoveRepeatType.CannotRepeat),
+                state => AssertBranch(state, roar, MoveRepeatType.UseOnlyOnce),
+                state => AssertBranch(state, claw, MoveRepeatType.CannotRepeat));
+            var rng = combat.RunState.Rng.MonsterAi;
+            var initialRng = rng.ToSerializable();
+            Assert.Equal(0, initialRng.counter);
+            Assert.Equal(witness.InitialRng, (initialRng.state0, initialRng.state1, initialRng.state2, initialRng.state3));
+            Assert.Equal(claw, monster.NextMove!.StateId);
+            Assert.Equal(witness.Moves.Take(1), machine.StateLog.Select(state => state.Id));
+            var expectedRng = rng.CloneExact();
+            int roarCount = 0;
+            for (int turn = 0; turn < witness.Moves.Length - 1; turn++)
             {
-                await Task14MonsterTestFixture.PerformAndRoll(monster, targets);
-                sequence.Add(monster.NextMove!.StateId);
+                string previous = monster.NextMove!.StateId;
+                expectedRng.NextFloat();
+                machine.OnMovePerformed(monster.NextMove);
+                monster.RollMove(targets);
+                string current = monster.NextMove!.StateId;
+                Assert.True(current == witness.Moves[turn + 1], $"seed={witness.Seed}, turn={turn}");
+                Assert.Equal(witness.Moves.Take(turn + 2), machine.StateLog.Select(state => state.Id));
+                Assert.Equal(expectedRng.ToSerializable(), rng.ToSerializable());
+                if (current == roar) roarCount++;
+                else Assert.NotEqual(previous, current);
+                Assert.InRange(roarCount, 0, 1);
             }
-
-            Assert.Equal("CLAW_MOVE", sequence[0]);
-            Assert.True(sequence.Count(id => id == "ROAR_MOVE") <= 1, string.Join(",", sequence));
-            for (int index = 1; index < sequence.Count; index++)
-            {
-                if (sequence[index] != "ROAR_MOVE")
-                {
-                    Assert.NotEqual(sequence[index - 1], sequence[index]);
-                }
-            }
-
-            seen.UnionWith(sequence);
+            Assert.Equal(1, roarCount);
         }
-
-        Assert.Equal(
-            new[] { "CLAW_MOVE", "RIP_AND_TEAR_MOVE", "ROAR_MOVE" }.OrderBy(id => id),
-            seen.OrderBy(id => id));
-
-        (_, Mawler inspected, _) = Task14MonsterTestFixture.CreateCombat<Mawler>(0, "mawler-weights");
-        RandomBranchState branch = Assert.IsType<RandomBranchState>(inspected.MoveStateMachine!.States["RAND"]);
-        Assert.Collection(
-            branch.States,
-            state => AssertBranch(state, "RIP_AND_TEAR_MOVE", MoveRepeatType.CannotRepeat),
-            state => AssertBranch(state, "ROAR_MOVE", MoveRepeatType.UseOnlyOnce),
-            state => AssertBranch(state, "CLAW_MOVE", MoveRepeatType.CannotRepeat));
     }
 
     private static void AssertBranch(

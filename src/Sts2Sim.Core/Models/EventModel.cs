@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Players;
@@ -22,9 +23,11 @@ public abstract class EventModel : AbstractModel
     private EventOption? _activeChoiceOption;
     private int _activeChoicePageVersion;
     private int _pageVersion;
+    private int _initialPageVersion;
     private bool _hasBegun;
     private bool _isAwaitingForcedCombat;
     private Queue<RewardsSet> _pendingRewardOffers = new();
+    private Stack<Queue<RewardsSet>> _suspendedRewardOffers = new();
     private Func<MonsterModel>? _pendingForcedCombatFactory;
     private Func<IReadOnlyList<MonsterModel>>? _pendingForcedCombatBatchFactory;
     private Func<IReadOnlyList<(MonsterModel Monster, string? SlotName)>>? _pendingForcedCombatSlottedBatchFactory;
@@ -39,6 +42,52 @@ public abstract class EventModel : AbstractModel
 
     public bool IsFinished { get; private set; }
 
+    /// <summary>Whether the player is still on the page the event opened with (no option taken yet that changed the
+    /// page). Visible to the player; read by the strategic deployment, never by RNG or simulation logic (#777).</summary>
+    public bool IsOnInitialPage { get { lock (_stateLock) { return _hasBegun && !IsFinished && _pageVersion == _initialPageVersion; } } }
+
+    /// <summary>Returns only values already displayed by the current event page.</summary>
+    public VisibleDecisionSnapshot GetVisibleState()
+    {
+        lock (_stateLock)
+        {
+            if (!_hasBegun || IsFinished) return new(VisibleDecisionMetadata.Empty, []);
+            VisibleDecisionMetadata state = BuildVisibleState();
+            var declaredByKey = state.DisplayOptions
+                .GroupBy(option => option.OptionKey)
+                .ToDictionary(group => group.Key, group => new Queue<VisibleOption>(group));
+            var rows = ImmutableArray.CreateBuilder<VisibleOption>(CurrentOptions.Count);
+            for (int i = 0; i < CurrentOptions.Count; i++)
+            {
+                EventOption option = CurrentOptions[i];
+                VisibleOption declared = declaredByKey.TryGetValue(option.Key, out Queue<VisibleOption>? matches) && matches.Count > 0
+                    ? matches.Dequeue() : new VisibleOption(option.Key, []);
+                rows.Add(DescribeVisibleOption(option, i, declared) with { IsEnabled = option.IsEnabled });
+            }
+            return new(state with { DisplayOptions = rows.ToImmutable() }, CurrentOptions.Cast<object>().ToArray());
+        }
+    }
+
+    protected virtual VisibleDecisionMetadata BuildVisibleState() =>
+        VisibleDecisionMetadata.Empty with { CoverageGapIds = ["Unsupported.EventMetadata"] };
+
+    protected virtual VisibleOption DescribeVisibleOption(EventOption option, int displayIndex, VisibleOption declared) =>
+        option.OfferedContent is { } content
+            ? declared with { Contents = declared.Contents.Add(content) }
+            : declared;
+
+    public VisibleDecisionSnapshot GetCustomVisibleState(IReadOnlyList<CustomEventDecision> candidates)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        lock (_stateLock)
+        {
+            if (!_hasBegun || IsFinished) return new(VisibleDecisionMetadata.Empty, []);
+            return new(BuildCustomVisibleState(candidates), candidates.Cast<object>().ToArray());
+        }
+    }
+
+    protected virtual VisibleDecisionMetadata BuildCustomVisibleState(IReadOnlyList<CustomEventDecision> candidates) =>
+        throw new NotSupportedException($"Event {Id} does not describe custom visible decisions.");
     public bool IsAwaitingForcedCombat { get { lock (_stateLock) { return _isAwaitingForcedCombat; } } }
 
     public bool HasPendingRewardOffers
@@ -134,6 +183,7 @@ public abstract class EventModel : AbstractModel
             {
                 CalculateVars();
                 SetOptions(GenerateInitialOptionsWrapper());
+                _initialPageVersion = _pageVersion;
             }
             if (LocksPotions && !IsFinished) Owner.CanUseOrRemovePotions = false;
         }
@@ -242,6 +292,11 @@ public abstract class EventModel : AbstractModel
             if (!_isAwaitingForcedCombat) throw new InvalidOperationException("Event is not awaiting a forced combat.");
             _isAwaitingForcedCombat = false;
         }
+        string continuationKey = _owner is not null
+            ? $"{_owner.CurrentSemanticLocationKey}/event={Id.Entry}/page={_pageVersion}/after-forced-combat"
+            : $"floor={RunState.TotalFloor}/event={Id.Entry}/page={_pageVersion}/after-forced-combat";
+        using IDisposable runRngScope = RunState.Rng.BeginSemanticScope(continuationKey);
+        using IDisposable? playerRngScope = _owner?.PlayerRng.BeginSemanticScope(continuationKey);
         AfterForcedCombat(outcome);
     }
 
@@ -377,26 +432,32 @@ public abstract class EventModel : AbstractModel
         AssertMutable();
         lock (_stateLock)
         {
-            var scope = new NestedRewardOfferScope(this, _pendingRewardOffers);
+            _suspendedRewardOffers.Push(_pendingRewardOffers);
             _pendingRewardOffers = new Queue<RewardsSet>();
-            return scope;
+            return new NestedRewardOfferScope(this);
         }
     }
 
-    private sealed class NestedRewardOfferScope(EventModel owner, Queue<RewardsSet> parent) : IDisposable
+    // A fork resumes a cloned data frame, not the source using/async state machine.
+    internal IDisposable ResumeNestedRewardOffers() => new NestedRewardOfferScope(this);
+
+    private void EndNestedRewardOffers()
     {
-        public void Dispose()
+        lock (_stateLock)
         {
-            lock (owner._stateLock)
-            {
-                // Preserve any undrained child offers if reward resolution throws.
-                if (owner._pendingRewardOffers.Count == 0)
-                    owner._pendingRewardOffers = parent;
-                else
-                    foreach (RewardsSet offer in parent)
-                        owner._pendingRewardOffers.Enqueue(offer);
-            }
+            Queue<RewardsSet> parent = _suspendedRewardOffers.Pop();
+            // Preserve any undrained child offers if reward resolution throws.
+            if (_pendingRewardOffers.Count == 0)
+                _pendingRewardOffers = parent;
+            else
+                foreach (RewardsSet offer in parent)
+                    _pendingRewardOffers.Enqueue(offer);
         }
+    }
+
+    private sealed class NestedRewardOfferScope(EventModel owner) : IDisposable
+    {
+        public void Dispose() => owner.EndNestedRewardOffers();
     }
 
     internal bool TryDequeuePendingRewardOffer([NotNullWhen(true)] out RewardsSet? rewards)
@@ -406,6 +467,50 @@ public abstract class EventModel : AbstractModel
         {
             return _pendingRewardOffers.TryDequeue(out rewards);
         }
+    }
+
+    internal void AssertRunCloneBoundary()
+    {
+        lock (_stateLock)
+        {
+            if (_activeChoiceTask is { IsCompleted: false })
+                throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
+                    $"Event {Id} still has an executing option callback.");
+        }
+    }
+
+    internal void RestoreRunCloneStateFrom(
+        EventModel source, Player owner, IRunState runState, Rng rng,
+        Func<RewardsSet, RewardsSet> mapOffer,
+        Func<Delegate, Delegate> mapCallback)
+    {
+        source.AssertRunCloneBoundary();
+        // Preserve logical progress; never run BeginEvent/CalculateVars/options again.
+        // Callback descriptors are rebound only after all mutable roots are mapped.
+        _stateLock = new object();
+        _owner = owner;
+        _runState = runState;
+        _rng = rng;
+        _activeChoiceTask = null;
+        _activeChoiceOption = null;
+        _activeChoicePageVersion = 0;
+        _pageVersion = source._pageVersion;
+        _initialPageVersion = source._initialPageVersion;
+        _hasBegun = source._hasBegun;
+        _isAwaitingForcedCombat = source._isAwaitingForcedCombat;
+        IsFinished = source.IsFinished;
+        CurrentOptions = Array.AsReadOnly(source.CurrentOptions
+            .Select(option => option.RebindForRun(mapCallback)).ToArray());
+        _pendingRewardOffers = new Queue<RewardsSet>(source._pendingRewardOffers.Select(mapOffer));
+        // Stack enumeration is top-first. Reverse before constructing the clone stack.
+        _suspendedRewardOffers = new Stack<Queue<RewardsSet>>(source._suspendedRewardOffers
+            .Reverse().Select(queue => new Queue<RewardsSet>(queue.Select(mapOffer))));
+        _pendingForcedCombatFactory = source._pendingForcedCombatFactory is { } factory
+            ? (Func<MonsterModel>)mapCallback(factory) : null;
+        _pendingForcedCombatBatchFactory = source._pendingForcedCombatBatchFactory is { } batch
+            ? (Func<IReadOnlyList<MonsterModel>>)mapCallback(batch) : null;
+        _pendingForcedCombatSlottedBatchFactory = source._pendingForcedCombatSlottedBatchFactory is { } slotted
+            ? (Func<IReadOnlyList<(MonsterModel Monster, string? SlotName)>>)mapCallback(slotted) : null;
     }
 
     protected override void AfterCloned()
@@ -419,11 +524,14 @@ public abstract class EventModel : AbstractModel
         _activeChoiceOption = null;
         _activeChoicePageVersion = 0;
         _pageVersion = 0;
+        _initialPageVersion = 0;
         _hasBegun = false;
         _isAwaitingForcedCombat = false;
         _pendingRewardOffers = new Queue<RewardsSet>();
+        _suspendedRewardOffers = new Stack<Queue<RewardsSet>>();
         _pendingForcedCombatFactory = null;
         _pendingForcedCombatBatchFactory = null;
+        _pendingForcedCombatSlottedBatchFactory = null;
         CurrentOptions = EmptyOptions();
         IsFinished = false;
     }
@@ -449,10 +557,12 @@ public abstract class EventModel : AbstractModel
         }
         catch (OperationCanceledException exception)
         {
+            // fail-open: stored and forwarded to the choice completion task below
             cancellation = exception;
         }
         catch (Exception exception)
         {
+            // fail-open: stored and forwarded to the choice completion task below
             failure = exception;
         }
 

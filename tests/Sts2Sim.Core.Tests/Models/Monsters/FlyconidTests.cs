@@ -26,61 +26,77 @@ public sealed class FlyconidTests : IDisposable
     }
 
     [Fact]
-    public async Task InitialAndRandBranches_HaveEqualWeightsAndRuntimeCooldownRules()
+    public void FixedWitnesses_PreserveInitialBranchesCooldownExpiryFallbackAndRng()
     {
-        var seenInitial = new HashSet<string>();
-        var seenRand = new HashSet<string>();
-
-        for (int seed = 0; seed < 64; seed++)
+        const string vulnerable = "VULNERABLE_SPORES_MOVE", frail = "FRAIL_SPORES_MOVE", smash = "SMASH_MOVE";
+        var witnesses = new[]
         {
-            (_, Flyconid monster, IReadOnlyList<Sts2Sim.Core.Entities.Creatures.Creature> targets) =
-                Task14MonsterTestFixture.CreateCombat<Flyconid>(0, $"flyconid-{seed}");
-            string previous = monster.NextMove!.StateId;
-            seenInitial.Add(previous);
-            var history = new List<string> { previous };
-            Assert.Contains(previous, new[] { "FRAIL_SPORES_MOVE", "SMASH_MOVE" });
-            Assert.NotEqual("VULNERABLE_SPORES_MOVE", previous);
-
-            for (int turn = 0; turn < 18; turn++)
+            (Seed: 0, Moves: new[] { smash, vulnerable, smash, frail, smash, vulnerable, frail, smash, vulnerable, smash, frail, smash, vulnerable, smash, frail, smash, vulnerable, frail, smash },
+                InitialRng: (17041663368176751194UL, 12557946027415917052UL, 3004765070209312485UL, 3047991625224520881UL)),
+            (Seed: 2, Moves: new[] { frail, smash, vulnerable, smash, frail, smash, vulnerable, smash, frail, smash, vulnerable, frail, smash, vulnerable, frail, smash, vulnerable, smash, frail },
+                InitialRng: (4887817895513884327UL, 4354087154534142974UL, 9946874644757525327UL, 16165317146417626750UL)),
+        };
+        bool sawFallback = false, sawVulnerableExpiry = false, sawFrailExpiry = false;
+        var vulnerableBlockedDistances = new HashSet<int>();
+        var frailBlockedDistances = new HashSet<int>();
+        foreach (var witness in witnesses)
+        {
+            (var combat, Flyconid monster, var targets) =
+                Task14MonsterTestFixture.CreateCombat<Flyconid>(0, $"flyconid-{witness.Seed}");
+            MonsterMoveStateMachine machine = monster.MoveStateMachine!;
+            RandomBranchState initial = Assert.IsType<RandomBranchState>(machine.States["INITIAL"]);
+            Assert.Collection(initial.States,
+                state => AssertBranch(state, frail, 1f),
+                state => AssertBranch(state, smash, 1f));
+            RandomBranchState random = Assert.IsType<RandomBranchState>(machine.States["RAND"]);
+            Assert.Collection(random.States,
+                state => AssertBranch(state, vulnerable, 1f),
+                state => AssertBranch(state, frail, 1f),
+                state => AssertBranch(state, smash, 1f));
+            var rng = combat.RunState.Rng.MonsterAi;
+            var initialRng = rng.ToSerializable();
+            Assert.Equal(1, initialRng.counter);
+            Assert.Equal(witness.InitialRng, (initialRng.state0, initialRng.state1, initialRng.state2, initialRng.state3));
+            Assert.Equal(witness.Moves[0], monster.NextMove!.StateId);
+            Assert.Equal(witness.Moves.Take(1), machine.StateLog.Select(state => state.Id));
+            var expectedRng = rng.CloneExact();
+            for (int turn = 0; turn < witness.Moves.Length - 1; turn++)
             {
-                await Task14MonsterTestFixture.PerformAndRoll(monster, targets);
+                string[] history = machine.StateLog.Select(state => state.Id).ToArray();
+                int lastVulnerable = Array.LastIndexOf(history, vulnerable);
+                int lastFrail = Array.LastIndexOf(history, frail);
+                int vulnerableDistance = lastVulnerable < 0 ? int.MaxValue : history.Length - lastVulnerable;
+                int frailDistance = lastFrail < 0 ? int.MaxValue : history.Length - lastFrail;
+                bool zeroEligible = vulnerableDistance <= 3 && frailDistance <= 2 && history[^1] == smash;
+                if (vulnerableDistance <= 3) vulnerableBlockedDistances.Add(vulnerableDistance);
+                if (frailDistance <= 2) frailBlockedDistances.Add(frailDistance);
+                // The all-excluded edge still draws once before returning the first branch.
+                expectedRng.NextFloat();
+                machine.OnMovePerformed(monster.NextMove!);
+                monster.RollMove(targets);
                 string current = monster.NextMove!.StateId;
-                seenRand.Add(current);
-                Assert.NotEqual(previous, current);
-                int cooldown = current == "VULNERABLE_SPORES_MOVE" ? 3 : current == "FRAIL_SPORES_MOVE" ? 2 : 0;
-                // Native RandomBranchState selects its first branch when all weights
-                // are zero (NextFloat(0), then <= 0). Preserve that edge case.
-                bool anyEligible = !history.TakeLast(3).Contains("VULNERABLE_SPORES_MOVE")
-                    || !history.TakeLast(2).Contains("FRAIL_SPORES_MOVE")
-                    || previous != "SMASH_MOVE";
-                if (anyEligible)
-                    Assert.DoesNotContain(current, history.TakeLast(cooldown));
+                Assert.True(current == witness.Moves[turn + 1], $"seed={witness.Seed}, turn={turn}");
+                Assert.Equal(witness.Moves.Take(turn + 2), machine.StateLog.Select(state => state.Id));
+                Assert.Equal(expectedRng.ToSerializable(), rng.ToSerializable());
+                if (zeroEligible)
+                {
+                    Assert.Equal(vulnerable, current);
+                    sawFallback = true;
+                }
                 else
-                    Assert.Equal("VULNERABLE_SPORES_MOVE", current);
-                history.Add(current);
-                previous = current;
+                {
+                    if (current == vulnerable) Assert.True(vulnerableDistance > 3);
+                    if (current == frail) Assert.True(frailDistance > 2);
+                }
+                sawVulnerableExpiry |= current == vulnerable && vulnerableDistance == 4;
+                sawFrailExpiry |= current == frail && frailDistance == 3;
             }
         }
-
-        Assert.Equal(
-            new[] { "FRAIL_SPORES_MOVE", "SMASH_MOVE" },
-            seenInitial.OrderBy(id => id));
-        Assert.Equal(
-            new[] { "FRAIL_SPORES_MOVE", "SMASH_MOVE", "VULNERABLE_SPORES_MOVE" },
-            seenRand.OrderBy(id => id));
-
-        (_, Flyconid inspected, _) = Task14MonsterTestFixture.CreateCombat<Flyconid>(0, "flyconid-weights");
-        RandomBranchState initial = Assert.IsType<RandomBranchState>(inspected.MoveStateMachine!.States["INITIAL"]);
-        Assert.Collection(
-            initial.States,
-            state => AssertBranch(state, "FRAIL_SPORES_MOVE", 1f),
-            state => AssertBranch(state, "SMASH_MOVE", 1f));
-        RandomBranchState random = Assert.IsType<RandomBranchState>(inspected.MoveStateMachine.States["RAND"]);
-        Assert.Collection(
-            random.States,
-            state => AssertBranch(state, "VULNERABLE_SPORES_MOVE", 1f),
-            state => AssertBranch(state, "FRAIL_SPORES_MOVE", 1f),
-            state => AssertBranch(state, "SMASH_MOVE", 1f));
+        Assert.True(sawFallback);
+        Assert.True(sawVulnerableExpiry);
+        Assert.True(sawFrailExpiry);
+        Assert.Equal(new[] { 1, 2, 3 }, vulnerableBlockedDistances.Order());
+        Assert.Equal(new[] { 1, 2 }, frailBlockedDistances.Order());
     }
 
     [Theory]

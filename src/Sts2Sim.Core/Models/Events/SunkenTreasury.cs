@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Models.Cards;
@@ -8,6 +9,12 @@ public sealed class SunkenTreasury : EventModel
 {
     private decimal _smallChestGold;
     private decimal _largeChestGold;
+
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("FIRST_CHEST", [VisibleValue.Int("SmallChestGold", (int)_smallChestGold)]),
+        new("SECOND_CHEST", [VisibleValue.Int("LargeChestGold", (int)_largeChestGold), VisibleValue.Id("CurseCardId", "GREED"), VisibleValue.Int("CurseCount", 1)])
+            { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<Greed>())] },
+    ]);
 
     protected override void CalculateVars()
     {

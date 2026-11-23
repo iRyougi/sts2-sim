@@ -24,7 +24,8 @@ public sealed class Orichalcum : RelicModel
         return Task.CompletedTask;
     }
 
-    public override Task BeforeSideTurnEndEarly(
+    // 原版在 BeforeSideTurnEndVeryEarly 判定格挡是否为 0（早于覆甲等 BeforeSideTurnEndEarly 给的格挡）
+    public override Task BeforeSideTurnEndVeryEarly(
         CombatSide side,
         IEnumerable<Creature> participants)
     {

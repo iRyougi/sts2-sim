@@ -10,9 +10,11 @@ public sealed class DisintegrationPower : PowerModel
 {
     public override PowerType Type => PowerType.Debuff;
     public override PowerStackType StackType => PowerStackType.Counter;
-    public override Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants) =>
-        side == Owner.Side
+    // 原版挂在 AfterSideTurnEndLate（同一时机的 AfterSideTurnEnd 全部结算完之后，如格挡盾先按扣血前的格挡判定），
+    // 伤害来源是自己
+    public override Task AfterSideTurnEndLate(CombatSide side, IEnumerable<Creature> participants) =>
+        participants.Contains(Owner)
             ? CreatureCmd.Damage(Owner.CombatState!, [Owner], Amount,
-                ValueProp.Unpowered, null, null, null)
+                ValueProp.Unpowered, Owner, null, null)
             : Task.CompletedTask;
 }

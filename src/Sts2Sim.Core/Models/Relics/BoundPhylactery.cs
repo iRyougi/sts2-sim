@@ -13,8 +13,8 @@ public sealed class BoundPhylactery : RelicModel
 
     public override async Task AfterEnergyResetLate(Player player)
     {
-        // 原版判断 TurnNumber != 1；本引擎在 AfterEnergyReset 之后才加一回合数，0 是首回合的等价时刻。
-        if (player == Owner && Owner.PlayerCombatState!.TurnNumber != 0)
+        // 原版判断 TurnNumber != 1（回合数在重置能量前已加一，与原版一致）
+        if (player == Owner && Owner.PlayerCombatState!.TurnNumber != 1)
             await SummonPet();
     }
 

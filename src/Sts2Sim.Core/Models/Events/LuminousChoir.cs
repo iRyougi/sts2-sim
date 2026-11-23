@@ -15,6 +15,16 @@ public sealed class LuminousChoir : EventModel
 
     private decimal _cost;
 
+    // Native also has a locked tribute row. Keep the existing simulator option shape unchanged.
+    protected override VisibleDecisionMetadata BuildVisibleState() => new([], [
+        new("REACH_INTO_THE_FLESH", [VisibleValue.Int("RemoveCount", 2), VisibleValue.Id("Curse", "SPORE_MIND"),
+            VisibleValue.Int("CurseCount", 1)])
+        { Contents = [VisibleContentProjection.ForCard(ModelDb.Card<SporeMind>())] },
+        new("OFFER_TRIBUTE", [VisibleValue.Int("Gold", (int)_cost), VisibleValue.Int("RelicCount", 1),
+            VisibleValue.Condition("Relic", "Random")]),
+        new("OFFER_TRIBUTE_LOCKED", [VisibleValue.Int("Gold", (int)_cost)]),
+    ]);
+
     protected override void CalculateVars() => _cost = 149m - Rng.NextInt(0, 50);
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Gold >= BaseTributeCost &&

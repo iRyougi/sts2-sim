@@ -1,39 +1,29 @@
-using Sts2Sim.Core.Combat;
-using Sts2Sim.Core.Commands;
-using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 
 namespace Sts2Sim.Core.Models.Relics;
 
+/// <summary>原版 <c>Pendulum</c>（v0.111.0）：每次抽手牌前 TurnsSeen = (TurnsSeen + 1) % 3，归零的那一回合手牌多抽 1 张
+/// （ModifyHandDraw，算在正常抽牌里）。原来的移植在回合开始后另抽 1 张（非手牌抽牌），会被提琴之类禁止回合内抽牌的效果挡掉，
+/// 抽牌时机也比原版晚。计数是存档属性 TurnsSeen（跨战斗累计，移植快照映射到 _turnCounter）。</summary>
 public sealed class Pendulum : RelicModel
 {
+    private const int Turns = 3;
     private int _turnCounter;
 
     public override RelicRarity Rarity => RelicRarity.Common;
 
-    public override async Task AfterSideTurnStart(
-        CombatSide side,
-        IReadOnlyList<Creature> participants)
+    public override Task BeforeHandDraw(Player player)
     {
-        // 偏离 #114：无独立 AfterPlayerTurnStart；用摸牌后的 AfterSideTurnStart 过滤到持有者的玩家回合。
-        if (!participants.Contains(Owner.Creature))
+        if (player == Owner)
         {
-            return;
+            _turnCounter = (_turnCounter + 1) % Turns;
         }
-
-        _turnCounter++;
-        if (_turnCounter < 3)
-        {
-            return;
-        }
-
-        _turnCounter = 0;
-        await CardPileCmd.Draw(
-            Owner.Creature.CombatState!,
-            1,
-            Owner,
-            fromHandDraw: false);
+        return Task.CompletedTask;
     }
+
+    public override decimal ModifyHandDraw(Player player, decimal count) =>
+        player == Owner && _turnCounter == 0 ? count + 1m : count;
 
     internal override void AppendCombatStateDescription(
         ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,

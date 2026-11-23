@@ -6,7 +6,10 @@ namespace Sts2Sim.Core.Models.Powers;
 public sealed class OrbitPower : PowerModel
 {
     private const int EnergyPerTrigger = 4;
+    // sls2：照原版的内部数据记累计花掉的能量与已经触发的次数（原来记的是除以 4 的余数），规则不变；观测格式 20 的能力内部数据（8、9）读这两个数
     private int _energySpent;
+
+    private int _triggerCount;
 
     public int EnergySpent => _energySpent;
 
@@ -24,12 +27,12 @@ public sealed class OrbitPower : PowerModel
         }
 
         _energySpent += amount;
-        while (_energySpent >= EnergyPerTrigger)
+        int triggers = _energySpent / EnergyPerTrigger - _triggerCount;
+        for (int k = 0; k < triggers; k++)
         {
             Owner.Player!.PlayerCombatState!.GainEnergy(Amount);
-            _energySpent -= EnergyPerTrigger;
         }
-
+        if (triggers > 0) _triggerCount += triggers;
         return Task.CompletedTask;
     }
 
@@ -38,5 +41,6 @@ public sealed class OrbitPower : PowerModel
         global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
     {
         builder.Append(_energySpent);
+        builder.Append(_triggerCount);
     }
 }

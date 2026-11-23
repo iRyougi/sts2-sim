@@ -16,7 +16,8 @@ public static partial class HiveEncounters
         new(() => CreateExoskeletons(3), [EncounterTag.Exoskeletons], true, "ExoskeletonsWeak"),
         new(() => [(Monster<HunterKiller>(), null)], null, false, "HunterKillerNormal"),
         new(() => [(Monster<InfestedPrism>(), null)], null, false, "InfestedPrismsElite"),
-        new(() => [(Monster<Ovicopter>(), "ovicopter")], null, false, "OvicopterNormal"),
+        // 原版 OvicopterNormal.Slots：下蛋召唤后 SortEnemiesBySlotName 按这个顺序重排（蛋排在母体前面，先于母体行动）
+        new(() => [(Monster<Ovicopter>(), "ovicopter")], null, false, "OvicopterNormal") { Slots = ["egg1", "egg2", "egg3", "egg4", "egg5", "ovicopter"] },
     ];
 
     private static IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateBowlbugsNormal(Rng rng)

@@ -38,7 +38,7 @@ public sealed class PlanPowerHookTests : IDisposable
             typeof(MonarchsGazePower), typeof(TheGambitPower), typeof(MayhemPower), typeof(EntropyPower),
             typeof(MonarchsGazeStrengthDownPower),
             typeof(StrengthPower), typeof(DrawCardsNextTurnPower), typeof(Purity), typeof(Supermassive),
-            typeof(PillarOfCreationPower), typeof(TransformGenerationProbeRelic),
+            typeof(PillarOfCreationPower), typeof(TransformGenerationProbeRelic), typeof(StratagemPower),
         });
     }
 
@@ -311,6 +311,36 @@ public sealed class PlanPowerHookTests : IDisposable
         int hpBefore = enemy.CurrentHp;
         await supermassive.PlayAsync(enemy);
         Assert.Equal(hpBefore - 14, enemy.CurrentHp);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StratagemPower_FillingHandDuringShuffle_StopsOuterDraw(bool fromHandDraw)
+    {
+        (Player player, CombatRoom room) = await CreateCombatAsync("stratagem-full-hand-shuffle");
+        CombatState state = room.Engine!.State;
+        PlayerCombatState piles = player.PlayerCombatState!;
+        foreach (CardPile pile in piles.AllPiles)
+            foreach (CardModel card in pile.Cards.ToArray())
+                pile.RemoveInternal(card);
+        for (int i = 0; i < 9; i++)
+            AddToHand<StrikeRegent>(player);
+        DefendRegent selected = AddTo<DefendRegent>(player, PileType.Discard);
+        StrikeRegent remaining = AddTo<StrikeRegent>(player, PileType.Discard);
+        state.CardSelectionSource = new PlanPowerFirstCardsSelectionSource();
+        await PowerCmd.Apply<StratagemPower>(state, player.Creature, 1m, player.Creature, null);
+        int drawsBefore = piles.CardsDrawnThisCombat;
+
+        IReadOnlyList<CardModel> drawn = await CardPileCmd.Draw(state, 1, player, fromHandDraw);
+
+        Assert.True(piles.Hand.Cards.Count == 10,
+            $"seed=stratagem-full-hand-shuffle, fromHandDraw={fromHandDraw}: hand={piles.Hand.Cards.Count}");
+        Assert.Contains(selected, piles.Hand.Cards);
+        Assert.Same(remaining, Assert.Single(piles.DrawPile.Cards));
+        Assert.Empty(drawn);
+        Assert.Equal(drawsBefore, piles.CardsDrawnThisCombat);
+        Assert.Empty(piles.DiscardPile.Cards);
     }
 
     private static TCard AddToHand<TCard>(Player player)

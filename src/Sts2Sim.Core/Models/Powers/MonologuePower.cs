@@ -11,11 +11,21 @@ public sealed class MonologuePower : PowerModel
 {
     private Dictionary<CardModel, int> _amountsForPlayedCards =
         new(ReferenceEqualityComparer.Instance);
-    private int _strengthApplied;
+    private decimal _strength = 1m;
+    private decimal _strengthApplied;
+
+    internal decimal Strength
+    {
+        get => _strength;
+        set => _strength = Math.Min(value, 999999999m);
+    }
 
     public override PowerType Type => PowerType.Buff;
 
-    public override PowerStackType StackType => PowerStackType.None;
+    public override PowerStackType StackType =>
+        (int)_strengthApplied != 0 ? PowerStackType.Counter : PowerStackType.None;
+
+    public override int DisplayAmount => (int)_strengthApplied;
 
     public override PowerInstanceType InstanceType => PowerInstanceType.Instanced;
 
@@ -23,7 +33,7 @@ public sealed class MonologuePower : PowerModel
     {
         if (cardPlay.Card.Owner.Creature == Owner)
         {
-            _amountsForPlayedCards[cardPlay.Card] = Amount;
+            _amountsForPlayedCards.Add(cardPlay.Card, (int)_strength);
         }
 
         return Task.CompletedTask;
@@ -39,7 +49,7 @@ public sealed class MonologuePower : PowerModel
 
         await PowerCmd.Apply<StrengthPower>(
             Owner.CombatState!, Owner, amount, Owner, null);
-        _strengthApplied += amount;
+        _strengthApplied = Math.Min(_strengthApplied + (decimal)(int)_strength, 999999999m);
     }
 
     public override async Task AfterSideTurnEnd(
@@ -51,13 +61,9 @@ public sealed class MonologuePower : PowerModel
             return;
         }
 
-        int strengthToRevoke = _strengthApplied;
         await PowerCmd.Remove(this);
-        if (strengthToRevoke != 0)
-        {
-            await PowerCmd.Apply<StrengthPower>(
-                Owner.CombatState!, Owner, -strengthToRevoke, Owner, null);
-        }
+        await PowerCmd.Apply<StrengthPower>(
+            Owner.CombatState!, Owner, -_strengthApplied, Owner, null);
     }
 
     protected override void DeepCloneFields()
@@ -71,6 +77,8 @@ public sealed class MonologuePower : PowerModel
         ref CombatStateDescriptionBuilder builder,
         CombatStateDescriptionContext context)
     {
+        base.AppendCombatStateDescription(ref builder, context);
+        builder.Append(_strength);
         builder.Append(_strengthApplied);
         context.AssertTransientEmpty(
             _amountsForPlayedCards.Count == 0,
