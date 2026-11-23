@@ -527,17 +527,16 @@ public static class Hook
 
     /// <summary>
     /// 偏离 #28: 游戏原版签名为 (IRunState, ICombatState?),本计划战斗期 hook 只从 ICombatState 派生 IRunState。
+    /// 游戏 <c>Hook.IterateCombatHookListeners</c>（#1072）：首次 MoveNext 时检查结束闸门，然后只遍历
+    /// <c>combatState.IterateHookListeners()</c>（逐个生物：能力 → 怪物，或玩家的遗物、药水、充能球、牌堆里的牌），
+    /// 不经过 RunState，所以没有牌组牌。
     /// </summary>
-    private static IEnumerable<AbstractModel> IterateCombatHookListeners(ICombatState combatState) =>
-        (combatState as CombatState)?.SnapshotCombatHookListeners() ?? IterateCombatHookListenersOverRun(combatState);
-
-    private static IEnumerable<AbstractModel> IterateCombatHookListenersOverRun(ICombatState combatState)
+    private static IEnumerable<AbstractModel> IterateCombatHookListeners(ICombatState combatState)
     {
         if (combatState.IsOverOrEnding() && !combatState.IsStarting())
             yield break;
-        // Keep the simulator's existing run/combat composition here (deviation #31).
         // Actual dispatch loops apply lifecycle eligibility; this helper preserves raw capture.
-        foreach (AbstractModel model in combatState.RunState.IterateHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
             yield return model;
     }
 
@@ -597,7 +596,7 @@ public static class Hook
             };
             if (concrete.GetHookListenerSnapshot(combatState.RunState, phase) is { } snapshot)
                 return snapshot.CostListeners(slot);
-            return combatState.RunState.IterateHookListeners(combatState)
+            return combatState.IterateHookListeners()
                 .Where(model => (slot != HookOverrideIndex.CostSlot.Star && !IsKnownHookModelType(model))
                     || HookOverrideIndex.MayOverride(model, slot)).ToArray();
         }
@@ -605,13 +604,6 @@ public static class Hook
             .Where(model => (slot != HookOverrideIndex.CostSlot.Star && !IsKnownHookModelType(model))
                     || HookOverrideIndex.MayOverride(model, slot)).ToArray();
     }
-
-    // Native combatState.IterateHookListeners includes relics and potions after each player's powers.
-    // The simulator's public iterator omits inventory for RunState's composition.
-    private static IEnumerable<AbstractModel> IterateDirectCombatHookListeners(ICombatState combatState) =>
-        combatState is CombatState concrete
-            ? concrete.IterateHookListeners(includePlayerInventory: true)
-            : combatState.IterateHookListeners();
 
     public static async Task AfterOrbChanneled(ICombatState combatState, Player player, OrbModel orb)
     {
@@ -708,7 +700,7 @@ public static class Hook
 
     public static async Task AfterCreatureAddedToCombat(ICombatState combatState, Creature creature)
     {
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in combatState.IterateHookListeners().ToArray())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCreatureAddedToCombat(creature);
@@ -739,15 +731,6 @@ public static class Hook
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCombatEnd();
             model.InvokeExecutionFinished();
-        }
-
-        CardModel[] persistentDeckCards = combatState.RunState.Players
-            .SelectMany(player => player.Deck.Cards)
-            .ToArray();
-        foreach (CardModel card in persistentDeckCards)
-        {
-            await card.AfterCombatEnd();
-            card.InvokeExecutionFinished();
         }
     }
 
@@ -1208,7 +1191,7 @@ public static class Hook
     /// Global 关键字时调用，结果不写回卡牌。</summary>
     public static void ModifyKeywordsInCombat(ICombatState combatState, CardModel card, ISet<CardKeyword> keywords)
     {
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
         {
             if (!IsEligibleHookListener(model)) continue;
             model.TryModifyKeywordsInCombat(card, keywords);
@@ -1282,9 +1265,20 @@ public static class Hook
     {
         // Both original phases are eager and ungated. Keep every finished notification,
         // including listeners with neutral base bodies, at its original ordered position.
+        // With a cached combat snapshot the run's deck part (#1072) comes first, captured with it before any hook runs.
         CombatState.HookListenerSnapshot? normal = (combatState as CombatState)?
             .GetHookListenerSnapshot(runState, CombatState.HookListenerPhase.AfterPiles);
+        List<AbstractModel>? deck = normal is null ? null : ((CombatState)combatState!).DeckHookListenerList(runState.Players);
         AbstractModel[] listeners = normal?.Full ?? runState.IterateHookListeners(combatState).ToArray();
+        if (deck is not null)
+        {
+            foreach (AbstractModel model in deck)
+            {
+                if (!IsEligibleHookListener(model)) continue;
+                await model.AfterCardChangedPiles(card, oldPileType, clonedBy);
+                model.InvokeExecutionFinished();
+            }
+        }
         for (int i = 0; i < listeners.Length; i++)
         {
             AbstractModel model = listeners[i];
@@ -1296,7 +1290,17 @@ public static class Hook
         // Normal Hook/await/finished can change any source, so late always obtains a fresh phase.
         CombatState.HookListenerSnapshot? late = (combatState as CombatState)?
             .GetHookListenerSnapshot(runState, CombatState.HookListenerPhase.AfterPilesLate);
+        deck = late is null ? null : ((CombatState)combatState!).DeckHookListenerList(runState.Players);
         listeners = late?.Full ?? runState.IterateHookListeners(combatState).ToArray();
+        if (deck is not null)
+        {
+            foreach (AbstractModel model in deck)
+            {
+                if (!IsEligibleHookListener(model)) continue;
+                await model.AfterCardChangedPilesLate(card, oldPileType, clonedBy);
+                model.InvokeExecutionFinished();
+            }
+        }
         for (int i = 0; i < listeners.Length; i++)
         {
             AbstractModel model = listeners[i];
@@ -1418,14 +1422,14 @@ public static class Hook
 
     public static async Task AfterCardPlayed(ICombatState combatState, CardPlay cardPlay)
     {
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCardPlayed(cardPlay);
             model.InvokeExecutionFinished();
         }
 
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterCardPlayedLate(cardPlay);
@@ -1434,13 +1438,10 @@ public static class Hook
     }
 
     /// <summary>原版遍历战斗侧监听者且不经过结束守卫（<c>combatState.IterateHookListeners()</c>，逐个生物依次是能力、
-    /// 遗物、药水、卡牌）。模拟器的无参 <c>IterateHookListeners()</c> 不含遗物和药水，BookRepairKnife 要靠含背包的版本。</summary>
+    /// 遗物、药水、卡牌）。</summary>
     public static async Task AfterDiedToDoom(ICombatState combatState, IReadOnlyList<Creature> creatures)
     {
-        IEnumerable<AbstractModel> listeners = combatState is CombatState concrete
-            ? concrete.IterateHookListeners(includePlayerInventory: true)
-            : combatState.IterateHookListeners();
-        foreach (AbstractModel model in listeners)
+        foreach (AbstractModel model in combatState.IterateHookListeners())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterDiedToDoom(creatures);
@@ -1677,7 +1678,7 @@ public static class Hook
         Creature target,
         CardModel? cardSource)
     {
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
         {
             if (SkipNoOp(model, HookOverrideIndex.HookSlot.AfterDamageGiven)) continue;
             if (!IsEligibleHookListener(model)) continue;
@@ -2006,7 +2007,7 @@ public static class Hook
         decimal amount, ValueProp props, Creature? dealer)
     {
         Creature? target = null;
-        foreach (AbstractModel model in combatState is null ? [] : IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState is null ? [] : combatState.IterateHookListeners())
         {
             if (HookOverrideIndex.Skips(model, HookOverrideIndex.HookSlot.ModifyPreBlockDamageTarget)) continue;
             if (!IsEligibleHookListener(model)) continue;
@@ -2239,8 +2240,7 @@ public static class Hook
     {
         if (combatState.IsOverOrEnding() && !combatState.IsStarting())
             yield break;
-        // Block retention already used native powers-before-inventory order.
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel model in combatState.IterateHookListeners())
             yield return model;
     }
 
@@ -2293,7 +2293,7 @@ public static class Hook
         Creature target,
         Creature? breaker)
     {
-        foreach (AbstractModel model in IterateDirectCombatHookListeners(combatState).ToArray())
+        foreach (AbstractModel model in combatState.IterateHookListeners().ToArray())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterBlockBroken(target, breaker);
@@ -2347,7 +2347,7 @@ public static class Hook
 
     public static bool ShouldStopCombatFromEnding(ICombatState combatState)
     {
-        foreach (AbstractModel item in IterateDirectCombatHookListeners(combatState))
+        foreach (AbstractModel item in combatState.IterateHookListeners())
         {
             if (!IsEligibleHookListener(item)) continue;
             if (item.ShouldStopCombatFromEnding())

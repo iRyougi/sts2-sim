@@ -34,7 +34,7 @@ public sealed partial class CombatState
         // Materialize the independent OLD path before looking up/building the candidate.
         var oraclePreflight = default(ListenerWitnessScan);
         if (!ScanListenerSources(runState, ref oraclePreflight)) return null;
-        AbstractModel[] oracleOld = runState.IterateHookListeners(this).ToArray();
+        AbstractModel[] oracleOld = IterateHookListeners().ToArray();
 #endif
         HookListenerSnapshot? snapshot = _hookListenerSnapshotCache;
 #if HOOK_LISTENER_CACHE_DIAGNOSTICS
@@ -50,7 +50,10 @@ public sealed partial class CombatState
             var scan = new ListenerWitnessScan(new List<object?>(256));
             if (!ScanListenerSources(runState, ref scan))
                 return null; // Preserve malformed/null-listener exception timing in the old phase.
-            AbstractModel[] full = runState.IterateHookListeners(this).ToArray();
+            // This combat's own listeners (#1072): what the game's cost hooks walk (Hook.IterateCombatHookListeners), and
+            // the part of runState.IterateHookListeners(this) after the run's deck cards, which AfterCardChangedPiles takes
+            // separately from CombatState.DeckHookListenerList.
+            AbstractModel[] full = HookListenerList().ToArray();
             if (Array.Exists(full, static model => model is null))
                 return null;
             snapshot = new HookListenerSnapshot(scan.Captured(), full, (snapshot?.Version ?? 0) + 1);
@@ -63,6 +66,7 @@ public sealed partial class CombatState
         return snapshot;
     }
 
+    /// <summary>A validated copy of <see cref="HookListenerList"/> with its cost and pile-hook projections.</summary>
     internal sealed class HookListenerSnapshot
     {
         internal readonly object?[] _witness;
@@ -161,17 +165,6 @@ public sealed partial class CombatState
         {
             Player player = players[i];
             if (player is null || !scan.Reference(player)) return false;
-            IReadOnlyList<RelicModel> relics = player.Relics;
-            if (relics is null || !scan.Reference(relics) || !scan.Count(relics.Count)) return false;
-            for (int r = 0; r < relics.Count; r++)
-            {
-                RelicModel relic = relics[r];
-                if (relic is null || !scan.Reference(relic) || !scan.Flag(relic.IsMelted)) return false;
-            }
-            IReadOnlyList<PotionModel?> potions = player.PotionSlots;
-            if (potions is null || !scan.Reference(potions) || !scan.Count(potions.Count)) return false;
-            for (int p = 0; p < potions.Count; p++)
-                if (!scan.Reference(potions[p])) return false;
         }
         return ScanCreatureSources(_allies, ref scan) && ScanCreatureSources(_enemies, ref scan);
     }
@@ -191,6 +184,18 @@ public sealed partial class CombatState
             if (creature.IsMonster || creature.Player is not { } player) continue;
             if (!scan.Flag(player.IsActiveForHooks)) return false;
             if (!player.IsActiveForHooks) continue;
+            // Relics and potions are combat listeners of the player's creature (game CombatState order, #1072).
+            IReadOnlyList<RelicModel> relics = player.Relics;
+            if (relics is null || !scan.Reference(relics) || !scan.Count(relics.Count)) return false;
+            for (int r = 0; r < relics.Count; r++)
+            {
+                RelicModel relic = relics[r];
+                if (relic is null || !scan.Reference(relic) || !scan.Flag(relic.IsMelted)) return false;
+            }
+            IReadOnlyList<PotionModel?> potions = player.PotionSlots;
+            if (potions is null || !scan.Reference(potions) || !scan.Count(potions.Count)) return false;
+            for (int p = 0; p < potions.Count; p++)
+                if (!scan.Reference(potions[p])) return false;
             PlayerCombatState? state = player.PlayerCombatState;
             if (!scan.Reference(state)) return false;
             if (state is null) continue;

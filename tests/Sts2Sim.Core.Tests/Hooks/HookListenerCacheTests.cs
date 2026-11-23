@@ -166,6 +166,10 @@ public sealed class HookListenerCacheTests : IDisposable
             AssertMutation(state, root, () => extra.IsMelted = true, "live IsMelted true");
             AssertMutation(state, root, () => extra.IsMelted = false, "live IsMelted false");
             AssertMutation(state, root, () => relics[0] = relics[1], "relic indexer duplicate");
+            var deck = (List<CardModel>)player.Deck.Cards;
+            CardModel extraDeckCard = NewCard(player);
+            deck.Add(extraDeckCard);
+            Assert.Contains(extraDeckCard, root.IterateHookListeners(state)); // Reused deck part must see the change (#1072).
 
             PotionModel potion = player.AddPotionInternal(ModelDb.Potion<FirePotion>());
             var slots = (List<PotionModel?>)player.PotionSlots;
@@ -185,8 +189,10 @@ public sealed class HookListenerCacheTests : IDisposable
         var explicitSnapshot = Snapshot(world.State, other.Run, "explicit different root");
         Assert.NotSame(previous, explicitSnapshot);
         Assert.True(explicitSnapshot.Version > previous.Version, "explicit root replacement must invalidate");
-        Assert.Contains(explicitSnapshot.Full, model => ReferenceEquals(model, other.Player.Relics[0]));
-        Assert.DoesNotContain(explicitSnapshot.Full, model => ReferenceEquals(model, world.Player.Relics[0]));
+        // In combat the run root contributes only its deck part; relics come from the combat's own creatures (#1072).
+        Assert.Same(other.Player.Deck.Cards[0], other.Run.IterateHookListeners(world.State).First());
+        Assert.Contains(explicitSnapshot.Full, model => ReferenceEquals(model, world.Player.Relics[0]));
+        Assert.DoesNotContain(explicitSnapshot.Full, model => ReferenceEquals(model, other.Player.Relics[0]));
         Assert.Null(world.State.GetHookListenerSnapshot(null!, CombatState.HookListenerPhase.AfterPiles));
 
         // No-child dispatch stays the real run/deck path and does not touch combat's cache.
@@ -250,7 +256,8 @@ public sealed class HookListenerCacheTests : IDisposable
         beforeNull.Late = () => { effects.Add("late"); return Task.CompletedTask; };
         beforeNull.ExecutionFinished += _ => effects.Add("finished");
         beforeNull.Energy = cost => { effects.Add("cost"); return cost + 1m; };
-        ((List<PowerModel>)malformed.Player.Creature.Powers).Add(null!);
+        // On the enemy, so it follows the player's relic in the game order (the player's own powers precede its relics).
+        ((List<PowerModel>)malformed.State.Enemies[0].Powers).Add(null!);
         Assert.Null(malformed.State.GetHookListenerSnapshot(malformed.Run, CombatState.HookListenerPhase.AfterPiles));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Hook.AfterCardChangedPiles(
             malformed.Run, malformed.State, NewCard(malformed.Player), PileType.Hand, null));
@@ -409,7 +416,7 @@ public sealed class HookListenerCacheTests : IDisposable
         facade.Starting = true;
         Assert.Equal(12m, Hook.ModifyEnergyCostInCombat(facade, card, 1m, out modified));
         Assert.True(modified);
-        Assert.Equal(2, unknown.Enumerations);
+        Assert.Equal(0, unknown.Enumerations); // Cost hooks walk the combat's listeners only (game helper, #1072).
         facade.Over = false;
         facade.Starting = false;
         int startingReads = facade.StartingReads;
@@ -417,7 +424,7 @@ public sealed class HookListenerCacheTests : IDisposable
         Assert.True(modified);
         Assert.Equal(startingReads, facade.StartingReads); // Original && short-circuits.
         await Hook.AfterCardChangedPiles(unknown, facade, card, PileType.Hand, null);
-        Assert.Equal(6, unknown.Enumerations); // Two independent enumerations per dispatch.
+        Assert.Equal(2, unknown.Enumerations); // Two independent run enumerations per AfterCardChangedPiles dispatch.
         Assert.NotSame(cached, CacheField.GetValue(world.State)); // Real setup changed the source graph.
     }
 
@@ -451,8 +458,12 @@ public sealed class HookListenerCacheTests : IDisposable
     {
         var snapshot = state.GetHookListenerSnapshot(root, CombatState.HookListenerPhase.AfterPiles);
         Assert.True(snapshot is not null, label + ": known valid source must cache");
-        AbstractModel[] full = root.IterateHookListeners(state).ToArray();
-        AssertReferences(full, snapshot!.Full, label + ": original full wrapper");
+        // The snapshot is the combat's own listeners (what cost hooks walk, game Hook.IterateCombatHookListeners); the run
+        // wrapper gives the run's deck part first, then exactly these (#1072).
+        AbstractModel[] full = state.IterateHookListeners().ToArray();
+        AssertReferences(full, snapshot!.Full, label + ": combat listeners");
+        AbstractModel[] wrapper = root.IterateHookListeners(state).ToArray();
+        AssertReferences(full, wrapper.Skip(wrapper.Length - full.Length).ToArray(), label + ": run wrapper ends with them");
         foreach (CombatState.HookListenerPhase phase in Enum.GetValues<CombatState.HookListenerPhase>())
             Assert.Same(snapshot, state.GetHookListenerSnapshot(root, phase));
         foreach (HookOverrideIndex.CostSlot slot in new[] { HookOverrideIndex.CostSlot.Energy,

@@ -17,6 +17,14 @@ public sealed class TreasureRoom : AbstractRoom
 
     internal IReadOnlyList<TreasureRoomResolution> Resolutions => _resolutions;
 
+    // Native TreasureRoomRelicSynchronizer lets the player pick a chest relic or skip it (PickRelicLocally(index) /
+    // SkipRelicLocally). Null = no decision source: the relic is taken, as before.
+    private Func<Player, IReadOnlyList<RelicModel>, Task<int?>>? _chooseRelic;
+
+    /// <summary>Routes the chest relic choice to a run decision source (<see cref="IRunDecisionSource.ChooseTreasureRelicAsync"/>).</summary>
+    internal void ConfigureRelicChoice(Func<Player, IReadOnlyList<RelicModel>, Task<int?>> choose) =>
+        _chooseRelic = choose ?? throw new ArgumentNullException(nameof(choose));
+
     // Upstream enters the room (including hooks) before its separate reward synchronization.
     protected override bool EntryHooksBeforeRewards => true;
 
@@ -89,6 +97,17 @@ public sealed class TreasureRoom : AbstractRoom
                     await quest.OnQuestComplete();
             }
             int goldGained = player.Gold - goldBefore;
+            // Native: the chest's gold is granted before relic picking (NTreasureRoom.OpenChest); a singleplayer skip
+            // (TreasureRoomRelicSynchronizer.OnPicked with a null index) returns before AwardRelics: the relic is not
+            // obtained, not returned to the bag, and no further random numbers are drawn.
+            int? pick = _chooseRelic is null ? 0 : await _chooseRelic(player, new[] { relic });
+            if (pick is not (null or 0))
+                throw new InvalidOperationException($"Treasure relic choice {pick} is outside the offered relics.");
+            if (pick is null)
+            {
+                resolutions.Add(new TreasureRoomResolution(player, goldGained, null));
+                continue;
+            }
             await RelicCmd.Obtain(relic, player);
             resolutions.Add(new TreasureRoomResolution(
                 player,

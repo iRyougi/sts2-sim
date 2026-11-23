@@ -163,7 +163,9 @@ public sealed class RunDriver
             _runState.EntryPhase != RunEntryPhase.InitializedBeforeAncient;
         if (!startingAlreadyEntered)
         {
-            MapPoint startingPoint = _runState.Map.StartingMapPoint;
+            MapPoint startingPoint = _runState.CurrentActIndex > 0
+                ? await ChooseActStartPointAsync()
+                : _runState.Map.StartingMapPoint;
             _runState.AddVisitedMapCoord(startingPoint.coord);
             if (startingPoint.PointType == MapPointType.Ancient)
             {
@@ -298,6 +300,8 @@ public sealed class RunDriver
                     using IDisposable? entryRewards = room is MerchantRoom merchant
                         ? merchant.BeginEntryRewardResolution(rewards => ResolveRewardsAsync(rewards))
                         : null;
+                    if (room is TreasureRoom treasure)
+                        treasure.ConfigureRelicChoice((player, relics) => _decisionSource.ChooseTreasureRelicAsync(player, relics));
                     await room.Enter(_runState);
                 }
                 catch
@@ -409,7 +413,7 @@ public sealed class RunDriver
                 _runState.AdvanceToNextAct();
                 _runState.EntryPhase = RunEntryPhase.InitializedBeforeAncient;
                 StopAtEntry(stopAtActEntry);
-                current = _runState.Map.StartingMapPoint;
+                current = await ChooseActStartPointAsync();
                 _runState.AddVisitedMapCoord(current.coord);
                 if (current.PointType == MapPointType.Ancient)
                 {
@@ -544,6 +548,18 @@ public sealed class RunDriver
     }
 
     private int PlayerHp() => _runState.Players.Count > 0 ? (int)_runState.Players[0].Creature.CurrentHp : 0;
+
+    /// <summary>Native act start after the first act (RunManager.EnterAct enters a MapRoom): the map screen opens with the
+    /// starting point as the only travelable node; the decision source is asked before the point is visited (old floor,
+    /// the Ancient room not yet entered).</summary>
+    private async Task<MapPoint> ChooseActStartPointAsync()
+    {
+        MapPoint start = _runState.Map.StartingMapPoint;
+        MapPoint chosen = await _decisionSource.ChooseActStartMapPointAsync(start);
+        if (!ReferenceEquals(chosen, start))
+            throw new InvalidOperationException("Decision source returned a point other than the act's starting point.");
+        return start;
+    }
 
     private async Task DriveAncientStartingRoomAsync()
     {

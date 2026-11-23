@@ -109,10 +109,12 @@ public class HookDispatchTests(ITestOutputHelper output)
             }
             if (route == "cost-normal")
             {
-                // Unknown neutral types must reach qualification, not disappear in override projection.
+                // Game cost hooks walk only the combat's listeners (Hook.IterateCombatHookListeners, #1072): a run-level
+                // listener, even of an unknown type, is never visited. Unknown candidates inside the raw combat walk
+                // still reach qualification (HookListenerCacheTests "phase-notifications-errors", null power).
                 var unknown = new NeutralUnknownCostListener();
                 var unknownState = new CombatState(new FakeRunState(unknown));
-                Assert.Throws<ArgumentOutOfRangeException>(() => Hook.ModifyEnergyCostInCombat(unknownState, card, 0m));
+                Assert.Equal(0m, Hook.ModifyEnergyCostInCombat(unknownState, card, 0m));
             }
         }
         finally { ModelDb.ResetForTests(); }

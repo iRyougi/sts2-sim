@@ -51,6 +51,50 @@ public class TreasureRoomTests : IDisposable
         Assert.Contains(player.Relics, relic => relic is Akabeko);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EnterInternal_RelicChoice_IsAskedAfterGold_AndSkipKeepsGoldWithoutRelicOrExtraRng(bool skip)
+    {
+        // Baseline: no decision source (the relic is taken, as before #1073).
+        (RunState baseState, Player basePlayer, _) = CreateChestRun();
+        await new TreasureRoom(goldAmount: 50).EnterInternal(baseState);
+
+        (RunState runState, Player player, int goldBefore) = CreateChestRun();
+        int relicsBefore = player.Relics.Count, goldAtAsk = -1;
+        IReadOnlyList<RelicModel>? offered = null;
+        var room = new TreasureRoom(goldAmount: 50);
+        room.ConfigureRelicChoice((p, relics) =>
+        {
+            offered = relics;
+            goldAtAsk = p.Gold;
+            return Task.FromResult<int?>(skip ? null : 0);
+        });
+        await room.EnterInternal(runState);
+
+        Assert.IsType<Akabeko>(Assert.Single(offered!));
+        Assert.Equal(goldBefore + 50, goldAtAsk);
+        Assert.Equal(goldBefore + 50, player.Gold);
+        Assert.Equal(relicsBefore + (skip ? 0 : 1), player.Relics.Count);
+        Assert.Equal(skip ? null : offered![0].Id.ToString(), Assert.Single(room.Resolutions).RelicGained);
+        // A skipped relic is not returned to the shared bag (the only uncommon stays pulled).
+        Assert.False(runState.SharedRelicGrabBag!.HasAvailableRelics(Sts2Sim.Core.Entities.Relics.RelicRarity.Uncommon));
+        Assert.Equal(RngCounters(baseState, basePlayer), RngCounters(runState, player));
+    }
+
+    private static (RunState RunState, Player Player, int GoldBefore) CreateChestRun()
+    {
+        var runState = new RunState("8F9CPYQ6QYEN", new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
+        runState.AddPlayer(player);
+        return (runState, player, player.Gold);
+    }
+
+    private static string RngCounters(RunState runState, Player player) => string.Join(",",
+        Enum.GetValues<Sts2Sim.Core.Entities.Rngs.RunRngType>().Select(t => $"{t}={runState.Rng.GetRng(t).Counter}")
+            .Concat(Enum.GetValues<Sts2Sim.Core.Entities.Rngs.PlayerRngType>()
+                .Select(t => $"{t}={player.PlayerRng.GetRng(t).Counter}")));
+
     [Fact]
     public async Task EnterInternal_WhenSharedPoolIsExhausted_GrantsCirclet()
     {

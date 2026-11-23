@@ -424,7 +424,8 @@ public static class ItemEffectProbe
         public void AfterSelection(CardSelectionRequest request, IReadOnlyList<CardModel> selected, bool automatic) => Count++;
     }
 
-    /// <summary>Like RunState's dispatcher: the player's unmelted relics and potions, then the combat's listeners.</summary>
+    /// <summary>RunState's dispatcher order (#1072): deck cards, then out of combat relics and potions, in combat the combat's
+    /// listeners (which give each player's relics and potions after that player's powers).</summary>
     private sealed class SandboxRunState : IRunState
     {
         private readonly List<Player> _players = [];
@@ -434,17 +435,7 @@ public static class ItemEffectProbe
         public int TotalFloor => 0;
         public Rooms.AbstractRoom? CurrentRoom => null;
         public void AddPlayer(Player player) => _players.Add(player);
-        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState)
-        {
-            foreach (Player player in _players)
-            {
-                foreach (RelicModel relic in player.Relics.ToArray())
-                    if (!relic.IsMelted) yield return relic;
-                foreach (PotionModel potion in player.PotionSlots.OfType<PotionModel>())
-                    yield return potion;
-            }
-            foreach (AbstractModel listener in childCombatState?.IterateHookListeners() ?? [])
-                yield return listener;
-        }
+        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
+            RunState.IterateRunHookListeners(_players, childCombatState);
     }
 }

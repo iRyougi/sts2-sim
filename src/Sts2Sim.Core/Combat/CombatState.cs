@@ -399,57 +399,77 @@ public sealed partial class CombatState : ICombatState
     }
 
     /// <summary>
-    /// hook 监听器遍历顺序：先盟友后敌人；每个生物先它的 powers,再是它的怪物模型（怪物侧）或
-    /// 手牌/抽/弃/消耗/出牌堆里的全部卡牌及其附魔（玩家侧,仅当 IsActiveForHooks 时)。逐字对照原文结构移植
-    /// （<c>MegaCrit.Sts2.Core.Combat.CombatState.IterateHookListeners</c>），是确定性契约的一部分。
+    /// hook 监听器遍历顺序（游戏 v0.113.1 <c>MegaCrit.Sts2.Core.Combat.CombatState.IterateHookListeners</c>，#1072）：
+    /// 先盟友后敌人，逐个生物给出：它的能力 → 怪物侧给怪物模型；玩家侧（仅当 IsActiveForHooks）依次给未熔化的遗物、
+    /// 药水、充能球、手牌/抽/弃/消耗/出牌堆里的每张牌（每张牌之后是它的苦难、再是附魔）。所以玩家的能力排在该玩家的
+    /// 遗物之前。牌组里的牌不在这里，由 RunState 在本列表之前给出。是确定性契约的一部分。偏离 #37：不链 Modifiers /
+    /// BadgeModels / RunModels / Dominion 与 ModHelper 订阅者（均未移植）。
     /// </summary>
-    public IEnumerable<AbstractModel> IterateHookListeners() => IterateHookListeners(includePlayerInventory: false);
-
-    /// <summary>Plan 09-O: Hook's combat-dispatch walk as one iterator when this combat runs on a combat-local run facade
-    /// (preview and search clones); null otherwise.</summary>
-    internal IEnumerable<AbstractModel>? SnapshotCombatHookListeners() =>
-        RunState is CombatRunStateSnapshot snapshot ? snapshot.IterateCombatHookListeners(this) : null;
-
-    // Block retention needs powers-before-relics ordering. Other dispatchers retain
-    // the inventory-free iterator composed with RunState's existing wrapper.
-    internal IEnumerable<AbstractModel> IterateHookListeners(bool includePlayerInventory) =>
-        HookListenerList(includePlayerInventory);
+    public IEnumerable<AbstractModel> IterateHookListeners() => HookListenerList();
 
     /// <summary>
-    /// <see cref="IterateHookListeners(bool)"/> as a concrete list (enumerated without boxing). Plan 09-O: the last list of
-    /// each kind is kept and handed out again when walking the sources now yields exactly its elements in its order (the
-    /// walk compares instead of copying); otherwise a new list is built and kept. A handed-out list is never written to
-    /// again, so a dispatch that is still iterating an older one is unaffected, and a list a caller changed simply stops
-    /// matching.
+    /// <see cref="IterateHookListeners()"/> as a concrete list (enumerated without boxing). Plan 09-O: the last list is
+    /// kept and handed out again when walking the sources now yields exactly its elements in its order (the walk compares
+    /// instead of copying); otherwise a new list is built and kept. A handed-out list is never written to again, so a
+    /// dispatch that is still iterating an older one is unaffected, and a list a caller changed simply stops matching.
     /// </summary>
-    internal List<AbstractModel> HookListenerList(bool includePlayerInventory)
+    internal List<AbstractModel> HookListenerList()
     {
         HookListenerLists lists = _hookListenerLists ??= new HookListenerLists();
-        List<AbstractModel>? kept = includePlayerInventory ? lists.Inventory : lists.Plain;
+        List<AbstractModel>? kept = lists.Combat;
         if (kept is not null)
         {
             var match = new MatchSink(kept);
-            WalkHookListeners(ref match, includePlayerInventory);
+            WalkHookListeners(ref match);
             if (match.Matches) return kept;
         }
 
         // Build the whole dispatch snapshot before any hook runs. Intermediate copies of
         // creature, orb, and pile collections are unnecessary during this synchronous pass.
         // Nothing runs while it is built, so the sources are read by index (no boxed enumerators).
-        // The previous list of the same kind sizes the new one (the estimate misses inventory and enchantments).
+        // The previous list sizes the new one (the estimate misses inventory and enchantments).
         var build = new ListSink(new List<AbstractModel>(Math.Max(EstimateHookListenerCount(), kept?.Count ?? 0)));
-        WalkHookListeners(ref build, includePlayerInventory);
-        if (includePlayerInventory) lists.Inventory = build.List;
-        else lists.Plain = build.List;
+        WalkHookListeners(ref build);
+        lists.Combat = build.List;
         return build.List;
     }
 
-    // Derived data only (Plan 09-O): the last hook listener list of each kind. Every constructor/clone starts cold.
+    /// <summary>
+    /// The deck part of the game's <c>RunState.IterateHookListeners</c> while this combat is the child (#1072): for each
+    /// player active for hooks, every deck card followed by its enchantments. Kept and compared exactly like
+    /// <see cref="HookListenerList"/>; the deck rarely changes during combat, so the comparison is the usual cost.
+    /// </summary>
+    internal List<AbstractModel> DeckHookListenerList(IReadOnlyList<Player> players)
+    {
+        HookListenerLists lists = _hookListenerLists ??= new HookListenerLists();
+        List<AbstractModel>? kept = lists.Deck;
+        if (kept is not null)
+        {
+            var match = new MatchSink(kept);
+            WalkDeckHookListeners(ref match, players);
+            if (match.Matches) return kept;
+        }
+
+        var build = new ListSink(new List<AbstractModel>(kept?.Count ?? 0));
+        WalkDeckHookListeners(ref build, players);
+        lists.Deck = build.List;
+        return build.List;
+    }
+
+    /// <summary>The game's run-level deck part, built fresh (out of combat, or for a combat this run does not own).</summary>
+    internal static List<AbstractModel> BuildDeckHookListeners(IReadOnlyList<Player> players)
+    {
+        var build = new ListSink(new List<AbstractModel>());
+        WalkDeckHookListeners(ref build, players);
+        return build.List;
+    }
+
+    // Derived data only (Plan 09-O): the last combat and deck listener lists. Every constructor/clone starts cold.
     private HookListenerLists? _hookListenerLists;
 
     private sealed class HookListenerLists
     {
-        public List<AbstractModel>? Plain, Inventory;
+        public List<AbstractModel>? Combat, Deck;
     }
 
     private interface IHookListenerSink
@@ -512,20 +532,20 @@ public sealed partial class CombatState : ICombatState
         return count;
     }
 
-    private void WalkHookListeners<TSink>(ref TSink sink, bool includePlayerInventory) where TSink : struct, IHookListenerSink
+    private void WalkHookListeners<TSink>(ref TSink sink) where TSink : struct, IHookListenerSink
     {
         for (int i = 0; i < _allies.Count; i++)
         {
-            WalkCreatureHookListeners(ref sink, _allies[i], includePlayerInventory);
+            WalkCreatureHookListeners(ref sink, _allies[i]);
         }
 
         for (int i = 0; i < _enemies.Count; i++)
         {
-            WalkCreatureHookListeners(ref sink, _enemies[i], includePlayerInventory);
+            WalkCreatureHookListeners(ref sink, _enemies[i]);
         }
     }
 
-    private static void WalkCreatureHookListeners<TSink>(ref TSink sink, Creature creature, bool includePlayerInventory)
+    private static void WalkCreatureHookListeners<TSink>(ref TSink sink, Creature creature)
         where TSink : struct, IHookListenerSink
     {
         WalkAll(ref sink, creature.PowerList);
@@ -541,22 +561,19 @@ public sealed partial class CombatState : ICombatState
         }
 
         Player player = creature.Player;
-        if (includePlayerInventory)
+        foreach (RelicModel relic in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.RelicList))
         {
-            foreach (RelicModel relic in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.RelicList))
+            if (!relic.IsMelted)
             {
-                if (!relic.IsMelted)
-                {
-                    sink.Put(relic);
-                }
+                sink.Put(relic);
             }
+        }
 
-            foreach (PotionModel? slot in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.PotionSlotList))
+        foreach (PotionModel? slot in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.PotionSlotList))
+        {
+            if (slot is { } potion)
             {
-                if (slot is { } potion)
-                {
-                    sink.Put(potion);
-                }
+                sink.Put(potion);
             }
         }
 
@@ -584,16 +601,38 @@ public sealed partial class CombatState : ICombatState
         }
     }
 
+    // Game order inside a combat pile: the card, its affliction, then its enchantment.
     private static void WalkPileHookListeners<TSink>(ref TSink sink, CardPile pile) where TSink : struct, IHookListenerSink
     {
         foreach (CardModel card in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(pile.CardList))
         {
             sink.Put(card);
-            WalkAll(ref sink, card.EnchantmentList);
-
             if (card.Affliction is not null)
             {
                 sink.Put(card.Affliction);
+            }
+
+            WalkAll(ref sink, card.EnchantmentList);
+        }
+    }
+
+    // Game RunState.IterateHookListeners: all players' deck cards first (each followed by its enchantment), players
+    // inactive for hooks skipped. Deck cards carry no affliction in the game's run-level walk.
+    private static void WalkDeckHookListeners<TSink>(ref TSink sink, IReadOnlyList<Player> players)
+        where TSink : struct, IHookListenerSink
+    {
+        for (int i = 0; i < players.Count; i++)
+        {
+            Player player = players[i];
+            if (!player.IsActiveForHooks)
+            {
+                continue;
+            }
+
+            foreach (CardModel card in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.Deck.CardList))
+            {
+                sink.Put(card);
+                WalkAll(ref sink, card.EnchantmentList);
             }
         }
     }

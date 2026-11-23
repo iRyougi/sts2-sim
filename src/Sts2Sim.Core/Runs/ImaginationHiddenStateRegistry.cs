@@ -152,6 +152,7 @@ internal static class ImaginationHiddenStateRegistry
         Room("RestSiteRoom", N, runtime, "_rewardLock");
         Room("RestSiteRoom", V, history, "_pendingRewardOffers _remainingDecisions _displayedOptionIds");
         Room("TreasureRoom", V, reward, "_goldAmount _resolutions");
+        Room("TreasureRoom", N, runtime, "_chooseRelic");
         Room("TreasureRoomResolution", V, reward,
             "<Player>k__BackingField <GoldGained>k__BackingField <RelicGained>k__BackingField");
 

@@ -55,4 +55,10 @@ public sealed class CombinedRunDecisionSource : IRunDecisionSource, ICombatCompl
 
     public Task<EventOption> ChooseEventOptionAsync(IReadOnlyList<EventOption> options) =>
         _strategySource.ChooseEventOptionAsync(options);
+
+    public Task<int?> ChooseTreasureRelicAsync(Player player, IReadOnlyList<RelicModel> relics) =>
+        _strategySource.ChooseTreasureRelicAsync(player, relics);
+
+    public Task<MapPoint> ChooseActStartMapPointAsync(MapPoint startingPoint) =>
+        _strategySource.ChooseActStartMapPointAsync(startingPoint);
 }

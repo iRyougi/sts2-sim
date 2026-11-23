@@ -22,8 +22,9 @@ public class CardPileCmdTests
 
     private sealed class FakeCombatState : ICombatState
     {
-        public FakeCombatState(IRunState runState) => RunState = runState;
-        public IEnumerable<AbstractModel> IterateHookListeners() => Array.Empty<AbstractModel>();
+        public FakeCombatState(FakeRunState runState) => RunState = runState;
+        // Combat hooks walk the combat's listeners only (game Hook.IterateCombatHookListeners, #1072).
+        public IEnumerable<AbstractModel> IterateHookListeners() => ((FakeRunState)RunState).Listeners;
         public IRunState RunState { get; }
         public IReadOnlyList<Sts2Sim.Core.Entities.Creatures.Creature> Allies => Array.Empty<Sts2Sim.Core.Entities.Creatures.Creature>();
         public IReadOnlyList<Sts2Sim.Core.Entities.Creatures.Creature> Enemies => Array.Empty<Sts2Sim.Core.Entities.Creatures.Creature>();
@@ -40,8 +41,10 @@ public class CardPileCmdTests
 
     private sealed class FakeRunState(params AbstractModel[] listeners) : IRunState
     {
+        public AbstractModel[] Listeners => listeners;
         public Sts2Sim.Core.Rooms.AbstractRoom? CurrentRoom => null;
-        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) => listeners;
+        public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
+            childCombatState?.IterateHookListeners() ?? listeners;
         public RunRngSet Rng { get; } = new RunRngSet("card_pile_cmd_tests");
         public Sts2Sim.Core.Entities.Ascension.AscensionManager Ascension { get; } = new(0);
 

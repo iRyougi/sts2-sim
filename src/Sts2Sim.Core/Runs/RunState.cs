@@ -586,36 +586,67 @@ public sealed partial class RunState : IRunState
         return id;
     }
 
-    /// <summary>偏离 #69：现在会枚举玩家的 <see cref="Player.Relics"/>，但仍不链上真实游戏还有的
-    /// <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c>（均未移植）；本条也修复了此前"非战斗期
-    /// hook 恒无人监听"的缺口。</summary>
-    public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState)
+    /// <summary>偏离 #69：不链真实游戏还有的 <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c>/<c>RunModels</c>/
+    /// <c>Dominion</c> 与 ModHelper 订阅者（均未移植）。顺序见 <see cref="IterateRunHookListeners"/>。</summary>
+    public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
+        IterateRunHookListeners(_players, childCombatState);
+
+    /// <summary>
+    /// 游戏 v0.113.1 <c>MegaCrit.Sts2.Core.Runs.RunState.IterateHookListeners</c> 的顺序（#1072）：首次 MoveNext 时
+    /// 捕获 run 部分——每名 IsActiveForHooks 的玩家的牌组牌（每张牌之后是它的附魔）；不在战斗中时再接各玩家未熔化的
+    /// 遗物与药水。战斗中遗物与药水不由 run 给出，而在战斗监听者里逐个生物给出（玩家的能力在前），
+    /// 战斗部分在 run 部分全部给完后才捕获（游戏 child 迭代器的首次 MoveNext）。<see cref="CombatRunStateSnapshot"/>
+    /// 与本类共用此实现。
+    /// </summary>
+    internal static IEnumerable<AbstractModel> IterateRunHookListeners(IReadOnlyList<Player> players,
+        ICombatState? childCombatState)
     {
-        foreach (Player player in _players)
+        if (childCombatState is CombatState concrete)
         {
-            // Hooks may obtain a relic (for example a merchant relic purchase), so
-            // enumerate a stable listener snapshot for this dispatch.
-            foreach (RelicModel relic in player.Relics.ToArray())
+            foreach (AbstractModel listener in concrete.DeckHookListenerList(players))
             {
-                if (!relic.IsMelted)
-                    yield return relic;
+                yield return listener;
             }
 
-            foreach (PotionModel potion in player.PotionSlots.OfType<PotionModel>())
+            foreach (AbstractModel listener in concrete.HookListenerList())
             {
-                yield return potion;
+                yield return listener;
             }
 
-            if (childCombatState is null)
+            yield break;
+        }
+
+        List<AbstractModel> run = CombatState.BuildDeckHookListeners(players);
+        if (childCombatState is null)
+        {
+            // Hooks may obtain a relic (for example a merchant relic purchase); the run part is captured before any runs.
+            foreach (Player player in players)
             {
-                foreach (CardModel card in player.Deck.Cards.ToArray())
+                if (!player.IsActiveForHooks)
                 {
-                    yield return card;
+                    continue;
+                }
+
+                foreach (RelicModel relic in player.Relics)
+                {
+                    if (!relic.IsMelted)
+                        run.Add(relic);
+                }
+
+                foreach (PotionModel? slot in player.PotionSlots)
+                {
+                    if (slot is PotionModel potion)
+                        run.Add(potion);
                 }
             }
         }
 
-        if (childCombatState != null)
+        foreach (AbstractModel listener in run)
+        {
+            yield return listener;
+        }
+
+        if (childCombatState is not null)
         {
             foreach (AbstractModel listener in childCombatState.IterateHookListeners())
             {

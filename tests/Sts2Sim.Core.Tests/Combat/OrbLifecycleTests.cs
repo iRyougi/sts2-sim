@@ -273,6 +273,9 @@ internal static class OrbFixture
         var run = new RunState(seed, probe);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
+        // Combat hooks reach the combat's listeners only (game Hook.IterateCombatHookListeners, #1072), so the probe
+        // listens as one of the player's relics rather than from the run wrapper.
+        if (probe is not null) player.AddRelicInternal(probe);
         var state = new CombatState(run);
         Creature enemy = state.AddMonster(
             (TrainingDummy)ModelDb.Monster<TrainingDummy>().MutableClone(), CombatSide.Enemy);
@@ -298,8 +301,7 @@ internal static class OrbFixture
         public AbstractRoom? CurrentRoom => null;
         public void AddPlayer(Player player) => _players.Add(player);
         public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
-            (probe is null ? [] : new AbstractModel[] { probe })
-                .Concat(childCombatState?.IterateHookListeners() ?? []);
+            childCombatState?.IterateHookListeners() ?? (probe is null ? [] : new AbstractModel[] { probe });
     }
 
     internal sealed class Probe : RelicModel

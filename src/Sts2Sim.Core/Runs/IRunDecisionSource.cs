@@ -45,4 +45,19 @@ public interface IRunDecisionSource : ICardSelectionDecisionSource
 
     Task<EventOption> ChooseEventOptionAsync(IReadOnlyList<EventOption> options) =>
         Task.FromResult(EventOptionDecisionPolicy.ChooseDefault(options));
+
+    /// <summary>
+    /// Chest relic choice in a treasure room (native TreasureRoomRelicSynchronizer.PickRelicLocally / SkipRelicLocally),
+    /// asked after the chest's gold: the index of the relic to take, or null to skip it (the gold is kept, the relic is
+    /// not obtained and not returned to the bag). Default: take the first relic, without a decision.
+    /// </summary>
+    Task<int?> ChooseTreasureRelicAsync(Player player, IReadOnlyList<RelicModel> relics) => Task.FromResult<int?>(0);
+
+    /// <summary>
+    /// Travel to the starting map point of an act after the first (native RunManager.EnterAct enters a MapRoom: the map
+    /// screen opens with the starting point as the only travelable node). Asked before the point is recorded as visited
+    /// and before its room is entered. Implementations must return <paramref name="startingPoint"/>;
+    /// <see cref="RunDriver"/> verifies it. Default: no decision.
+    /// </summary>
+    Task<MapPoint> ChooseActStartMapPointAsync(MapPoint startingPoint) => Task.FromResult(startingPoint);
 }
