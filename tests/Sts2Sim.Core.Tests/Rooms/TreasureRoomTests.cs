@@ -79,7 +79,12 @@ public class TreasureRoomTests : IDisposable
         Assert.Equal(skip ? null : offered![0].Id.ToString(), Assert.Single(room.Resolutions).RelicGained);
         // A skipped relic is not returned to the shared bag (the only uncommon stays pulled).
         Assert.False(runState.SharedRelicGrabBag!.HasAvailableRelics(Sts2Sim.Core.Entities.Relics.RelicRarity.Uncommon));
-        Assert.Equal(RngCounters(baseState, basePlayer), RngCounters(runState, player));
+        // #1102: taking the relic runs AwardRelics' StableShuffle of the (empty) unpicked list on TreasureRoomRelics,
+        // which draws once from the parent stream; a singleplayer skip returns before AwardRelics. The next chest's
+        // rarity roll is therefore draw 3 after a take and draw 2 after a skip.
+        Assert.Equal(2, baseState.Rng.GetRng(Sts2Sim.Core.Entities.Rngs.RunRngType.TreasureRoomRelics).Counter);
+        Assert.Equal(skip ? 1 : 2, runState.Rng.GetRng(Sts2Sim.Core.Entities.Rngs.RunRngType.TreasureRoomRelics).Counter);
+        Assert.Equal(RngCounters(baseState, basePlayer, exceptTreasure: true), RngCounters(runState, player, exceptTreasure: true));
     }
 
     private static (RunState RunState, Player Player, int GoldBefore) CreateChestRun()
@@ -90,8 +95,10 @@ public class TreasureRoomTests : IDisposable
         return (runState, player, player.Gold);
     }
 
-    private static string RngCounters(RunState runState, Player player) => string.Join(",",
-        Enum.GetValues<Sts2Sim.Core.Entities.Rngs.RunRngType>().Select(t => $"{t}={runState.Rng.GetRng(t).Counter}")
+    private static string RngCounters(RunState runState, Player player, bool exceptTreasure = false) => string.Join(",",
+        Enum.GetValues<Sts2Sim.Core.Entities.Rngs.RunRngType>()
+            .Where(t => !exceptTreasure || t != Sts2Sim.Core.Entities.Rngs.RunRngType.TreasureRoomRelics)
+            .Select(t => $"{t}={runState.Rng.GetRng(t).Counter}")
             .Concat(Enum.GetValues<Sts2Sim.Core.Entities.Rngs.PlayerRngType>()
                 .Select(t => $"{t}={player.PlayerRng.GetRng(t).Counter}")));
 

@@ -210,19 +210,30 @@ public sealed class SilentBatchCTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, 8)]
-    [InlineData(true, 12)]
-    public async Task KnifeTrap_AutoPlaysEveryExhaustShivWithoutEnergyAndPreservesExhaust(bool upgraded, int expectedDamage)
+    [InlineData(false, false, 8)]
+    [InlineData(true, false, 12)]
+    [InlineData(false, true, 8)]
+    [InlineData(true, true, 12)]
+    public async Task KnifeTrap_AutoPlaysEveryExhaustShivWithoutEnergyAndPreservesExhaust(bool upgraded, bool targetDies, int expectedDamage)
     {
-        (Player player, CombatRoom room) = await CreateCombatAsync($"knife-trap-{upgraded}");
+        (Player player, CombatRoom room) = await CreateCombatAsync($"knife-trap-{upgraded}-{targetDies}");
         KnifeTrap trap = AddToHand<KnifeTrap>(player, upgraded);
         Shiv first = AddToPile<Shiv>(player, PileType.Exhaust);
         Shiv second = AddToPile<Shiv>(player, PileType.Exhaust);
-        Creature enemy = room.Engine.State.HittableEnemies.Single();
-        int hp = enemy.CurrentHp;
+        CombatState state = room.Engine.State;
+        Creature enemy = state.HittableEnemies.Single();
+        // #1103: native CardCmd.AutoPlay keeps a non-null AnyEnemy target even after it died (the damage fizzles);
+        // only a null target is rerolled on CombatTargets. The first Shiv kills the target here.
+        Creature other = state.AddMonster((WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
+        if (targetDies) enemy.SetCurrentHpInternal(expectedDamage / 2);
+        int hp = enemy.CurrentHp, otherHp = other.CurrentHp;
+        int targetCounter = state.RunState.Rng.CombatTargets.Counter;
         player.PlayerCombatState!.Energy = trap.EnergyCost;
         await room.Engine.PlayCardAsync(player, trap, enemy);
-        Assert.Equal(expectedDamage, hp - enemy.CurrentHp);
+        Assert.Equal(targetDies ? expectedDamage / 2 : expectedDamage, hp - enemy.CurrentHp);
+        Assert.Equal(targetDies, enemy.IsDead);
+        Assert.Equal(otherHp, other.CurrentHp);
+        Assert.Equal(targetCounter, state.RunState.Rng.CombatTargets.Counter);
         Assert.Equal(0, player.PlayerCombatState.Energy);
         Assert.Contains(first, player.PlayerCombatState.ExhaustPile.Cards);
         Assert.Contains(second, player.PlayerCombatState.ExhaustPile.Cards);

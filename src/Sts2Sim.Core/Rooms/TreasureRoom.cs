@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Ascension;
@@ -76,12 +77,12 @@ public sealed class TreasureRoom : AbstractRoom
         }
 
         // All relics are picked before gold and quest rewards; obtain effects still run afterward.
-        var resolutions = new List<TreasureRoomResolution>();
+        var picks = new List<(Player Player, int GoldGained, RelicModel? Relic, bool Skipped)>();
         foreach ((Player player, RelicModel? relic) in relics)
         {
             if (relic is null)
             {
-                resolutions.Add(new TreasureRoomResolution(player, 0, null));
+                picks.Add((player, 0, null, false));
                 continue;
             }
 
@@ -103,7 +104,28 @@ public sealed class TreasureRoom : AbstractRoom
             int? pick = _chooseRelic is null ? 0 : await _chooseRelic(player, new[] { relic });
             if (pick is not (null or 0))
                 throw new InvalidOperationException($"Treasure relic choice {pick} is outside the offered relics.");
-            if (pick is null)
+            picks.Add((player, goldGained, relic, pick is null));
+        }
+
+        // Native TreasureRoomRelicSynchronizer.OnPicked → AwardRelics (once every vote is in): the indices nobody voted
+        // for are StableShuffle'd on TreasureRoomRelics before RelicsAwarded obtains the relics. ListExtensions.
+        // UnstableShuffle draws once from the parent stream even for an empty list (#1102; v0.111.0 did not draw).
+        // A singleplayer skip returns before AwardRelics. Each player is offered only their own relic here (no
+        // multiplayer voting), so the unvoted indices are the relics of players who skipped.
+        var offered = picks.Where(p => p.Relic is not null).ToList();
+        bool singleplayerSkipped = runState.Players.Count == 1 && offered.Any(p => p.Skipped);
+        if (offered.Count > 0 && !singleplayerSkipped)
+        {
+            List<int> unvoted = Enumerable.Range(0, offered.Count).Where(index => offered[index].Skipped).ToList();
+            unvoted.StableShuffle(runState.Rng.ForSemanticKey(
+                RunRngType.TreasureRoomRelics,
+                $"{runState.SemanticLocationKey}/treasure/award"));
+        }
+
+        var resolutions = new List<TreasureRoomResolution>();
+        foreach ((Player player, int goldGained, RelicModel? relic, bool skipped) in picks)
+        {
+            if (relic is null || skipped)
             {
                 resolutions.Add(new TreasureRoomResolution(player, goldGained, null));
                 continue;

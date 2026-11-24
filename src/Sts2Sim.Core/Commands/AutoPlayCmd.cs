@@ -243,11 +243,10 @@ public static class AutoPlayCmd
             if (card.TargetType is TargetType.AnyEnemy or TargetType.AnyAlly ||
                 card.TargetType == TargetType.AnyPlayer && spendResources && fixedTarget is not null)
             {
-                IReadOnlyList<Creature> candidates =
-                    CombatTargetCandidates.ForCard(combatState, card.Owner, card.TargetType);
-                target = fixedTarget is not null && candidates.Contains(fixedTarget)
-                    ? fixedTarget
-                    : combatState.RunState.Rng.CombatTargets.NextItem(candidates);
+                // Native CardCmd.AutoPlay rerolls on CombatTargets only when the passed target is null; a fixed
+                // target that has died meanwhile is still played at (the damage fizzles, #1103).
+                target = fixedTarget ?? combatState.RunState.Rng.CombatTargets.NextItem(
+                    CombatTargetCandidates.ForCard(combatState, card.Owner, card.TargetType));
                 if (target is null)
                 {
                     await card.MoveToResultPileWithoutPlaying(combatState);
