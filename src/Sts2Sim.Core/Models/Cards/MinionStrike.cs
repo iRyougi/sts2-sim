@@ -15,6 +15,8 @@ public sealed class MinionStrike : CardModel, ICardDamageVariableProvider
         return true;
     }
 
+    protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Strike, CardTag.Minion];
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Token;

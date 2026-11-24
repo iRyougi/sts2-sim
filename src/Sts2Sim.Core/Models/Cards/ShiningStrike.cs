@@ -15,6 +15,8 @@ public sealed class ShiningStrike : CardModel, ICardDamageVariableProvider
         return true;
     }
 
+    protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Strike];
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;

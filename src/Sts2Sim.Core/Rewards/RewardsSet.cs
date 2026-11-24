@@ -22,18 +22,25 @@ public sealed class RewardsSet
 
     public IReadOnlyList<Reward> ExtraRewards { get; }
 
+    /// <summary>逐字对应游戏 <c>RewardsSet.WithSkippingDisallowed</c>（#1094）：这个界面没有“离开”，每一项都必须领取。
+    /// 自己构造奖励界面的驱动方在还有可领奖励时不得提供离开，也不得对其中的奖励直接调用
+    /// <see cref="TakeableReward.Skip"/>。游戏里唯一的调用点是 <c>NeowsBones.AfterObtained</c>。</summary>
+    public bool SkippingDisallowed { get; }
+
     private RewardsSet(
         GoldReward gold,
         PotionReward? potion,
         CardReward card,
         RelicReward? relic,
-        IReadOnlyList<Reward> extraRewards)
+        IReadOnlyList<Reward> extraRewards,
+        bool skippingDisallowed = false)
     {
         Gold = gold;
         Potion = potion;
         Card = card;
         Relic = relic;
         ExtraRewards = extraRewards;
+        SkippingDisallowed = skippingDisallowed;
     }
 
     internal RewardsSet CloneForRun(Func<Reward, Reward> mapReward) =>
@@ -41,7 +48,8 @@ public sealed class RewardsSet
             Potion is null ? null : (PotionReward)mapReward(Potion),
             (CardReward)mapReward(Card),
             Relic is null ? null : (RelicReward)mapReward(Relic),
-            Array.AsReadOnly(ExtraRewards.Select(mapReward).ToArray()));
+            Array.AsReadOnly(ExtraRewards.Select(mapReward).ToArray()),
+            SkippingDisallowed);
 
     public static RewardsSet GenerateFor(
         Player player,
@@ -127,7 +135,8 @@ public sealed class RewardsSet
         CardReward? card = null,
         PotionReward? potion = null,
         RelicReward? relic = null,
-        IReadOnlyList<Reward>? extraRewards = null)
+        IReadOnlyList<Reward>? extraRewards = null,
+        bool skippingDisallowed = false)
     {
         ArgumentNullException.ThrowIfNull(player);
 
@@ -142,6 +151,7 @@ public sealed class RewardsSet
             potion,
             card ?? CardReward.CreateResolvedEmpty(player),
             relic,
-            Array.AsReadOnly(extras));
+            Array.AsReadOnly(extras),
+            skippingDisallowed);
     }
 }

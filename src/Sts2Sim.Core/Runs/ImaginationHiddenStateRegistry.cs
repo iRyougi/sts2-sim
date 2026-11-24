@@ -126,7 +126,7 @@ internal static class ImaginationHiddenStateRegistry
         RewardField("RelicReward", V, reward, "_predeterminedRelic _rarity <Relic>k__BackingField");
         RewardField("SpecialCardReward", V, reward, "<Card>k__BackingField");
         RewardField("RewardsSet", V, reward,
-            "<Gold>k__BackingField <Potion>k__BackingField <Card>k__BackingField <Relic>k__BackingField <ExtraRewards>k__BackingField");
+            "<Gold>k__BackingField <Potion>k__BackingField <Card>k__BackingField <Relic>k__BackingField <ExtraRewards>k__BackingField <SkippingDisallowed>k__BackingField");
 
         Merchant("MerchantInventory", V, reward,
             "_player _cards _relics _potions <CardRemoval>k__BackingField");

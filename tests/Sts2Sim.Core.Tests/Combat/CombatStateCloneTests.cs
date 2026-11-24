@@ -502,6 +502,7 @@ public sealed class CombatStateCloneTests
     public async Task Clone_PlayedAbundancePreservesIndependentCandidateGraph()
     {
         (CombatState original, _) = await NewStartedCombat("clone-abundance-candidates");
+        original.CardSelectionSource = new Sts2Sim.Core.Tests.Models.LegacySelectionDecisionSource();
         Player originalPlayer = original.Players[0];
         PlayerCombatState originalCombat = originalPlayer.PlayerCombatState!;
         var originalAbundance = (Abundance)ModelDb.Card<Abundance>().MutableClone();
@@ -606,6 +607,7 @@ public sealed class CombatStateCloneTests
     public async Task Clone_OffMapOwnedAbundanceCandidatePreservesCombatRuntimeAndCloneOwnership()
     {
         (CombatState original, _) = await NewStartedCombat("clone-off-map-abundance-candidate");
+        original.CardSelectionSource = new Sts2Sim.Core.Tests.Models.LegacySelectionDecisionSource();
         Player originalPlayer = original.Players[0];
         PlayerCombatState originalCombat = originalPlayer.PlayerCombatState!;
         var originalAbundance = (Abundance)ModelDb.Card<Abundance>().MutableClone();

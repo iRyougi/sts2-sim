@@ -214,6 +214,12 @@ public sealed class GeneratedCardRepairTask1Tests : IDisposable
     public async Task UltimateStrike_HasStrikeTag_AndRetainsDamageUpgrade()
     {
         Assert.Contains(CardTag.Strike, ModelDb.Card<UltimateStrike>().Tags);
+        // #1095：对拍发现 Seeker Strike 在 Strike Dummy 下少 3 点；游戏 CanonicalTags 逐张核对后补齐的五张。
+        Assert.Equal([CardTag.Strike], ModelDb.Card<SeekerStrike>().Tags);
+        Assert.Equal([CardTag.Strike], ModelDb.Card<ShiningStrike>().Tags);
+        Assert.Equal(new[] { CardTag.Strike, CardTag.Minion }.Order(), ModelDb.Card<MinionStrike>().Tags.Order());
+        Assert.Equal([CardTag.Minion], ModelDb.Card<MinionDiveBomb>().Tags);
+        Assert.Equal([CardTag.Minion], ModelDb.Card<MinionSacrifice>().Tags);
         (Player player, CombatRoom room) = await CreateCombatAsync("task1-ultimate-strike");
         UltimateStrike card = AddToHand<UltimateStrike>(player);
         card.Upgrade();

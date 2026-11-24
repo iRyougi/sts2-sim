@@ -5,8 +5,10 @@ using Sts2Sim.Core.Factories;
 namespace Sts2Sim.Core.Models.Cards;
 
 /// <summary>
-/// Deviation #155: the simulator deterministically chooses candidate zero.
-/// Candidate generation follows the native character pool and full-pool shuffle.
+/// Verbatim port of <c>MegaCrit.Sts2.Core.Models.Cards.Abundance</c>: three upgraded Power candidates
+/// from the character pool (full-pool shuffle), then <c>CardSelectCmd.FromChooseACardScreen</c> without
+/// <c>canSkip</c>, so exactly one candidate must be chosen. The choice goes through the combat
+/// card-selection decision source (same mechanism as Toolbox).
 /// </summary>
 public sealed class Abundance : CardModel
 {
@@ -37,7 +39,10 @@ public sealed class Abundance : CardModel
             candidate.Upgrade();
         }
 
-        CardModel? chosen = _generatedCandidates.FirstOrDefault();
+        // FromChooseACardScreen(canSkip: false): one of the candidates must be chosen; an empty result
+        // (empty candidate list) adds nothing.
+        CardModel? chosen = (await CardSelectCmd.SelectCardsAsync(
+            CombatState!, Owner, _generatedCandidates, 1, 1, this)).FirstOrDefault();
         if (chosen is null) return;
         chosen.AssignOwner(Owner);
         chosen.SetToFreeThisTurn();     // 游戏 Abundance：SetToFreeThisTurn（本回合内或打出前免费；不覆盖 X 费用）

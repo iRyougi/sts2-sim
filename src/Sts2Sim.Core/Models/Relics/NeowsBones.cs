@@ -29,12 +29,15 @@ public sealed class NeowsBones : RelicModel
         Reward[] relicRewards = candidates.Take(2)
             .Select(candidate => (Reward)new RelicReward((RelicModel)candidate.MutableClone(), Owner))
             .ToArray();
-        OfferRewards(RewardsSet.CreateCustom(Owner, extraRewards: relicRewards));
+        // 游戏：new RewardsSet(Owner).WithCustomRewards(rewards).WithSkippingDisallowed().Offer()（#1094）。
+        OfferRewards(RewardsSet.CreateCustom(Owner, extraRewards: relicRewards, skippingDisallowed: true));
 
-        // The queue resumes this continuation after the relic set and its children.
+        // The queue resumes this continuation after the relic set and its children. 游戏在遗物界面结束后直接把诅咒
+        // 加进牌组，没有界面；这里的诅咒奖励同样不可跳过，自己构造界面的驱动方应直接领取、不产生决策（#1094）。
         OfferRewards(RewardsSet.CreateCustom(
             Owner,
-            extraRewards: new Reward[] { new NeowsBonesCurseReward(Owner) }));
+            extraRewards: new Reward[] { new NeowsBonesCurseReward(Owner) },
+            skippingDisallowed: true));
         return Task.CompletedTask;
     }
 }

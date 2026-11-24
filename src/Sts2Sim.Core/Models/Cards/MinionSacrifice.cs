@@ -12,6 +12,8 @@ public sealed class MinionSacrifice : CardModel
 
     private decimal _block = 7m;
 
+    protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Minion];
+
     public override CardType Type => CardType.Skill;
 
     public override CardRarity Rarity => CardRarity.Token;

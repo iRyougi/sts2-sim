@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
@@ -39,11 +40,14 @@ public sealed class AbundanceTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Play_GeneratesThreeDistinctCandidates_AndAddsFreeFirstChoice(bool upgraded)
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public async Task Play_GeneratesThreeDistinctCandidates_AndAddsFreeChosenCandidate(bool upgraded, int pick)
     {
-        (Player player, _) = await CreateCombatAsync($"task11-abundance-{upgraded}");
+        var source = new PickIndexSource(pick);
+        (Player player, _) = await CreateCombatAsync($"task11-abundance-{upgraded}-{pick}", source);
         Abundance abundance = AddToHand<Abundance>(player);
         if (upgraded)
         {
@@ -54,10 +58,17 @@ public sealed class AbundanceTests : IDisposable
 
         Assert.Equal(3, abundance.GeneratedCandidates.Count);
         Assert.Equal(3, abundance.GeneratedCandidates.Select(card => card.GetType()).Distinct().Count());
-        CardModel chosen = abundance.GeneratedCandidates[0];
+        // game FromChooseACardScreen without canSkip: one request over the three candidates, exactly one must be chosen.
+        CardSelectionRequest request = Assert.Single(source.Requests);
+        Assert.Equal(abundance.GeneratedCandidates, request.Candidates);
+        Assert.Equal((1, 1, false), (request.MinCount, request.MaxCount, request.Cancelable));
+        CardModel chosen = abundance.GeneratedCandidates[pick];
         Assert.Contains(chosen, player.PlayerCombatState!.Hand.Cards);
         Assert.Equal(0, chosen.TemporaryCostOverrideThisTurnOrUntilPlayed);     // game SetToFreeThisTurn (free until played or turn end)
         Assert.Equal(0, chosen.EnergyCost);
+        Assert.All(
+            abundance.GeneratedCandidates.Where(card => !ReferenceEquals(card, chosen)),
+            card => Assert.DoesNotContain(card, player.PlayerCombatState.AllPiles.SelectMany(pile => pile.Cards)));
     }
 
     [Theory]
@@ -137,13 +148,26 @@ public sealed class AbundanceTests : IDisposable
         return card;
     }
 
-    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(string seed)
+    private sealed class PickIndexSource(int index) : ICardSelectionDecisionSource
+    {
+        public List<CardSelectionRequest> Requests { get; } = new();
+
+        public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request)
+        {
+            Requests.Add(request);
+            return Task.FromResult<IReadOnlyList<CardModel>>(new[] { request.Candidates[index] });
+        }
+    }
+
+    private static async Task<(Player player, CombatRoom room)> CreateCombatAsync(
+        string seed, ICardSelectionDecisionSource? selection = null)
     {
         var runState = new RunState(seed, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
         var room = new CombatRoom(() =>
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
+        room.ConfigureCardSelectionSource(selection ?? new LegacySelectionDecisionSource());
         await room.Enter(runState);
         return (player, room);
     }

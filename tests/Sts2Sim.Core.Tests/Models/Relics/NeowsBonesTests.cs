@@ -60,6 +60,14 @@ public sealed class NeowsBonesTests : IDisposable
 
         public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) =>
             throw new InvalidOperationException("Combat decisions are not expected while driving this event.");
+
+        public List<bool> SkippingDisallowedSeen { get; } = [];
+
+        public Task<RewardDecision> ChooseRewardActionAsync(RewardsSet rewards)
+        {
+            SkippingDisallowedSeen.Add(rewards.SkippingDisallowed);
+            return Task.FromResult(RewardDecisionClassifier.ChooseDefault(rewards));
+        }
     }
 
     private sealed class GivesBonesAncientEvent : AncientEventModel
@@ -276,10 +284,14 @@ public sealed class NeowsBonesTests : IDisposable
         EventRoom room = await EnterAncient(runState, hasCandidates: true);
         int deckBefore = player.Deck.Cards.Count;
         int relicsBefore = player.Relics.Count;
-        var driver = new RunDriver(runState, new EventOnlyDecisionSource());
+        var source = new EventOnlyDecisionSource();
+        var driver = new RunDriver(runState, source);
 
         await driver.DriveEventAsync(room);
 
+        // #1094：游戏 WithSkippingDisallowed——两件遗物的界面和随后的诅咒都不可跳过。
+        Assert.NotEmpty(source.SkippingDisallowedSeen);
+        Assert.All(source.SkippingDisallowedSeen, Assert.True);
         Assert.Equal(3, player.Relics.Count - relicsBefore);
         Assert.Single(player.Deck.Cards.Skip(deckBefore), card => card.Rarity == CardRarity.Curse);
         Assert.False(room.Event.HasPendingRewardOffers);

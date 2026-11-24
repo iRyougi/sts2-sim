@@ -18,6 +18,8 @@ public sealed class SeekerStrike : CardModel, ICardDamageVariableProvider
     // 偏离 #148：上游 CanonicalVars 的 CardsVar(3)，以具名数量常量承载。
     private const int CandidateCount = 3;
 
+    protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Strike];
+
     public override CardType Type => CardType.Attack;
 
     public override CardRarity Rarity => CardRarity.Uncommon;
