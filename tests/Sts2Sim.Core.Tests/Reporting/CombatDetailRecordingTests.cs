@@ -666,23 +666,18 @@ public sealed class CombatDetailRecordingTests : IDisposable
     [InlineData(true, nameof(Catastrophe))]
     [InlineData(false, nameof(DecisionsDecisions))]
     [InlineData(true, nameof(DecisionsDecisions))]
-    [InlineData(false, nameof(IAmInvincible))]
-    [InlineData(true, nameof(IAmInvincible))]
     public async Task NestedNamedCardPlays_AreAbsorbedIntoSingleParentAction(
         bool useDriver,
         string scenario)
     {
         Type parentType = NestedParentType(scenario);
-        bool invincible = scenario == nameof(IAmInvincible);
         RunCapture capture = await RunOnceAsync(
             useDriver,
             recorder: new RunRecorder(() => DateTimeOffset.UnixEpoch),
             configureDeck: player => ConfigureNestedOwnershipDeck(player, scenario),
             configureCombat: player => ConfigureNestedOwnershipCombat(player, scenario),
             decisionSource: useDriver ? new CardTypeDecisionSource(parentType) : null,
-            monsterFactory: invincible
-                ? () => (MonsterModel)ModelDb.Monster<CombatReportingLethalMonster>().MutableClone()
-                : () => (MonsterModel)ModelDb.Monster<CombatReportingOwnershipMonster>().MutableClone());
+            monsterFactory: () => (MonsterModel)ModelDb.Monster<CombatReportingOwnershipMonster>().MutableClone());
 
         CombatLog log = Assert.Single(capture.CombatLogs).Value;
         PlayCardAction play = Assert.Single(log.Turns
@@ -695,25 +690,15 @@ public sealed class CombatDetailRecordingTests : IDisposable
             {
                 nameof(BeatDown) => 3,
                 nameof(Catastrophe) => 2,
-                nameof(IAmInvincible) => 1,
                 _ => 0,
             },
             play.EnergyCost);
 
-        if (invincible)
-        {
-            Assert.Empty(play.DamageDealt);
-            Assert.Equal(15, play.BlockGained);
-            Assert.Equal("defeat", log.Result);
-        }
-        else
-        {
-            int expectedDamage = scenario == nameof(Catastrophe) ? 12 : 18;
-            Assert.Equal(expectedDamage, Assert.Single(play.DamageDealt).Amount);
-            Assert.Equal(
-                scenario == nameof(Catastrophe) ? "defeat" : "victory",
-                log.Result);
-        }
+        int expectedDamage = scenario == nameof(Catastrophe) ? 12 : 18;
+        Assert.Equal(expectedDamage, Assert.Single(play.DamageDealt).Amount);
+        Assert.Equal(
+            scenario == nameof(Catastrophe) ? "defeat" : "victory",
+            log.Result);
     }
 
     [Theory]
@@ -1052,7 +1037,6 @@ public sealed class CombatDetailRecordingTests : IDisposable
         nameof(BeatDown) => typeof(BeatDown),
         nameof(Catastrophe) => typeof(Catastrophe),
         nameof(DecisionsDecisions) => typeof(DecisionsDecisions),
-        nameof(IAmInvincible) => typeof(DefendRegent),
         _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown ownership scenario."),
     };
 
@@ -1075,11 +1059,6 @@ public sealed class CombatDetailRecordingTests : IDisposable
                 AddToDeck<DecisionsDecisions>(player);
                 AddToDeck<CombatReportingNestedSkillCard>(player);
                 AddDazed(player, 3);
-                break;
-            case nameof(IAmInvincible):
-                AddToDeck<DefendRegent>(player);
-                AddDazed(player, 4);
-                AddToDeck<IAmInvincible>(player);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown ownership scenario.");
@@ -1119,14 +1098,6 @@ public sealed class CombatDetailRecordingTests : IDisposable
                     new CardModel[] { decisions }
                         .Concat(draw.Cards.OfType<CombatReportingNestedSkillCard>())
                         .Concat(draw.Cards.OfType<Dazed>())
-                        .ToArray());
-                break;
-            case nameof(IAmInvincible):
-                PlaceDrawOrder(
-                    player,
-                    draw.Cards.OfType<DefendRegent>().Cast<CardModel>()
-                        .Concat(draw.Cards.OfType<Dazed>())
-                        .Concat(draw.Cards.OfType<IAmInvincible>())
                         .ToArray());
                 break;
             default:

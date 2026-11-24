@@ -1,13 +1,13 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>10 格挡；若抽牌堆顶是本卡则自动出牌。偏离 #103：原版在
-/// <c>AfterAutoPostPlayPhaseEntered</c> 检查；模拟器仍在每张牌打出后的
-/// <c>AfterCardPlayed</c> 检查。09-C1 已接入 AutoPostPlay 阶段，旧注释所说的“没有阶段划分”
-/// 不再成立；本卡触发时机与原版的差异仍需独立夹具验证。</summary>
+/// <summary>10 格挡；自动出牌后阶段（<c>AfterAutoPostPlayPhaseEntered</c>）若抽牌堆顶是本卡，
+/// 用 <c>AutoPlayCmd.FromTopOfDrawPile</c> 从抽牌堆自动打出（不付费用）。逐字移植
+/// <c>MegaCrit.Sts2.Core.Models.Cards.IAmInvincible</c>。</summary>
 public sealed class IAmInvincible : CardModel
 {
     public override bool GainsBlock => true;
@@ -27,13 +27,12 @@ public sealed class IAmInvincible : CardModel
         await CreatureCmd.GainBlock(CombatState!, Owner.Creature, _block, ValueProp.Move, this, cardPlay);
     }
 
-    public override async Task AfterCardPlayed(CardPlay cardPlay)
+    public override async Task AfterAutoPostPlayPhaseEntered(Player player)
     {
-        if (cardPlay.Player == Owner &&
-            cardPlay.Card != this &&
+        if (player == Owner &&
             Owner.PlayerCombatState!.DrawPile.Cards.FirstOrDefault() == this)
         {
-            await PlayAsync(target: null);
+            await AutoPlayCmd.FromTopOfDrawPile(CombatState!, Owner, 1, forceExhaust: false);
         }
     }
 

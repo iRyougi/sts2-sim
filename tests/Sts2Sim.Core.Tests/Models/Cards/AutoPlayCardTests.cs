@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
+using Sts2Sim.Core.Hooks;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
@@ -35,20 +36,29 @@ public sealed class AutoPlayCardTests : IDisposable
     public void Dispose() => ModelDb.ResetForTests();
 
     [Fact]
-    public async Task IAmInvincible_OnDrawPileTop_AutoPlaysAfterAnotherCardIsPlayed()
+    public async Task IAmInvincible_OnDrawPileTop_AutoPlaysOnlyInAutoPostPlayPhase_WithoutPayingCost()
     {
-        (Player player, _) = await CreateCombatAsync("i-am-invincible");
+        (Player player, CombatRoom room) = await CreateCombatAsync("i-am-invincible");
         var card = (IAmInvincible)ModelDb.Card<IAmInvincible>().MutableClone();
         card.AssignOwner(player);
         CardPileCmd.Add(card, PileType.Draw, CardPilePosition.Top);
         DefendRegent other = AddToHand<DefendRegent>(player);
         int blockBefore = player.Creature.Block;
+        int energyBefore = player.PlayerCombatState!.Energy;
 
         await other.PlayAsync(target: null);
 
-        // DefendRegent 的5点格挡 + IAmInvincible 自动出牌的10点格挡。
+        // 游戏只在 AfterAutoPostPlayPhaseEntered 检查：打出别的牌之后什么都不发生（#1099）。
+        Assert.Equal(blockBefore + 5, player.Creature.Block);
+        Assert.Equal(PileType.Draw, card.Pile!.Type);
+        Assert.Equal(energyBefore - 1, player.PlayerCombatState.Energy);
+
+        await Hook.AfterAutoPostPlayPhaseEntered(room.Engine.State, player);
+
+        // 阶段钩子里走 AutoPlayFromDrawPile：+10 格挡，不付 IAmInvincible 自己的 1 点费用。
         Assert.Equal(blockBefore + 5 + 10, player.Creature.Block);
         Assert.NotEqual(PileType.Draw, card.Pile!.Type);
+        Assert.Equal(energyBefore - 1, player.PlayerCombatState.Energy);
     }
 
     [Fact]
