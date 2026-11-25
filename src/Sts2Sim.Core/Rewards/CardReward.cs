@@ -24,6 +24,8 @@ public sealed class CardReward : Reward
     private object? _resolutionIdentity;
     private IReadOnlyList<CardRewardAlternative>? _alternatives;
     private RelicModel[] _alternativeRelics = [];
+    // Native CardReward(CardCreationOptions, ...) subscribes Player.RelicObtained in its constructor (#1118).
+    private bool _relicObtainedSubscribed;
 
     public IReadOnlyList<CardModel> Options { get; private set; } = Array.Empty<CardModel>();
     public CardModel? SelectedOption { get; private set; }
@@ -50,6 +52,7 @@ public sealed class CardReward : Reward
     {
         _oddsType = oddsType;
         _isFromCombat = isFromCombat;
+        SubscribeRelicObtained();
     }
 
     public CardReward(Player player, CardCreationOptions creationOptions, int optionCount = OptionCount) : base(player)
@@ -58,6 +61,7 @@ public sealed class CardReward : Reward
         ArgumentOutOfRangeException.ThrowIfNegative(optionCount);
         _creationOptions = creationOptions.WithFlags(CardCreationFlags.IsCardReward);
         _optionCount = optionCount;
+        SubscribeRelicObtained();
     }
 
     public CardReward(Player player, IReadOnlyList<CardModel> options,
@@ -109,9 +113,7 @@ public sealed class CardReward : Reward
         }
         else
         {
-            var creationOptions = new CardCreationOptions([Player.Character.CardPool],
-                _explicitOptions is null ? CardCreationSource.Encounter : CardCreationSource.Other, _oddsType)
-                .WithFlags(CardCreationFlags.IsCardReward);
+            CardCreationOptions creationOptions = CreateDefaultOptions();
             if (Player.PlayerRng.UsesSemanticKeys)
             {
                 creationOptions.WithRngOverride(
@@ -121,10 +123,6 @@ public sealed class CardReward : Reward
             }
             if (_explicitOptions is null)
             {
-                if (_isFromCombat)
-                {
-                    creationOptions.WithFlags(CardCreationFlags.IsFromCombat);
-                }
                 IReadOnlyList<CardModel> cards = Player.PlayerRng.UsesSemanticKeys
                     ? CardFactory.CreateForReward(Player, OptionCount, creationOptions)
                     : CardFactory.CreateForEncounterReward(Player, OptionCount, creationOptions);
@@ -137,6 +135,54 @@ public sealed class CardReward : Reward
         CanReroll = !_hasBeenRerolled &&
             (_explicitOptions is null || _rerollOptions is not null) &&
             Hooks.Hook.CanRerollCardReward(runState, Player, this);
+    }
+
+    private CardCreationOptions CreateDefaultOptions()
+    {
+        var options = new CardCreationOptions([Player.Character.CardPool],
+            _explicitOptions is null ? CardCreationSource.Encounter : CardCreationSource.Other, _oddsType)
+            .WithFlags(CardCreationFlags.IsCardReward);
+        if (_explicitOptions is null && _isFromCombat) options.WithFlags(CardCreationFlags.IsFromCombat);
+        return options;
+    }
+
+    private void SubscribeRelicObtained()
+    {
+        Player.RelicObtained += OnRelicObtained;
+        _relicObtainedSubscribed = true;
+    }
+
+    private void UnsubscribeRelicObtained()
+    {
+        if (!_relicObtainedSubscribed) return;
+        Player.RelicObtained -= OnRelicObtained;
+        _relicObtainedSubscribed = false;
+    }
+
+    /// <summary>Run clones copy reward fields without constructors and build players afresh; re-attach the
+    /// cloned reward to the cloned player so neither world calls back into the other (#1118).</summary>
+    internal void RestoreRelicObtainedSubscriptionAfterClone()
+    {
+        if (_relicObtainedSubscribed) Player.RelicObtained += OnRelicObtained;
+    }
+
+    /// <summary>Native <c>CardReward.OnRelicObtained</c> (v0.114.0): only the newly obtained relic rewrites the
+    /// already generated options, with the reward's own <c>Options</c> and no flag gate. The simulator splits the
+    /// native list-wide Late hook into a per-option hook plus a list hook; both run here for that relic only.
+    /// Native then calls <c>relic.AfterModifyingRewards()</c>, which no card-reward modifier overrides, so there is
+    /// deliberately no <c>AfterModifyingCardRewardOptions</c> call (SilverCrucible/SilkenTress uses are not spent).</summary>
+    private void OnRelicObtained(RelicModel relic)
+    {
+        CardCreationOptions hookOptions = _creationOptions ?? CreateDefaultOptions();
+        var options = Options.ToList();
+        relic.TryModifyCardRewardOptions(Player, options, hookOptions);
+        for (int i = 0; i < options.Count; i++)
+        {
+            CardModel? replacement = relic.TryModifyCardRewardOptionLate(Player.RunState, Player, options[i], hookOptions);
+            if (replacement is not null) options[i] = replacement;
+        }
+        relic.TryModifyCardRewardOptionsLate(Player, options, hookOptions);
+        Options = options.AsReadOnly();
     }
 
     public Task SelectOption(CardModel chosen) => Resolve(chosen, () =>
@@ -218,6 +264,12 @@ public sealed class CardReward : Reward
             // fail-open: Reward side effects are not transactional. Retain the failed task, never retry them.
             IsResolved = true;
             completion.SetException(exception);
+        }
+        finally
+        {
+            // Native unsubscribes after the selection loop (card added, or a completing alternative such as
+            // PaelsWing SACRIFICE ran), and in OnSkipped; relics obtained during the side effect still rewrite.
+            UnsubscribeRelicObtained();
         }
     }
 }

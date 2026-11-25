@@ -21,7 +21,7 @@ internal static class RunCloneFieldRegistry
             shared: "<Ascension>k__BackingField <Progress>k__BackingField",
             rejected: "<CardSelectionSource>k__BackingField _nextEncounterForTransplant");
         Register<Player>(fields,
-            cloned: "<Creature>k__BackingField <RunState>k__BackingField <IsActiveForHooks>k__BackingField <PlayerCombatState>k__BackingField <Gold>k__BackingField <CanUseOrRemovePotions>k__BackingField <BaseOrbSlotCount>k__BackingField <CardRemovalsUsed>k__BackingField <Deck>k__BackingField _relics _potionSlots <RelicGrabBag>k__BackingField <PlayerRng>k__BackingField <Odds>k__BackingField",
+            cloned: "<Creature>k__BackingField <RunState>k__BackingField <IsActiveForHooks>k__BackingField <PlayerCombatState>k__BackingField <Gold>k__BackingField <CanUseOrRemovePotions>k__BackingField <BaseOrbSlotCount>k__BackingField <CardRemovalsUsed>k__BackingField <Deck>k__BackingField _relics _potionSlots <RelicGrabBag>k__BackingField <PlayerRng>k__BackingField <Odds>k__BackingField RelicObtained",
             shared: "<Character>k__BackingField <UnlockState>k__BackingField <MaxEnergy>k__BackingField");
         Register<ActDefinition>(fields,
             cloned: "_weakMonsterEncounterState _regularMonsterEncounterState _eliteEncounterState _lastMonsterEncounter _monsterEncountersPicked");

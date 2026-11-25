@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Cards;
@@ -6,8 +7,11 @@ using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Characters;
 using Sts2Sim.Core.Models.Cards;
+using Sts2Sim.Core.Models.Enchantments;
+using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Relics;
 using Sts2Sim.Core.Rewards;
+using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 
 namespace Sts2Sim.Core.Tests.Rewards;
@@ -208,6 +212,69 @@ public sealed class CardRewardLateModificationTests : IDisposable
         Assert.Equal(2, relic.AfterCallbackCount);
         Assert.All(reward.Options, option => Assert.Same(ModelDb.Card<LateModificationReplacementCard>(), option));
     }
+
+    // #1118: native CardReward subscribes Player.RelicObtained, so a relic taken on the same reward screen rewrites
+    // the already generated options (LavaLamp: permanent deck difference; WingCharm: Rewards RNG draw).
+    [Theory]
+    [InlineData(typeof(LavaLamp))]
+    [InlineData(typeof(WingCharm))]
+    [InlineData(typeof(ToxicEgg))]
+    public async Task PendingCardReward_IsRewrittenWhenRelicObtainedOnSameScreen(Type relicType)
+    {
+        var run = new RunState("reward-relic-obtained-" + relicType.Name, new Overgrowth());
+        Player player = Player.CreateForNewRun(ModelDb.Character<Silent>(), run);
+        run.AddPlayer(player);
+        run.PushRoom(new CombatRoom(() => (MonsterModel)ModelDb.Monster<WanderingGrunt>().MutableClone()));
+        var card = new CardReward(player, new CardCreationOptions([player.Character.CardPool],
+                CardCreationSource.Encounter, CardRarityOddsType.EliteEncounter,
+                candidate => candidate.Type == CardType.Skill && candidate.IsUpgradable)
+            .WithFlags(CardCreationFlags.NoUpgradeRoll));
+        card.Populate(run);
+        RewardsSet offer = RewardsSet.CreateCustom(player, card: card,
+            relic: new RelicReward((RelicModel)ModelDb.Get(relicType).MutableClone(), player));
+        run.BeginActiveRewardOffer(offer);
+        Assert.All(card.Options, option => Assert.False(option.IsUpgraded || option.Enchantments.Count > 0));
+        string untouched = Describe(card);
+
+        // The clone is attached to its own player: taking the relic there must not reach the source reward.
+        RewardsSet cloneOffer = Assert.Single(run.CloneExact().ActiveRewardOffers);
+        int cloneRewards = cloneOffer.Player.PlayerRng.Rewards.Counter;
+        int sourceRewards = player.PlayerRng.Rewards.Counter;
+        await cloneOffer.Relic!.Take();
+        AssertRewritten(relicType, cloneOffer.Card, cloneOffer.Player.PlayerRng.Rewards.Counter - cloneRewards);
+        Assert.Equal(untouched, Describe(card));
+        Assert.Equal(sourceRewards, player.PlayerRng.Rewards.Counter);
+
+        await offer.Relic!.Take();
+        AssertRewritten(relicType, card, player.PlayerRng.Rewards.Counter - sourceRewards);
+        Assert.Equal(Describe(cloneOffer.Card), Describe(card));
+
+        // Completing the reward unsubscribes it: a later relic no longer rewrites it or draws Rewards RNG.
+        await card.SelectOption(card.Options[0]);
+        IReadOnlyList<CardModel> settled = card.Options;
+        int afterPick = player.PlayerRng.Rewards.Counter;
+        await RelicCmd.Obtain(ModelDb.Relic<WingCharm>(), player);
+        Assert.Same(settled, card.Options);
+        Assert.Equal(afterPick, player.PlayerRng.Rewards.Counter);
+    }
+
+    private static void AssertRewritten(Type relicType, CardReward reward, int rewardsDraws)
+    {
+        string state = Describe(reward);
+        if (relicType == typeof(WingCharm))
+        {
+            Assert.Single(reward.Options, option => option.Enchantments.OfType<Swift>().Any());
+            Assert.True(rewardsDraws == 1, $"WingCharm Rewards draws {rewardsDraws}: {state}");
+        }
+        else
+        {
+            Assert.All(reward.Options, option => Assert.True(option.IsUpgraded, state));
+            Assert.True(rewardsDraws == 0, $"{relicType.Name} Rewards draws {rewardsDraws}: {state}");
+        }
+    }
+
+    private static string Describe(CardReward reward) => string.Join(",", reward.Options.Select(option =>
+        $"{option.Id.Entry}+{option.CurrentUpgradeLevel}[{string.Join("/", option.Enchantments.Select(e => e.GetType().Name))}]"));
 
     private static LateSequenceRelic AttachSequenceRelic(Player player, string label, CardModel? replacement, List<string> trace)
     {

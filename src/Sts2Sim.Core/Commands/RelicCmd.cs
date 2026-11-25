@@ -24,7 +24,8 @@ public static class RelicCmd
 
         var relic = (RelicModel)canonical.MutableClone();
         relic.AssignOwner(player);
-        player.AddRelicInternal(relic);
+        // Native AddRelicInternal raises RelicObtained before the bag removal and AfterObtained (#1118).
+        player.AddRelicInternal(relic, silent: false);
         RemoveObtainedRelicFromBags(player, relic);
         await relic.AfterObtained();
     }
@@ -69,7 +70,8 @@ public static class RelicCmd
         {
             replacement.AssignOwner(owner);
         }
-        owner.InsertRelicInternal(index, replacement);
+        // Native Replace = Remove + Obtain(index), so the replacement raises RelicObtained too.
+        owner.InsertRelicInternal(index, replacement, silent: false);
         RemoveObtainedRelicFromBags(owner, replacement);
         await replacement.AfterObtained();
     }

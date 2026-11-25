@@ -9,6 +9,7 @@ using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Entities.RestSite;
+using Sts2Sim.Core.Factories;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Cards;
@@ -327,6 +328,15 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             Assert.Same(originals[2], reward.Options[2]);
             await reward.SelectOption(changed);
             Assert.IsType<Swift>(Assert.Single(player.Deck.Cards.Last().Enchantments));
+            // #1118: native WingCharm only checks the owner, so event card choices built without IsCardReward
+            // (RoomFullOfCheese, EndlessConveyor, ... via ForNonCombatWith*) are enchanted as well.
+            // The selection draws come from the override, so the Rewards delta is WingCharm's single pick.
+            int eventRewardsBefore = player.PlayerRng.Rewards.Counter;
+            IReadOnlyList<CardModel> eventChoices = CardFactory.CreateForReward(player, 3,
+                CardCreationOptions.ForNonCombatWithDefaultOdds([player.Character.CardPool])
+                    .WithRngOverride(new Sts2Sim.Core.Random.Rng(1118)));
+            Assert.Single(eventChoices, card => card.Enchantments.OfType<Swift>().Any());
+            Assert.Equal(1, player.PlayerRng.Rewards.Counter - eventRewardsBefore);
         }
         else if (relicType == typeof(SeaGlass))
         {

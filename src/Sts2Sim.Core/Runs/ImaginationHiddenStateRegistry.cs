@@ -115,7 +115,7 @@ internal static class ImaginationHiddenStateRegistry
 
         RewardField("Reward", V, runtime, "<Player>k__BackingField <IsResolved>k__BackingField");
         RewardField("TakeableReward", N, runtime, "_takeLock _takeTask");
-        RewardField("CardReward", N, runtime, "_resolutionLock _resolutionTask _resolutionIdentity");
+        RewardField("CardReward", N, runtime, "_resolutionLock _resolutionTask _resolutionIdentity _relicObtainedSubscribed");
         RewardField("CardReward", V, reward,
             "_oddsType _isFromCombat _explicitOptions _creationOptions _rerollOptions _optionCount _isPopulated _hasBeenRerolled _alternatives _alternativeRelics <Options>k__BackingField <SelectedOption>k__BackingField <CanReroll>k__BackingField");
         RewardField("CardRewardAlternative", N, runtime, "_onSelect _isAvailable");

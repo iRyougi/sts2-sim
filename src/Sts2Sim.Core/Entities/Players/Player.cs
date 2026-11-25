@@ -196,7 +196,24 @@ public sealed class Player
         }
     }
 
+    /// <summary>原生 <c>Player.RelicObtained</c>（v0.114.0）：非 silent 地加入遗物后触发。生成型
+    /// <see cref="Rewards.CardReward"/> 构造时订阅、完成或放弃时退订（#1118）。克隆玩家由构造新建，
+    /// 不继承订阅；跑局克隆由奖励图在复制后重新挂接。</summary>
+    public event Action<RelicModel>? RelicObtained;
+
+    /// <summary>Subscriber targets in invocation order; run clones re-attach cloned rewards in this order.</summary>
+    internal IEnumerable<object?> RelicObtainedSubscribers() =>
+        RelicObtained?.GetInvocationList().Select(handler => handler.Target) ?? [];
+
+    /// <summary>静默加入（建局、读档、测试夹具），对应原生 <c>AddRelicInternal(relic, silent: true)</c>。</summary>
     public void AddRelicInternal(RelicModel relic) => _relics.Add(relic);
+
+    /// <summary>原生 <c>AddRelicInternal(relic, -1, silent)</c>：非 silent 时加入后触发 <see cref="RelicObtained"/>。</summary>
+    internal void AddRelicInternal(RelicModel relic, bool silent)
+    {
+        _relics.Add(relic);
+        if (!silent) RelicObtained?.Invoke(relic);
+    }
 
     internal int RemoveRelicInternal(RelicModel relic)
     {
@@ -210,7 +227,11 @@ public sealed class Player
         return index;
     }
 
-    internal void InsertRelicInternal(int index, RelicModel relic) => _relics.Insert(index, relic);
+    internal void InsertRelicInternal(int index, RelicModel relic, bool silent = true)
+    {
+        _relics.Insert(index, relic);
+        if (!silent) RelicObtained?.Invoke(relic);
+    }
 
     public void IncrementCardRemovalsUsed() => CardRemovalsUsed++;
 

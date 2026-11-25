@@ -197,6 +197,8 @@ public static class TransplantFieldRegistry
     [
         "<UnlockState>k__BackingField", "<RunState>k__BackingField",
         "<IsActiveForHooks>k__BackingField", "<BaseOrbSlotCount>k__BackingField",
+        // #1118: subscribers are unresolved generated CardRewards; none exist at the combat-entry boundary.
+        "RelicObtained",
     ];
 
     private static readonly string[] PlayerBoundaryFields =

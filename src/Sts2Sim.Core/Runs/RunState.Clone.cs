@@ -737,6 +737,8 @@ public sealed partial class RunState
             return target;
         }
 
+        private readonly Dictionary<CardReward, CardReward> _clonedCardRewards = new(ReferenceEqualityComparer.Instance);
+
         internal void Complete()
         {
             while (_pending.TryDequeue(out var pair))
@@ -761,7 +763,20 @@ public sealed partial class RunState
                         field.SetValue(pair.Target, mapValue(value));
                     }
                 }
+                if (pair.Source is CardReward sourceCard) _clonedCardRewards.Add(sourceCard, (CardReward)pair.Target);
             }
+        }
+
+        /// <summary>Player.RelicObtained is never copied: cloned players start without subscribers (#1118). Called
+        /// once after every Drain batch, so rewards mapped in a later batch keep the source players' invocation
+        /// order and WingCharm draws Rewards RNG in the same order in both worlds.</summary>
+        internal void RestoreRelicObtainedSubscriptions()
+        {
+            foreach (Player sourcePlayer in _clonedCardRewards.Keys.Select(card => card.Player).Distinct())
+                foreach (CardReward sourceCard in sourcePlayer.RelicObtainedSubscribers().OfType<CardReward>())
+                    if (_clonedCardRewards.TryGetValue(sourceCard, out CardReward? target))
+                        target.RestoreRelicObtainedSubscriptionAfterClone();
+            _clonedCardRewards.Clear();
         }
 
         private object IndependentGate(object source)
@@ -966,6 +981,7 @@ public sealed partial class RunState
         RebuildModelControls();
         CopyStableRoomStackAndOffersFrom(source, roomMapper, MapOffer);
         Drain();
+        data.RestoreRelicObtainedSubscriptions();
 
         IEnumerable<CombatState> StableCombatStates()
         {
