@@ -485,6 +485,23 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
         await PlayCopies<ZeroCostSkillProbeCard>(room, player, null, 6);
 
         Assert.Equal(hpBeforeSkills - 10, enemy.CurrentHp);
+
+        // #1121: native AfterCombatEnd only clears IsActivating; the attack count survives the
+        // combat end and is cleared by the next combat's BeforeSideTurnStart.
+        System.Reflection.FieldInfo attackCount = typeof(OrnamentalFan).GetField(
+            "_attacksThisTurn",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        OrnamentalFan fan = Assert.Single(player.Relics.OfType<OrnamentalFan>());
+        Assert.Equal(10, attackCount.GetValue(fan));
+        await CreatureCmd.Kill(room.Engine.State.Enemies.Single());
+        Assert.True(room.Engine.CheckWinCondition());
+        await room.ResolveOutcomeAsync(generateRewards: false);
+        await room.Exit(runState);
+        Assert.Equal(10, attackCount.GetValue(fan));
+
+        CombatRoom nextRoom = CreateCombatRoom();
+        await nextRoom.Enter(runState);
+        Assert.Equal(0, attackCount.GetValue(fan));
     }
 
     [Fact]

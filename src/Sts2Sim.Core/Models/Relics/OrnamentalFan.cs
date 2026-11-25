@@ -64,8 +64,8 @@ public sealed class OrnamentalFan : RelicModel
     public override Task AfterCombatEnd()
     {
         // Source: IsActivating = false -> UpdateDisplay, with CombatManager.IsInProgress already false here -> Normal.
+        // The attack counter is not cleared here; it is kept until the next combat's BeforeSideTurnStart (#1121).
         Status = RelicStatus.Normal;
-        _attacksThisTurn = 0;
         return Task.CompletedTask;
     }
 
