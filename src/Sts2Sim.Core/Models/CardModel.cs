@@ -89,7 +89,10 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         AddThisTurnOrUntilPlayed,
     }
 
-    private readonly record struct LocalEnergyModifier(LocalEnergyModifierKind Kind, int Amount)
+    /// <summary><paramref name="ReduceOnly"/> 对应原版 <c>LocalCostModifier.IsReduceOnly</c>：绝对修饰只在
+    /// 能降低当前费用时生效（<c>Math.Min(当前费用, Amount)</c>）。</summary>
+    private readonly record struct LocalEnergyModifier(
+        LocalEnergyModifierKind Kind, int Amount, bool ReduceOnly = false)
     {
         public bool IsAbsolute => Kind is
             LocalEnergyModifierKind.FreeThisTurn or
@@ -143,7 +146,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         int cost = Math.Max(0, CanonicalEnergyCost - _energyCostUpgradeDelta);
         foreach (LocalEnergyModifier modifier in _localEnergyModifiers)
         {
-            cost = modifier.IsAbsolute ? modifier.Amount : cost + modifier.Amount;
+            cost = modifier.IsAbsolute
+                ? (modifier.ReduceOnly ? Math.Min(cost, modifier.Amount) : modifier.Amount)
+                : cost + modifier.Amount;
         }
         return Math.Max(0, cost);
     }
@@ -320,11 +325,27 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         TemporarySlyThisTurn = false;
     }
 
+    /// <summary>原版 <c>CardEnergyCost.Set*</c> 的守卫 <c>if (cost != 0 || Canonical >= 0)</c> 取反：对基础费用为 -1 的
+    /// 不可打出牌（诅咒）"设为 0"时不记录修饰。X 费的 Canonical 为 0，不受影响。</summary>
+    private bool IgnoresZeroEnergyCostModifier(int cost) =>
+        cost == 0 && !IsXEnergyCost && CanonicalEnergyCost < 0;
+
+    /// <summary>"免费"标志同时驱动星费（<see cref="LocalStarCost"/>），而原版星费没有上述守卫：
+    /// 能量部分被守卫挡下时，仍需在牌带星费时置标志。</summary>
+    private bool FreeFlagStillNeededForStars => CanonicalStarCost > 0;
+
     public void MakeTemporaryFreeThisTurn()
     {
         AssertMutable();
-        TemporaryFreeThisTurn = true;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisTurn, 0));
+        bool energyIgnored = IgnoresZeroEnergyCostModifier(0);
+        if (!energyIgnored || FreeFlagStillNeededForStars)
+        {
+            TemporaryFreeThisTurn = true;
+        }
+        if (!energyIgnored)
+        {
+            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisTurn, 0));
+        }
     }
 
     internal void ClearTemporaryFreeThisTurn()
@@ -341,8 +362,15 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     public void MakeFreeUntilPlayed()
     {
         AssertMutable();
-        TemporaryFreeUntilPlayed = true;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeUntilPlayed, 0));
+        bool energyIgnored = IgnoresZeroEnergyCostModifier(0);
+        if (!energyIgnored || FreeFlagStillNeededForStars)
+        {
+            TemporaryFreeUntilPlayed = true;
+        }
+        if (!energyIgnored)
+        {
+            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeUntilPlayed, 0));
+        }
     }
 
     /// <summary>Remains free for both energy and star costs through this combat.</summary>
@@ -351,8 +379,15 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     public void MakeFreeThisCombat()
     {
         AssertMutable();
-        TemporaryFreeThisCombat = true;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisCombat, 0));
+        bool energyIgnored = IgnoresZeroEnergyCostModifier(0);
+        if (!energyIgnored || FreeFlagStillNeededForStars)
+        {
+            TemporaryFreeThisCombat = true;
+        }
+        if (!energyIgnored)
+        {
+            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisCombat, 0));
+        }
     }
 
     /// <summary>A fixed energy-cost override for the current turn, with precedence over free flags.</summary>
@@ -362,6 +397,10 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         ArgumentOutOfRangeException.ThrowIfNegative(cost);
+        if (IgnoresZeroEnergyCostModifier(cost))
+        {
+            return;
+        }
         TemporaryCostOverrideThisTurn = cost;
         _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisTurn, cost));
     }
@@ -399,12 +438,18 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         TemporaryStarCostOverrideThisTurn = null;
     }
 
-    public void SetTemporaryCostOverrideThisTurnOrUntilPlayed(int cost)
+    /// <param name="reduceOnly">原版 <c>reduceOnly</c>（"降低"类效果，如 Enlightenment）：只在能降低当前费用时生效，
+    /// 之前的更低修饰过期后它才真正起作用。</param>
+    public void SetTemporaryCostOverrideThisTurnOrUntilPlayed(int cost, bool reduceOnly = false)
     {
         AssertMutable();
         ArgumentOutOfRangeException.ThrowIfNegative(cost);
+        if (IgnoresZeroEnergyCostModifier(cost))
+        {
+            return;
+        }
         TemporaryCostOverrideThisTurnOrUntilPlayed = cost;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisTurnOrUntilPlayed, cost));
+        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisTurnOrUntilPlayed, cost, reduceOnly));
     }
 
     internal void ClearTemporaryCostOverrideThisTurnOrUntilPlayed()
@@ -433,12 +478,17 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     public int? TemporaryCostOverrideThisCombat { get; private set; }
 
-    public void SetTemporaryCostOverrideThisCombat(int cost)
+    /// <param name="reduceOnly">见 <see cref="SetTemporaryCostOverrideThisTurnOrUntilPlayed"/>。</param>
+    public void SetTemporaryCostOverrideThisCombat(int cost, bool reduceOnly = false)
     {
         AssertMutable();
         ArgumentOutOfRangeException.ThrowIfNegative(cost);
+        if (IgnoresZeroEnergyCostModifier(cost))
+        {
+            return;
+        }
         TemporaryCostOverrideThisCombat = cost;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisCombat, cost));
+        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisCombat, cost, reduceOnly));
     }
 
     /// <summary>Adds a local modifier after the currently resolved local cost for this combat.</summary>
@@ -1486,6 +1536,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         {
             builder.Append((int)modifier.Kind);
             builder.Append(modifier.Amount);
+            builder.Append(modifier.ReduceOnly);
         }
         builder.Append(TemporaryStarCostOverrideThisTurn ?? int.MinValue);
         AppendDowngradeKeywords(ref builder);

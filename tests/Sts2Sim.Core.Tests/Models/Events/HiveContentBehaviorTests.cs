@@ -55,6 +55,9 @@ public sealed class HiveContentBehaviorTests : IDisposable
         Enlightenment enlightenment = AddToHand<Enlightenment>(player, upgraded);
         Sneaky expensive = AddToHand<Sneaky>(player);
         Slice cheap = AddToHand<Slice>(player);
+        Sneaky freed = AddToHand<Sneaky>(player);
+        AscendersBane bane = AddToHand<AscendersBane>(player);
+        freed.SetToFreeThisTurn();
         Assert.DoesNotContain(CardKeyword.Exhaust, enlightenment.Keywords);
         await room.Engine.PlayCardAsync(player, enlightenment, null);
         Assert.Equal(PileType.Discard, enlightenment.Pile!.Type);
@@ -63,8 +66,18 @@ public sealed class HiveContentBehaviorTests : IDisposable
         Assert.Equal(thisTurn ? 1 : null, expensive.TemporaryCostOverrideThisTurnOrUntilPlayed);
         Assert.Equal(thisCombat ? 1 : null, expensive.TemporaryCostOverrideThisCombat);
         Assert.Null(cheap.TemporaryCostOverrideThisTurn);
-        Assert.Null(cheap.TemporaryCostOverrideThisTurnOrUntilPlayed);
-        Assert.Null(cheap.TemporaryCostOverrideThisCombat);
+        // #1119：原版对整手牌 SetThis*(1, reduceOnly: true)，不筛费用；reduceOnly 使 0 费牌仍是 0，不被抬到 1。
+        Assert.Equal(0, cheap.EnergyCost);
+        Assert.Equal(thisTurn ? 1 : null, cheap.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        Assert.Equal(thisCombat ? 1 : null, cheap.TemporaryCostOverrideThisCombat);
+        // 已被压到 0 的牌：reduceOnly 不抬高；更低的修饰过期后它才生效（升级版本整场战斗有效）。
+        Assert.Equal(0, freed.EnergyCost);
+        freed.ClearTemporaryCostOverrideThisTurnOrUntilPlayed();
+        Assert.Equal(upgraded ? 1 : freed.CanonicalEnergyCostValue, freed.EnergyCost);
+        // 不可打出牌：设 1 费照常记录修饰（守卫只拦 0 费），有效费用仍是 -1。
+        Assert.Equal(-1, bane.EnergyCost);
+        Assert.Equal(thisTurn ? 1 : null, bane.TemporaryCostOverrideThisTurnOrUntilPlayed);
+        Assert.Equal(thisCombat ? 1 : null, bane.TemporaryCostOverrideThisCombat);
     }
 
     [Fact]
