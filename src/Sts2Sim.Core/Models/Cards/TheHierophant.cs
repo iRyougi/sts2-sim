@@ -5,7 +5,7 @@ using Sts2Sim.Core.Models.CardPools;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>生成 3（升级 4）张不同无色牌入手牌并本回合或打出前减 1 费（原版 <c>TheHierophant</c>）。</summary>
+/// <summary>生成 3（升级 4）张不同无色牌入手牌（v0.114.0 删除了减费）（原版 <c>TheHierophant</c>）。</summary>
 public sealed class TheHierophant : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
@@ -25,7 +25,6 @@ public sealed class TheHierophant : CardModel, ICardChoiceBaseValueProvider
             Owner.RunState.Rng.CombatCardGeneration);
         foreach (CardModel card in generated)
         {
-            card.AddEnergyCostThisTurnOrUntilPlayed(-1);
             await CardPileCmd.Generate(CombatState!, card, PileType.Hand, Owner);
         }
     }

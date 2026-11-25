@@ -188,7 +188,7 @@ public sealed class HiveEventTests : IDisposable
     {
         (RunState run, Player player) = CreateRun("flower-gold");
         var ev = Begin<ColossalFlower>(run, player);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 18, default);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 18);
         Assert.False(ev.IsAllowed(run));
         await CreatureCmd.Heal(player.Creature, 1m);
         Assert.True(ev.IsAllowed(run));
@@ -308,7 +308,7 @@ public sealed class HiveEventTests : IDisposable
     {
         (RunState run, Player player) = CreateRun("grafter-heal");
         run.ConfigureCardSelectionSource(new LegacySelectionDecisionSource());
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 1, default);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 1);
         var ev = Begin<SpiritGrafter>(run, player);
         Assert.Equal(new[] { "LET_IT_IN", "REJECTION" }, ev.CurrentOptions.Select(x => x.Key));
         await Choose(ev, "LET_IT_IN");
@@ -344,7 +344,7 @@ public sealed class HiveEventTests : IDisposable
         Assert.Equal(TargetType.TargetedNoCreature, foul.TargetType);
         Assert.False(foul.PassesCustomUsabilityCheck);
 
-        player.Creature.LoseHpInternal(10m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(10m);
         int hp = player.Creature.CurrentHp;
         var ambergris = player.AddPotionInternal(ModelDb.Potion<Sts2Sim.Core.Models.Potions.Ambergris>());
         await PotionCmd.Use(ambergris, player, player.Creature);
@@ -473,7 +473,7 @@ public sealed class HiveEventTests : IDisposable
         Type ancientType, int expectedRngCalls, int expectedBaseOptions)
     {
         (RunState run, Player player) = CreateRun($"ancient-{ancientType.Name}");
-        player.Creature.LoseHpInternal(30, default);
+        player.Creature.LoseHpInternal(30);
         var ancient = (AncientEventModel)ModelDb.Get(ancientType).MutableClone();
         ancient.AssignOwner(player);
 
@@ -631,7 +631,7 @@ public sealed class HiveEventTests : IDisposable
             (int)Sts2Sim.Core.Entities.Ascension.AscensionLevel.WearyTraveler);
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
-        player.Creature.LoseHpInternal(25m, default);
+        player.Creature.LoseHpInternal(25m);
         _ = Begin<Orobas>(run, player);
         Assert.Equal(player.Creature.MaxHp - 5, player.Creature.CurrentHp);
     }

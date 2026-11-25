@@ -4,5 +4,4 @@ public enum ArrowStatus
 {
     Retrieved,
     Away,
-    Destroyed,
 }

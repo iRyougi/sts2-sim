@@ -230,7 +230,7 @@ public sealed class RarePotionBatch2Tests : IDisposable
         Player ally = CreatePlayer(runState);
         runState.AddPlayer(owner);
         runState.AddPlayer(ally);
-        ally.Creature.LoseHpInternal(20m, ValueProp.Unpowered);
+        ally.Creature.LoseHpInternal(20m);
         int maxBefore = ally.Creature.MaxHp;
         int currentBefore = ally.Creature.CurrentHp;
         PotionModel juice = AddPotion("FruitJuice", owner);

@@ -3,7 +3,7 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>抽 2（升级 3）张牌、获得 2（升级 3）点能量并将 1 张 Soot 置入弃牌堆（原版 <c>TheSun</c>）。</summary>
+/// <summary>抽 2（升级 3）张牌、获得 2（升级 3）点能量并将 2 张 Soot 随机洗入抽牌堆（原版 <c>TheSun</c>）。</summary>
 public sealed class TheSun : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
@@ -12,14 +12,24 @@ public sealed class TheSun : CardModel, ICardChoiceBaseValueProvider
     protected override int CanonicalEnergyCost => 0;
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
     private int Amount => IsUpgraded ? 3 : 2;
+    private const int SootCount = 2;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Cards: Amount, Energy: Amount);
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
         await CardPileCmd.Draw(CombatState!, Amount, Owner, fromHandDraw: false);
         await PlayerCmd.GainEnergy(Amount, Owner);
-        var soot = (CardModel)ModelDb.Card<Soot>().MutableClone();
-        soot.AssignOwner(Owner);
-        await CardPileCmd.Generate(CombatState!, soot, PileType.Discard, Owner);
+        // 原版 AddToCombatAndPreview：持有者已死亡则不加入。
+        if (Owner.Creature.IsDead)
+        {
+            return;
+        }
+
+        for (int i = 0; i < SootCount; i++)
+        {
+            var soot = (CardModel)ModelDb.Card<Soot>().MutableClone();
+            soot.AssignOwner(Owner);
+            await CardPileCmd.Generate(CombatState!, soot, PileType.Draw, Owner, CardPilePosition.Random);
+        }
     }
 }

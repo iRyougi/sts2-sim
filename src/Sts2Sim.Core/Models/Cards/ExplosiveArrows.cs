@@ -8,10 +8,10 @@ namespace Sts2Sim.Core.Models.Cards;
 public sealed class ExplosiveArrows : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Power;
-    public override CardRarity Rarity => CardRarity.Rare;
+    public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
-    private decimal PowerAmount => IsUpgraded ? 8m : 6m;
+    private decimal PowerAmount => IsUpgraded ? 11m : 8m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
     protected override async Task OnPlay(CardPlay cardPlay)

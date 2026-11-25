@@ -46,7 +46,8 @@ public sealed class StretchPower : PowerModel
             return 0m;
 
         _gaveBonusBlock = true;
-        return Amount;
+        // v0.114.0：加成量取出牌开始时记下的层数。
+        return _amountWhenCardStarted;
     }
 
     private static bool GainsBlock(CardModel card) =>

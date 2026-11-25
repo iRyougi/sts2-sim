@@ -179,7 +179,7 @@ public sealed class SharedRelicPoolTask3bTests : RelicModel, IRunDecisionSource,
             silentRun.PushRoom(huntRoom);
             await huntRoom.Enter(silentRun);
             Creature huntTarget = Assert.Single(huntRoom.Engine.State.HittableEnemies);
-            huntTarget.LoseHpInternal(huntTarget.CurrentHp - 10, ValueProp.Unpowered);
+            huntTarget.LoseHpInternal(huntTarget.CurrentHp - 10);
             var huntCard = (TheHunt)ModelDb.Card<TheHunt>().MutableClone();
             huntCard.AssignOwner(silent);
             CardPileCmd.Add(huntCard, PileType.Hand);

@@ -88,7 +88,7 @@ public sealed class AncientEventModelTests : IDisposable
     public void BeginEvent_HealsOwnerToFull()
     {
         (RunState runState, Player player) = CreateRun();
-        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1, default);
+        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1);
         var ancient = (StubAncient)ModelDb.Event<StubAncient>().MutableClone();
         ancient.AssignOwner(player);
 

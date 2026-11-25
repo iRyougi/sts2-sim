@@ -55,7 +55,7 @@ public class CombatRoomOutcomeTests
     public async Task ResolveOutcomeAsync_BeforeEngineVictory_DoesNotResolveOrFireHook()
     {
         (CombatRoom room, _, CombatVictorySpyRelic spy) = await CreateCombatAsync("combat-outcome-early");
-        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue, default);
+        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue);
 
         await room.ResolveOutcomeAsync();
 
@@ -68,7 +68,7 @@ public class CombatRoomOutcomeTests
     public async Task ResolveOutcomeAsync_AfterEngineVictory_FiresHookExactlyOnce()
     {
         (CombatRoom room, _, CombatVictorySpyRelic spy) = await CreateCombatAsync("combat-outcome-victory");
-        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue, default);
+        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue);
         room.Engine.CheckWinCondition();
 
         await Task.WhenAll(room.ResolveOutcomeAsync(), room.ResolveOutcomeAsync());
@@ -87,7 +87,7 @@ public class CombatRoomOutcomeTests
     {
         (CombatRoom room, Player player, CombatVictorySpyRelic spy) = await CreateCombatAsync("combat-outcome-defeat");
         player.Creature.GainBlockInternal(5m);
-        player.Creature.LoseHpInternal(decimal.MaxValue, default);
+        player.Creature.LoseHpInternal(decimal.MaxValue);
         room.Engine.CheckWinCondition();
 
         await room.ResolveOutcomeAsync();

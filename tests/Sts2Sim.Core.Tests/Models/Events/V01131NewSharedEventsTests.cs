@@ -180,14 +180,15 @@ public sealed class V01131NewSharedEventsTests : IDisposable
     }
 
     [Theory]
-    [InlineData("MyShinies", 0, 0, 0)]
-    [InlineData("MyShinies", 0, 19, 0)]
-    [InlineData("MyShinies", 0, 20, 1)]
-    [InlineData("MyShinies", 0, 39, 1)]
-    [InlineData("MyShinies", 0, 40, 2)]
-    [InlineData("MyShinies", 1, 9, 0)]
-    [InlineData("MyShinies", 1, 10, 1)]
-    [InlineData("MyShinies", 1, 39, 3)]
+    // v0.114.0 (#1110): damage 2 (+1 upgraded) x hits (int)(1 + Gold / 25).
+    [InlineData("MyShinies", 0, 0, 2)]
+    [InlineData("MyShinies", 0, 24, 2)]
+    [InlineData("MyShinies", 0, 25, 4)]
+    [InlineData("MyShinies", 0, 49, 4)]
+    [InlineData("MyShinies", 0, 50, 6)]
+    [InlineData("MyShinies", 1, 0, 3)]
+    [InlineData("MyShinies", 1, 25, 6)]
+    [InlineData("MyShinies", 1, 75, 12)]
     [InlineData("DingyDagger", 0, 0, 7)]
     [InlineData("DingyDagger", 1, 0, 11)]
     [InlineData("DingyDagger", 2, 0, 16)]
@@ -233,7 +234,12 @@ public sealed class V01131NewSharedEventsTests : IDisposable
         if (cardName == "DingyDagger" && upgrades > 0)
         {
             Assert.True(card.IsUpgradable, context);
+            // v0.114.0 (#1109): Downgrade drops one level; RemoveAllUpgrades returns to level 0.
             card.Downgrade();
+            Assert.Equal(upgrades - 1, card.CurrentUpgradeLevel);
+            int oneLevelLower = 7 + Enumerable.Range(1, upgrades - 1).Sum(level => 3 + level);
+            Assert.Equal(oneLevelLower, ((ICardChoiceBaseValueProvider)card).CardChoiceBaseValues!.Value.Damage);
+            card.RemoveAllUpgrades();
             Assert.Equal(0, card.CurrentUpgradeLevel);
             Assert.Equal(7, ((ICardChoiceBaseValueProvider)card).CardChoiceBaseValues!.Value.Damage);
         }

@@ -3,36 +3,36 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>消耗全部非消耗堆 Shoot 牌并生成按消耗数强化的 TheShot（原版 <c>Florescence</c>）。</summary>
+/// <summary>选 1 张手牌变形为 TheShot（本牌升级时 TheShot 也升级）（v0.114.0 原版 <c>Florescence</c>）。</summary>
 public sealed class Florescence : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.Self;
-    protected override int CanonicalEnergyCost => 0;
-    protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
+    protected override int CanonicalEnergyCost => 1;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        List<CardModel> shootCards = Owner.PlayerCombatState!.AllPiles
-            .Where(pile => pile.Type != PileType.Exhaust)
-            .SelectMany(pile => pile.Cards)
-            .Where(card => card.Tags.Contains(CardTag.Shoot))
-            .ToList();
-        int count = shootCards.Count;
-        foreach (CardModel shootCard in shootCards)
+        CardModel? selected = (await CardSelectCmd.FromHand(
+            CombatState!,
+            Owner,
+            Owner.PlayerCombatState!.Hand.Cards,
+            1,
+            1,
+            this,
+            cancelable: false)).FirstOrDefault();
+        if (selected is null)
         {
-            await CardPileCmd.Exhaust(CombatState!, shootCard);
+            return;
         }
 
-        var theShot = (TheShot)ModelDb.Card<TheShot>().MutableClone();
+        var theShot = (CardModel)ModelDb.Card<TheShot>().MutableClone();
         theShot.AssignOwner(Owner);
         if (IsUpgraded)
         {
-            theShot.Upgrade();
+            CardCmd.Upgrade(theShot);
         }
-        theShot.BuffFromFlorescence(count);
-        await CardPileCmd.Generate(CombatState!, theShot, PileType.Hand);
+        await CardCmd.Transform(selected, theShot);
     }
 }

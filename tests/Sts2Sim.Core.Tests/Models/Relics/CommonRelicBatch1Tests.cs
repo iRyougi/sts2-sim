@@ -64,7 +64,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("book-of-five-rings");
         await RelicCmd.Obtain(ModelDb.Relic<BookOfFiveRings>(), player);
-        player.Creature.LoseHpInternal(25m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(25m);
         int woundedHp = player.Creature.CurrentHp;
 
         for (int i = 0; i < 4; i++)
@@ -101,7 +101,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
         };
         TransplantSavedProperties.Apply(book, properties, "Player.Relics.BookOfFiveRings", relic: true);
         Assert.Equal(0, book.DisplayAmount);
-        player.Creature.LoseHpInternal(40m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(40m);
         int woundedHp = player.Creature.CurrentHp;
 
         for (int total = 11; total <= 15; total++)
@@ -125,7 +125,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("book-of-five-rings-dead");
         await RelicCmd.Obtain(ModelDb.Relic<BookOfFiveRings>(), player);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp);
         Assert.True(player.Creature.IsDead);
 
         for (int i = 0; i < 5; i++)
@@ -291,7 +291,7 @@ public sealed class CommonRelicBatch1Tests : IDisposable
         await RelicCmd.Obtain(ModelDb.Relic<BloodVial>(), player);
         await RelicCmd.Obtain(ModelDb.Relic<FestivePopper>(), player);
         await RelicCmd.Obtain(ModelDb.Relic<Gorget>(), player);
-        player.Creature.LoseHpInternal(5m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(5m);
         int hpBefore = player.Creature.CurrentHp;
 
         var room = new CombatRoom(

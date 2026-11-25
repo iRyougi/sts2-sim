@@ -4,7 +4,7 @@ using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>随机自动打出手牌中两张（升级三张）可用牌（原版 <c>TheFool</c>）。</summary>
+/// <summary>随机自动打出手牌中两张（升级三张）可用牌；没有可用牌时不打出（v0.114.0 原版 <c>TheFool</c>）。</summary>
 public sealed class TheFool : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
@@ -23,11 +23,7 @@ public sealed class TheFool : CardModel, ICardChoiceBaseValueProvider
                 .Where(c => !c.Keywords.Contains(CardKeyword.Unplayable))
                 .ToList()
                 .StableShuffle(Owner.RunState.Rng.CombatCardSelection)
-                .FirstOrDefault()
-                ?? Owner.PlayerCombatState.Hand.Cards
-                    .ToList()
-                    .StableShuffle(Owner.RunState.Rng.CombatCardSelection)
-                    .FirstOrDefault();
+                .FirstOrDefault();
             if (picked is not null && !CombatState!.IsOverOrEnding() && !picked.Owner.Creature.IsDead)
             {
                 await AutoPlayCmd.FromCards(CombatState!, Owner, [picked]);

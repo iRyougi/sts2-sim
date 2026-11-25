@@ -63,7 +63,9 @@ public sealed class ImpaledPower : PowerModel
         Creature? dealer,
         CardModel? cardSource)
     {
-        if (target == Owner && dealer is not null && dealer == Applier && props.IsPoweredAttack())
+        // v0.114.0：施加者判定改看来源牌的持有者（不再比较 dealer）。
+        if (target == Owner && dealer is not null && cardSource is not null &&
+            ReferenceEquals(cardSource.Owner.Creature, Applier) && props.IsPoweredAttack())
         {
             HitCounter--;
             if (HitCounter <= 0)
@@ -90,12 +92,6 @@ public sealed class ImpaledPower : PowerModel
         {
             await ArrowCmd.DislodgeArrow(Owner.CombatState!, this, source);
         }
-    }
-
-    public async Task ForceRemoveArrow(ArrowSlot arrow)
-    {
-        _arrowSources.Remove(arrow);
-        await RemoveIfNoArrows();
     }
 
     protected override void DeepCloneFields()

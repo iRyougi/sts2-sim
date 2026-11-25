@@ -192,7 +192,7 @@ public sealed class Task7ReportingIntegrationFixRound1Tests : IDisposable
                 AddDeckCard<StrikeRegent>(player);
                 await RelicCmd.Obtain(ModelDb.Relic<MeatOnTheBone>(), player);
                 await RelicCmd.Obtain(ModelDb.Relic<Task7StrawberryRewardRelic>(), player);
-                player.Creature.LoseHpInternal(45m, ValueProp.Unpowered);
+                player.Creature.LoseHpInternal(45m);
             });
 
         TurnRecord finalTurn = Assert.Single(run.Log.Turns);
@@ -225,7 +225,7 @@ public sealed class Task7ReportingIntegrationFixRound1Tests : IDisposable
                     await CardPileCmd.AddToDeck(dazed, ModelDb.Card<Dazed>());
                 }
 
-                player.Creature.LoseHpInternal(45m, ValueProp.Unpowered);
+                player.Creature.LoseHpInternal(45m);
             });
 
         TurnRecord finalTurn = Assert.Single(run.Log.Turns);
@@ -326,7 +326,7 @@ public sealed class Task7ReportingIntegrationFixRound1Tests : IDisposable
             () => (MonsterModel)ModelDb.Monster<Task7CardLethalMonster>().MutableClone(),
             configurePlayer: player =>
             {
-                player.Creature.LoseHpInternal(45m, ValueProp.Unpowered);
+                player.Creature.LoseHpInternal(45m);
                 player.AddPotionInternal((PotionModel)ModelDb.Potion<Ambergris>().MutableClone());
                 return Task.CompletedTask;
             },

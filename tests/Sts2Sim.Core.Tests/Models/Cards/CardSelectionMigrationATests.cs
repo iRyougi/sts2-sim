@@ -181,7 +181,7 @@ public sealed class CardSelectionMigrationATests : IDisposable
         Creature enemy = state.HittableEnemies.Single();
         if (killsLastEnemy)
         {
-            enemy.LoseHpInternal(enemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Unpowered);
+            enemy.LoseHpInternal(enemy.CurrentHp - 1);
         }
 
         var source = new RecordingSource();

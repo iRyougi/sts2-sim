@@ -14,8 +14,8 @@ public sealed class ChoBarbs : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Cho];
-    private decimal Block => IsUpgraded ? 9m : 7m;
-    private decimal ThornsAmount => IsUpgraded ? 4m : 3m;
+    private decimal Block => IsUpgraded ? 10m : 8m;
+    private decimal ThornsAmount => IsUpgraded ? 3m : 2m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block);
 
     protected override async Task OnPlay(CardPlay cardPlay)

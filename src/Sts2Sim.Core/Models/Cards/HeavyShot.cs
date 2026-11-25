@@ -5,20 +5,19 @@ using Sts2Sim.Core.Entities.FoolArrows;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>双倍受 AimPower 加成的射击攻击（原版 <c>HeavyShot</c>）。</summary>
+/// <summary>受 3（升级 4）倍 AimPower 加成的射击攻击（原版 <c>HeavyShot</c>）。</summary>
 public sealed class HeavyShot : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider, IAimAmountModifier
 {
-    private const decimal AimMultiplier = 2m;
-
     public override CardType Type => CardType.Attack;
-    public override CardRarity Rarity => CardRarity.Common;
+    public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.AnyEnemy;
     protected override int CanonicalEnergyCost => 2;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Shoot];
-    private decimal Damage => IsUpgraded ? 25m : 20m;
+    private decimal Damage => IsUpgraded ? 17m : 16m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
+    private decimal AimMultiplier => IsUpgraded ? 4m : 3m;
     public decimal ModifyAimAmount(decimal originalAmount) => originalAmount * AimMultiplier;
 
     protected override bool ShouldGlowRedInternal => !ArrowCmd.PlayerHasAnyArrows(Owner);

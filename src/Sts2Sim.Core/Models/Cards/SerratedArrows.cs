@@ -6,7 +6,7 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class SerratedArrows : CardModel, ICardChoiceBaseValueProvider
 {
-    private decimal PowerAmount => IsUpgraded ? 50m : 25m;
+    private decimal PowerAmount => IsUpgraded ? 75m : 50m;
 
     public override CardType Type => CardType.Power;
     public override CardRarity Rarity => CardRarity.Uncommon;

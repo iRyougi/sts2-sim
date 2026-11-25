@@ -11,7 +11,7 @@ body:
     attributes:
       label: 游戏版本
       description: 你对比的游戏版本。模拟器的基线写在 README 里。
-      placeholder: v0.113.1
+      placeholder: v0.114.0
     validations:
       required: true
   - type: input

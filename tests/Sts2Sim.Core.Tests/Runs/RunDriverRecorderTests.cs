@@ -211,7 +211,7 @@ public sealed class RunDriverRecorderTests : IDisposable
             resolvedRooms.Add((point.coord, roomType));
             if (defeatAfterFirstRoom && resolvedRooms.Count == 1)
             {
-                player.Creature.LoseHpInternal(player.Creature.CurrentHp, default(ValueProp));
+                player.Creature.LoseHpInternal(player.Creature.CurrentHp);
             }
         };
 
@@ -363,7 +363,7 @@ public sealed class RunDriverRecorderTests : IDisposable
         public override Task EnterInternal(RunState? runState)
         {
             Player player = runState!.Players[0];
-            player.Creature.LoseHpInternal(player.Creature.MaxHp, default);
+            player.Creature.LoseHpInternal(player.Creature.MaxHp);
             return Task.CompletedTask;
         }
 

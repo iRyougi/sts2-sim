@@ -44,7 +44,7 @@ public sealed class RestSiteHealHookTests : IDisposable
         Player foreign = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         player.Creature.SetMaxHpInternal(80);
         player.Creature.HealInternal(80);
-        player.Creature.LoseHpInternal(79, default(ValueProp));
+        player.Creature.LoseHpInternal(79);
         await RelicCmd.Obtain(ModelDb.Relic<StoneHumidifier>(), player);
         await RelicCmd.Obtain(ModelDb.Relic<RegalPillow>(), player);
         await RelicCmd.Obtain(ModelDb.Relic<DreamCatcher>(), player);

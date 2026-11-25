@@ -3,7 +3,7 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>群体 Wah 攻击，伤害随本场全部牌堆里的旋律牌数量递增（原版 <c>WahSymphony</c>）。</summary>
+/// <summary>群体 Wah 攻击，伤害随本场全部牌堆里的 Cho/Ki 牌数量递增（v0.114.0 不再计 Wah）（原版 <c>WahSymphony</c>）。</summary>
 public sealed class WahSymphony : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
     private const decimal BaseDamage = 6m;
@@ -22,7 +22,7 @@ public sealed class WahSymphony : CardModel, ICardChoiceBaseValueProvider, ICard
         {
             int count = Owner?.PlayerCombatState?.AllPiles
                 .SelectMany(p => p.Cards)
-                .Count(c => c.Tags.Contains(CardTag.Wah) || c.Tags.Contains(CardTag.Cho) || c.Tags.Contains(CardTag.Ki)) ?? 0;
+                .Count(c => c.Tags.Contains(CardTag.Cho) || c.Tags.Contains(CardTag.Ki)) ?? 0;
             return BaseDamage + ExtraDamage * count;
         }
     }

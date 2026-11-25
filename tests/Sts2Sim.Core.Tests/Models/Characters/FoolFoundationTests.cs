@@ -35,7 +35,7 @@ public sealed class FoolFoundationTests : IDisposable
     [InlineData("three_hits_and_clone")]
     [InlineData("death_recovery")]
     [InlineData("escape_and_touchegg")]
-    [InlineData("destroy_after_impaled")]
+    [InlineData("dead_target_retrieves")]
     [InlineData("non_fool_shoot_auto_slot")]
     public async Task ArrowSubsystem_RecoveryCloningAndNonFoolSlot_MatchSource(string scenario)
     {
@@ -81,19 +81,21 @@ public sealed class FoolFoundationTests : IDisposable
 
         player.PlayerCombatState!.GainArrow();
         ArrowSlot slot = Assert.Single(player.PlayerCombatState.Arrows);
-        if (scenario == "destroy_after_impaled")
-            slot.DestroyAfterImpaled = true;
+        if (scenario == "dead_target_retrieves")
+        {
+            // v0.114.0：发射后、穿刺前目标已死，ImpaleTarget 直接回收箭矢（DestroyAfterImpaled/Destroyed 已删）。
+            Assert.Same(slot, await ArrowCmd.TryShootArrow(player, null));
+            Assert.Equal(ArrowStatus.Away, slot.Status);
+            await CreatureCmd.Kill(enemy);
+            await ArrowCmd.ImpaleTarget(enemy, slot, null, null);
+            Assert.Equal(ArrowStatus.Retrieved, slot.Status);
+            Assert.Empty(enemy.Powers.OfType<ImpaledPower>());
+            Assert.Equal(1, ArrowCmd.GetAvailableArrowCount(player));
+            return;
+        }
 
         FoolishShot starterShot = AddToPile<FoolishShot>(player, PileType.Hand);
         await room.Engine.PlayCardAsync(player, starterShot, enemy);
-
-        if (scenario == "destroy_after_impaled")
-        {
-            Assert.Equal(ArrowStatus.Destroyed, slot.Status);
-            Assert.Empty(enemy.Powers.OfType<ImpaledPower>());
-            Assert.Equal(0, ArrowCmd.GetAvailableArrowCount(player));
-            return;
-        }
 
         ImpaledPower impaled = Assert.Single(enemy.Powers.OfType<ImpaledPower>());
         Assert.Equal(3, impaled.HitCounter);
@@ -105,6 +107,9 @@ public sealed class FoolFoundationTests : IDisposable
                 player.PlayerCombatState!.Energy = 10;
                 StrikeFool strike1 = AddToPile<StrikeFool>(player, PileType.Hand);
                 Assert.NotNull(await room.Engine.PlayCardWithResultAsync(player, strike1, enemy));
+                Assert.Equal(2, impaled.HitCounter);
+                // v0.114.0：施加者判定看来源牌的持有者；无来源牌的攻击伤害不计数。
+                await CreatureCmd.Damage(state, [enemy], 1m, ValueProp.Move, player.Creature, null, null);
                 Assert.Equal(2, impaled.HitCounter);
 
                 CombatState cloneMid = state.Clone();
@@ -197,6 +202,8 @@ public sealed class FoolFoundationTests : IDisposable
                     PlayOrdinal = 2,
                 };
                 pcs.RecordCardPlayStarted(wahOuter);
+                // v0.114.0：PlayedThisTurn 读 CardPlaysStarted，出牌开始即算打出（结算完成前已为 true）。
+                Assert.True(MelodyCmd.PlayedWahThisTurn(player));
                 pcs.RecordCardPlayStarted(wahNested);
                 pcs.RecordCardPlayed(wahCard, isAutoPlay: true);
                 pcs.RecordCardPlayed(wahCard, isAutoPlay: false);
@@ -206,13 +213,25 @@ public sealed class FoolFoundationTests : IDisposable
                 Assert.True(MelodyCmd.PlayedWahThisTurn(player));
                 Assert.False(MelodyCmd.PlayedChoThisTurn(player));
                 Assert.Equal(1, MelodyCmd.MelodiesThisTurn(player));
-                Assert.Equal(2, MelodyCmd.MelodyCardsPlayedThisTurn(player));
 
                 var choKiCard = (TestTagCard)new TestTagCard(CardTag.Cho, CardTag.Ki).MutableClone();
                 choKiCard.AssignOwner(player);
+                // 只记完成、不记开始的出牌不再算旋律（v0.114.0 删除了 CardPlaysFinished 判定）。
                 pcs.RecordCardPlayed(choKiCard, isAutoPlay: true);
+                Assert.Equal(1, MelodyCmd.MelodiesThisTurn(player));
+                pcs.RecordCardPlayStarted(new CardPlay
+                {
+                    Card = choKiCard,
+                    Player = player,
+                    Target = null,
+                    ResultPile = PileType.Discard,
+                    Resources = new ResourceInfo { EnergyValue = 0, EnergySpent = 0 },
+                    IsAutoPlay = true,
+                    PlayIndex = 0,
+                    PlayCount = 1,
+                    PlayOrdinal = 3,
+                });
                 Assert.Equal(3, MelodyCmd.MelodiesThisTurn(player));
-                Assert.Equal(3, MelodyCmd.MelodyCardsPlayedThisTurn(player));
 
                 var turnEndProbe = (MelodyTurnEndProbePower)new MelodyTurnEndProbePower().MutableClone();
                 await PowerCmd.Apply(state, turnEndProbe, player.Creature, 1m, player.Creature, null);
@@ -222,7 +241,6 @@ public sealed class FoolFoundationTests : IDisposable
                 Assert.True(turnEndProbe.ObservedAtPlayerTurnEnd);
                 Assert.True(turnEndProbe.PlayedWahAtTurnEnd);
                 Assert.Equal(3, turnEndProbe.MelodiesAtTurnEnd);
-                Assert.Equal(3, turnEndProbe.MelodyCardsAtTurnEnd);
                 Assert.False(MelodyCmd.PlayedWahThisTurn(player));
                 Assert.Equal(0, MelodyCmd.MelodiesThisTurn(player));
                 break;
@@ -254,11 +272,11 @@ public sealed class FoolFoundationTests : IDisposable
                 Assert.Equal(6, Assert.Single(player.Creature.Powers.OfType<AimPower>()).Amount);
                 pcs.GainArrow();
                 TheShot shot = AddToPile<TheShot>(player, PileType.Hand);
-                shot.BuffFromFlorescence(2m);
                 int hpBeforeShot = enemy.CurrentHp;
                 await room.Engine.PlayCardAsync(player, shot, enemy);
-                // Base 10 * 2 + Aim 6 = 26 arrow damage; Aim consumed after attack.
+                // v0.114.0 TheShot: base 20 + Aim 6 = 26 arrow damage; Aim consumed after attack; exhausts.
                 Assert.Equal(26, hpBeforeShot - enemy.CurrentHp);
+                Assert.Equal(PileType.Exhaust, shot.Pile?.Type);
                 Assert.Empty(player.Creature.Powers.OfType<AimPower>());
 
                 // AutoPlayCmd cardModification upgrades drawn card before play.
@@ -315,7 +333,6 @@ public sealed class FoolFoundationTests : IDisposable
         public bool ObservedAtPlayerTurnEnd { get; private set; }
         public bool PlayedWahAtTurnEnd { get; private set; }
         public int MelodiesAtTurnEnd { get; private set; }
-        public int MelodyCardsAtTurnEnd { get; private set; }
 
         public override Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)
         {
@@ -324,7 +341,6 @@ public sealed class FoolFoundationTests : IDisposable
                 ObservedAtPlayerTurnEnd = true;
                 PlayedWahAtTurnEnd = MelodyCmd.PlayedWahThisTurn(p);
                 MelodiesAtTurnEnd = MelodyCmd.MelodiesThisTurn(p);
-                MelodyCardsAtTurnEnd = MelodyCmd.MelodyCardsPlayedThisTurn(p);
             }
             return Task.CompletedTask;
         }

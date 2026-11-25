@@ -661,7 +661,7 @@ public sealed class EventVisibleStateTests : IDisposable
             case "Rest":
                 foreach (Type type in new[] { typeof(RegalPillow), typeof(StoneHumidifier), typeof(TinyMailbox), typeof(DreamCatcher), typeof(Girya), typeof(PumpkinCandle), typeof(Sts2Sim.Core.Models.Relics.Wuppy) })
                     await RelicCmd.Obtain((RelicModel)ModelDb.Get(type).MutableClone(), player);
-                RestSiteDecision[] rest = [new RestSiteDecision.Heal(), new RestSiteDecision.Smith(cards[0]), new RestSiteDecision.Cook(), new RestSiteDecision.Hatch(), new LiftRestSiteOption(), new KindleRestSiteOption(), new CloneRestSiteOption(), new DigRestSiteOption(), new RestoreRestSiteOption(false), new EvolveRestSiteOption()];
+                RestSiteDecision[] rest = [new RestSiteDecision.Heal(), new RestSiteDecision.Smith(cards[0]), new RestSiteDecision.Cook(), new RestSiteDecision.Hatch(), new LiftRestSiteOption(), new KindleRestSiteOption(), new CloneRestSiteOption(player), new DigRestSiteOption(), new RestoreRestSiteOption(false), new EvolveRestSiteOption()];
                 projection = Pure(run, () => VisibleDecisionProjection.ForRestSite(player, rest)); bindings = rest;
                 Assert.Equal(10, projection.Metadata.DisplayOptions.Length);
                 Assert.False(projection.DescribeCandidate(rest[8]).IsEnabled);

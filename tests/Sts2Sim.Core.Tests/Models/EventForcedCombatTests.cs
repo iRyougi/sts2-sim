@@ -582,7 +582,7 @@ public sealed class EventForcedCombatTests : IDisposable
             (MonsterModel)ModelDb.Monster<ForcedCombatLifecycleMonster>().MutableClone());
         runState.PushRoom(room);
         await room.Enter(runState);
-        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue, default);
+        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue);
         room.Engine.CheckWinCondition();
         Assert.False(room.Engine.IsInProgress);
         Assert.True(room.Engine.Won);

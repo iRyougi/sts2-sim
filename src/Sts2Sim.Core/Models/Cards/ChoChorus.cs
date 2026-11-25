@@ -13,7 +13,7 @@ public sealed class ChoChorus : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 3;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Cho];
-    private decimal Block => IsUpgraded ? 15m : 12m;
+    private decimal Block => IsUpgraded ? 18m : 14m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block);
 
     protected override async Task OnPlay(CardPlay cardPlay)

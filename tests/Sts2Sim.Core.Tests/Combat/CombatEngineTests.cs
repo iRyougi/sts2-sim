@@ -193,7 +193,7 @@ public class CombatEngineTests
     {
         (CombatEngine engine, Player player, _) = MakeCombat("defeat_test");
         await engine.StartCombatAsync();
-        player.Creature.LoseHpInternal(999m, ValueProp.Move);
+        player.Creature.LoseHpInternal(999m);
 
         bool ended = engine.CheckWinCondition();
 

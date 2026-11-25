@@ -258,28 +258,38 @@ public class CreatureCmdTests
         if (second is not null) second.CombatState = state;
         target.GainBlockInternal(block);
 
+        // v0.114.0 空跑预览（ModifyDamage 之后的 12）与实际结果一致，且不改任何状态。
+        IReadOnlyList<DamageResult> preview = CreatureCmd.GetDamageResultsPreview(
+            state.RunState, state, target, 12m, ValueProp.Move, null, null!);
+        Assert.Equal((absorberHp, block, 30), (absorber.CurrentHp, target.Block, target.CurrentHp));
+
         var results = await CreatureCmd.Damage(state, [target], 10m, ValueProp.Move, null, null, null);
 
         int remaining = Math.Max(12 - absorberHp, 0);
         int blocked = Math.Min(block, remaining);
         int unblocked = remaining - blocked;
-        Assert.Equal(10m, probe.RawAmount);
+        Assert.Equal(preview, results);
+        // v0.114.0 把修正后的伤害传给 ModifyPreBlockDamageTarget（v0.113.1 传原始的 10）。
+        Assert.Equal(12m, probe.RawAmount);
+        // 结果顺序：原目标 → 格挡前转移 → 格挡后转移。
         Assert.Equal(redirectAgain ? 3 : 2, results.Count);
-        Assert.Same(absorber, results[0].Receiver);
-        Assert.Same(target, results[0].OriginalTarget);
-        Assert.Equal(12, results[0].IntendedHpLoss);
-        Assert.Equal(Math.Max(absorberHp - 12, 0), absorber.CurrentHp);
-        Assert.Same(second ?? target, results[1].Receiver);
+        DamageResult original = results[0];
+        Assert.Same(target, original.Receiver);
+        Assert.Same(absorber, results[1].Receiver);
         Assert.Same(target, results[1].OriginalTarget);
-        Assert.Equal(unblocked, results[1].IntendedHpLoss);
+        Assert.Equal(12, results[1].IntendedHpLoss);
+        Assert.Equal(Math.Max(absorberHp - 12, 0), absorber.CurrentHp);
+        DamageResult received = redirectAgain ? results[2] : original;
+        Assert.Same(second ?? target, received.Receiver);
+        Assert.Same(target, received.OriginalTarget);
+        Assert.Equal(unblocked, received.IntendedHpLoss);
         Assert.Equal(block - blocked, target.Block);
         Assert.Equal(30 - (redirectAgain ? Math.Max(unblocked - 2, 0) : unblocked), target.CurrentHp);
-        Assert.Equal(blocked, results[^1].BlockedDamage);
+        Assert.Equal(blocked, original.BlockedDamage);
         if (second is not null)
         {
             Assert.Equal(Math.Max(2 - unblocked, 0), second.CurrentHp);
-            Assert.Same(target, results[2].Receiver);
-            Assert.Equal(Math.Max(unblocked - 2, 0), results[2].IntendedHpLoss);
+            Assert.Equal(Math.Max(unblocked - 2, 0), original.IntendedHpLoss);
         }
     }
 
@@ -464,7 +474,8 @@ public class CreatureCmdTests
         Assert.Equal(3, result.BlockedDamage);
         Assert.Equal(6, result.UnblockedDamage);
         Assert.Equal(
-            ["modify-damage", "before", "finished", "modify-hp", "finished", "finished", "after", "finished"],
+            // v0.114.0：HP 修正先空跑，BeforeDamageReceived 之后才结算并通知修正者。
+            ["modify-damage", "modify-hp", "before", "finished", "finished", "finished", "after", "finished"],
             calls);
     }
 

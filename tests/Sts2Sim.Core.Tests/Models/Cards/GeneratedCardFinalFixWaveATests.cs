@@ -41,7 +41,7 @@ public sealed class GeneratedCardFinalFixWaveATests : IDisposable
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
             CombatSide.Enemy);
         Creature lethalTarget = room.Engine.State.HittableEnemies.First(enemy => enemy != survivor);
-        lethalTarget.LoseHpInternal(lethalTarget.CurrentHp - 1, ValueProp.Unblockable);
+        lethalTarget.LoseHpInternal(lethalTarget.CurrentHp - 1);
         int survivorHpBefore = survivor.CurrentHp;
 
         DyingStar card = AddToHand<DyingStar>(player);

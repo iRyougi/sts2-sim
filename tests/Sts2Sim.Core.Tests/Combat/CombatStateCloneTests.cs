@@ -139,8 +139,8 @@ public sealed class CombatStateCloneTests
         clone.RunState.Rng.CombatCardGeneration.NextInt(100);
         clonedEnemy.Monster!.Rng.NextInt(100);
         clonedPlayer.PlayerRng.Rewards.NextInt(100);
-        clonedPlayer.Creature.LoseHpInternal(7m, ValueProp.Unblockable);
-        clonedEnemy.LoseHpInternal(9m, ValueProp.Unblockable);
+        clonedPlayer.Creature.LoseHpInternal(7m);
+        clonedEnemy.LoseHpInternal(9m);
         clonedPlayer.PlayerCombatState.DiscardPile.AddInternal(clonedCard);
         var clonedStrength = (StrengthPower)ModelDb.Power<StrengthPower>().MutableClone();
         clonedStrength.ApplyInternal(clonedEnemy, 3m);
@@ -153,8 +153,8 @@ public sealed class CombatStateCloneTests
         Assert.Same(originalPlayer.PlayerCombatState.Hand, originalCard.Pile);
         Assert.Empty(originalEnemy.Powers);
 
-        originalPlayer.Creature.LoseHpInternal(5m, ValueProp.Unblockable);
-        originalEnemy.LoseHpInternal(4m, ValueProp.Unblockable);
+        originalPlayer.Creature.LoseHpInternal(5m);
+        originalEnemy.LoseHpInternal(4m);
         originalPlayer.PlayerCombatState.DiscardPile.AddInternal(originalCard);
 
         Assert.Equal(clonedPlayer.Character.StartingHp - 7, clonedPlayer.Creature.CurrentHp);
@@ -1174,6 +1174,7 @@ public sealed class CombatStateCloneTests
             Assert.Equal(expectedCreature.CurrentHp, actualCreature.CurrentHp);
             Assert.Equal(expectedCreature.MaxHp, actualCreature.MaxHp);
             Assert.Equal(expectedCreature.Block, actualCreature.Block);
+            Assert.Equal(expectedCreature.IsAttacking, actualCreature.IsAttacking);
             Assert.Same(actual, actualCreature.CombatState);
             if (expectedCreature.Player is not null)
             {

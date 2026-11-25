@@ -31,7 +31,7 @@ internal static class CombatPrivateStateRegistry
         "BeatingRemnant._hpLostThisTurn", "BeltBuckle._dexterityApplied",
         "BookOfFiveRings._cardsAdded", "BurningSticks._wasUsedThisCombat",
         "CentennialPuzzle._triggeredThisCombat", "GalacticDust._starsSpent",
-        "HappyFlower._turnCounter", "JossPaper._cardsExhausted", "JossPaper._etherealCount",
+        "HappyFlower._turnCounter", "HappyFlower._grantEnergyThisTurn", "JossPaper._cardsExhausted", "JossPaper._etherealCount",
         "Kunai._attacksThisTurn", "Kusarigama._attacksThisTurn", "LavaLamp._tookDamageThisCombat",
         "LetterOpener._skillsThisTurn", "LizardTail._wasUsed", "MiniRegent._triggeredThisTurn",
         "BathRobes._wasUsed",
@@ -50,7 +50,7 @@ internal static class CombatPrivateStateRegistry
         "BoneTea._combatsLeft", "EmberTea._combatsLeft", "TeaOfDiscourtesy._combatsLeft",
         "HistoryCourse._lastAttack", "HistoryCourse._lastAttackTurn",
         "HistoryCourse._previousAttack", "HistoryCourse._previousAttackTurn",
-        "FakeHappyFlower._turnsSeen", "FakeOrichalcum._shouldTrigger",
+        "FakeHappyFlower._turnsSeen", "FakeHappyFlower._grantEnergyThisTurn", "FakeOrichalcum._shouldTrigger",
         "FakeVenerableTeaSet._isArmed",
         "WongosMysteryTicket._combatsFinished", "WongosMysteryTicket._gaveRelics",
         "AutomationPower._cardsLeft", "IllusionPower._followUpStateId", "IllusionPower._isReviving",
@@ -113,16 +113,14 @@ internal static class CombatPrivateStateRegistry
         "GeneticAlgorithm._increase",
         // #929 G1: Fool arrow/shot state
         "ImpaledPower._arrowSources", "ImpaledPower._hitCounter",
-        "TheShot._cardsExhaustedByFlorescence",
         // #929 G2: Bounce last-turn state and YahPower turn trigger flag
         "Bounce._lastFinishedPlayerTurn",
         "YahPower._triggeredThisTurn",
         // #929 G3: EncorePower and LullabyPower state
         "EncorePower._cardsBeingPlayed", "EncorePower._numberOfCardsPlayedSinceApplied",
         "LullabyPower._proccdThisTurn",
-        // #929 G4: EnnuiPower and MythicFormPower state
+        // #929 G4: EnnuiPower state (MythicFormPower upgrade count removed in v0.114.0, #1109)
         "EnnuiPower._sadnessAmount",
-        "MythicFormPower._upgradedCount",
         // #929 G5: ShowOff persistent scaling and ShowOffPower bound instance
         "ShowOff._currentAim", "ShowOff._increasedAim",
         "ShowOffPower._showOffInstance",
@@ -372,7 +370,7 @@ internal static class CombatPrivateStateRegistry
         "Synchronize._focusPerDistinctOrb", "Synthesis._damage", "TeslaCoil._damage", "Thunder._power",
         "Turbo._energy", "Uproar._damage",
         // Fool G1 card literals, fixed by model ID and upgrade level.
-        "StrikeFool._damage", "DefendFool._block", "FoolishShot._damage", "Joy._energy", "TheShot._extraDamage",
+        "StrikeFool._damage", "DefendFool._block", "FoolishShot._damage", "Joy._energy",
     ];
 
     public static bool TryGetClassification(

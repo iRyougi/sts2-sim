@@ -59,8 +59,8 @@ public sealed class FoolCrossColorTests : IDisposable
                     typeof(KiRest), typeof(KiVerse), typeof(KiWhip), typeof(LockedIn),
                     typeof(FoolishShot), typeof(LostLute), typeof(Lullaby), typeof(MelodicShot),
                     typeof(Motif), typeof(MourningBlow), typeof(MythicForm), typeof(Nail),
-                    typeof(Nock), typeof(PunchOfJoy), typeof(QuickShot), typeof(Quietus),
-                    typeof(Quiver), typeof(RainShot), typeof(RapidShot), typeof(Recall),
+                    typeof(Nock), typeof(Optimism), typeof(PunchOfJoy), typeof(QuickShot), typeof(Quietus),
+                    typeof(Quiver), typeof(RainShot), typeof(TwinShot), typeof(Recall),
                     typeof(RepeatShot), typeof(RhythmStrike), typeof(Rummage), typeof(SelfDeprecate),
                     typeof(SerratedArrows), typeof(ShowOff), typeof(Simpleton), typeof(SkyShot),
                     typeof(SongPath), typeof(SorrowfulStrike), typeof(SteadyCadence), typeof(StrikeFool),
@@ -77,19 +77,20 @@ public sealed class FoolCrossColorTests : IDisposable
                 ];
                 Fool fool = ModelDb.Character<Fool>();
                 IReadOnlyList<CardModel> actual = fool.CardPool.AllCards;
-                Assert.Equal(90, expectedPool.Length);
+                // v0.114.0: 91 cards (Optimism added after Nock; TwinShot takes RapidShot's slot).
+                Assert.Equal(91, expectedPool.Length);
                 Assert.Equal(expectedPool, actual.Select(card => card.GetType()));
-                Assert.Equal(90, actual.Select(card => card.Id).Distinct().Count());
+                Assert.Equal(91, actual.Select(card => card.Id).Distinct().Count());
                 Assert.Equal(multiplayerOnly, actual.Where(c => c.IsMultiplayerOnly).Select(c => c.GetType()));
 
                 PlayerUnlockState allUnlocked = PlayerUnlockState.AllUnlocked();
-                Assert.Equal(84, fool.CardPool.GetUnlockedCards(allUnlocked, isMultiplayer: false).Count());
+                Assert.Equal(85, fool.CardPool.GetUnlockedCards(allUnlocked, isMultiplayer: false).Count());
                 Assert.Equal(expectedPool.Where(t => !multiplayerOnly.Contains(t)),
                     fool.CardPool.GetUnlockedCards(allUnlocked, isMultiplayer: false).Select(c => c.GetType()));
 
                 (string Epoch, Type[] Gated)[] epochs =
                 [
-                    (FoolCardPool.Fool2EpochId, [typeof(ArrowStab), typeof(Quiver), typeof(BlossomShot)]),
+                    (FoolCardPool.Fool2EpochId, [typeof(ArrowStab), typeof(Honing), typeof(BlossomShot)]),
                     (FoolCardPool.Fool5EpochId, [typeof(WahTouch), typeof(KiVerse), typeof(ChoLimbs)]),
                     (FoolCardPool.Fool7EpochId, [typeof(SorrowfulStrike), typeof(Ennui), typeof(Growth)]),
                 ];
@@ -259,7 +260,7 @@ public sealed class FoolCrossColorTests : IDisposable
                     await combat.Engine.PlayCardAsync(sPlayer, AddToPile<Splash>(sPlayer, PileType.Hand), null);
                     splashSignatures.Add(string.Join("/", capture.LastCandidates.Select(c => c.Id.Entry)));
                 }
-                Assert.Equal("WAH_BLAST/RAPID_SHOT/ASTRAL_PULSE | ROCKET_PUNCH/DEFILE/CINDER | ANGER/GO_FOR_THE_EYES/ARROW_STAB | SKY_SHOT/VEILPIERCER/METEOR_STRIKE", string.Join(" | ", splashSignatures));
+                Assert.Equal("WAH_BLAST/TWIN_SHOT/ASTRAL_PULSE | ROCKET_PUNCH/DEFILE/CINDER | ANGER/GO_FOR_THE_EYES/ARROW_STAB | SKY_SHOT/VEILPIERCER/METEOR_STRIKE", string.Join(" | ", splashSignatures));
 
                 // Orobas SeaGlass enumerates all 6 playable characters including Fool and can select FoolCardPool.
                 var orobasCanonical = (Orobas)ModelDb.Event<Orobas>().MutableClone();

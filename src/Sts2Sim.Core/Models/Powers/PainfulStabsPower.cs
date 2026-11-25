@@ -8,15 +8,12 @@ using Sts2Sim.Core.Entities.Powers;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.ValueProps;
 
+/// <summary>v0.114.0 删除了 <c>ShouldPowerBeRemovedAfterOwnerDeath</c> 与 <c>ShouldCreatureBeRemovedFromCombatAfterDeath</c>
+/// 两个 override：持有者在攻击中死亡时，能力由攻击/行动收尾统一清理，AfterAttack 仍能看到本次攻击。</summary>
 public sealed class PainfulStabsPower : PowerModel
 {
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;
-
-    public override bool ShouldPowerBeRemovedAfterOwnerDeath() => false;
-
-    public override bool ShouldCreatureBeRemovedFromCombatAfterDeath(Creature creature) =>
-        creature != Owner;
 
     public override async Task AfterAttack(AttackCommand command)
     {

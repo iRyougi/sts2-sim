@@ -189,6 +189,12 @@ internal static class TransplantSavedProperties
         }
         // Native [SavedProperty] setters recompute RelicModel.Status on load; the field writes above bypass them.
         (model as RelicModel)?.RefreshStatusAfterLoad();
+        // Native loading [SavedProperty] CurrentHp runs its setter, which sets the simulator's _currentHpSet flag
+        // (TransplantFieldRegistry classifies it Derived for exactly that reason). The field write above bypasses the
+        // setter; until v0.114.0 the flag was set later by the HP hook of the combat-start summon, which now uses the
+        // internal setters (#1110), so the flag is restored here (the imported value always carries CurrentHp).
+        if (model is Wuppy wuppy)
+            wuppy.CurrentHp = wuppy.CurrentHp; // deliberate self-assignment: the setter's side effect sets _currentHpSet
         if (model is SpoilsMap && !sawSpoilsCoord)
             throw new TransplantMappingException($"{path}.Props.spoils_coord",
                 "Missing native cross-room coordinate.");

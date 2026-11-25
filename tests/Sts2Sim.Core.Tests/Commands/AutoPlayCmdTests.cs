@@ -56,7 +56,7 @@ public sealed class AutoPlayCmdTests : IDisposable
         unplayable.ExhaustOnNextPlay = true;
         AddTo<StrikeRegent>(endingPlayer, PileType.Draw, CardPilePosition.Top);
         Creature enemy = endingRoom.Engine.State.HittableEnemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         await AutoPlayCmd.FromTopOfDrawPile(endingRoom.Engine.State, endingPlayer, count: 3);
         Assert.True(enemy.IsDead);
         Assert.Equal(1, endingPlayer.PlayerCombatState!.CardsPlayedThisTurn);
@@ -73,7 +73,7 @@ public sealed class AutoPlayCmdTests : IDisposable
         TheBomb skippedBomb = AddTo<TheBomb>(batchPlayer, PileType.Draw);
         skippedBomb.ExhaustOnNextPlay = true;
         Creature batchEnemy = batchRoom.Engine.State.HittableEnemies.Single();
-        batchEnemy.LoseHpInternal(batchEnemy.CurrentHp - 1, default);
+        batchEnemy.LoseHpInternal(batchEnemy.CurrentHp - 1);
         await AutoPlayCmd.FromCards(batchRoom.Engine.State, batchPlayer, [strike, skippedBomb]);
         Assert.True(batchEnemy.IsDead);
         Assert.Equal(1, batchPlayer.PlayerCombatState!.CardsPlayedThisTurn);

@@ -140,7 +140,12 @@ public sealed class V01131PetTests : IDisposable
             {
                 await ObtainWuppy(player, maxHp: 60);
                 player.Relics.OfType<WuppyRelic>().Single().CurrentHp = 0;
+                AddToDeck<Sts2Sim.Core.Models.Cards.Melancholy>(player);
                 CombatRoom room = await EnterCombat(run);
+                // v0.114.0 (#1110): a Wuppy that starts the fight dead no longer lowers Melancholy's cost.
+                var melancholy = player.PlayerCombatState!.Hand.Cards.Concat(player.PlayerCombatState.DrawPile.Cards)
+                    .OfType<Sts2Sim.Core.Models.Cards.Melancholy>().Single();
+                Assert.Equal(3, melancholy.EnergyCost);
                 Creature pet = Assert.Single(player.PlayerCombatState!.Pets);
                 Assert.True(pet.IsDead, ctx);
                 Assert.Contains(pet, room.Engine.State.Allies);

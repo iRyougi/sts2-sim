@@ -7,7 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/iRyougi/sts2-sim/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/iRyougi/sts2-sim/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/iRyougi/sts2-sim?label=release&color=blue)](https://github.com/iRyougi/sts2-sim/releases/latest)
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/9.0)
-[![STS2 v0.113.1](https://img.shields.io/badge/game-STS2%20v0.113.1-8B0000)](#)
+[![STS2 v0.114.0](https://img.shields.io/badge/game-STS2%20v0.114.0-8B0000)](#)
 [![License: MIT](https://img.shields.io/github/license/iRyougi/sts2-sim?color=green)](LICENSE)
 [![保真差异](https://img.shields.io/github/issues/iRyougi/sts2-sim/%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82?label=open%20fidelity%20issues&color=orange)](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+is%3Aopen+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82)
 [![Stars](https://img.shields.io/github/stars/iRyougi/sts2-sim?style=flat&logo=github)](https://github.com/iRyougi/sts2-sim/stargazers)
@@ -26,11 +26,11 @@ This project is not affiliated with or endorsed by Mega Crit. It contains no gam
 - **A port of the game logic, not a re-design.** Game rules are ported from the game's own code as literally as practical, so behaviour can be checked method by method. Doc comments cite the original type they come from (for example `MegaCrit.Sts2.Core.Commands.CardCmd`).
 - **Seed-exact RNG.** The random number generator and seed derivation follow the game, with the goal that the same seed and the same choices reproduce the same run as the game client, draw for draw.
 - **Cloneable.** Combat state can be cloned (`CombatState.Clone()`) for search; RNG streams (`Rng`, `RunRngSet`, `PlayerRngSet`) can be copied exactly (`CloneExact`) or with fresh randomness (`CloneReseeded`) for sampling. Deep cloning of a whole run (`RunState`) is not supported yet.
-- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of all six characters in game v0.113.1 (public beta) and all encounters and events of the four acts are ported; remaining omissions are listed below.
+- **Full runs.** Map generation, Neow and other ancients, combat, elites and bosses, events, shops, rest sites, treasure, rewards, potions, relics, enchantments, and ascension levels 0–10. All cards and potions of all six characters in game v0.114.0 (public beta) and all encounters and events of the four acts are ported; remaining omissions are listed below.
 
 | | |
 |---|---|
-| Game baseline | STS2 v0.113.1 public beta (release commit `d09d48e5`, `main_assembly_hash 358281912`) |
+| Game baseline | STS2 v0.114.0 public beta (release commit `a7b9a9c0`, `main_assembly_hash -1918903744`) |
 | Characters | Defect, Fool, Ironclad, Necrobinder, Regent, Silent |
 | Acts | Overgrowth, Underdocks, Hive, Glory |
 | Multiplayer | Not supported |

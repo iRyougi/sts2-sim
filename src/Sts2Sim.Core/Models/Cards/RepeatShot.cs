@@ -7,7 +7,7 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class RepeatShot : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
-    private decimal Damage => IsUpgraded ? 20m : 15m;
+    private decimal Damage => IsUpgraded ? 16m : 13m;
 
     public override CardType Type => CardType.Attack;
     public override CardRarity Rarity => CardRarity.Rare;

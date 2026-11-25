@@ -160,7 +160,7 @@ public sealed class AutoPlayCardTests : IDisposable
         Catastrophe card = AddToHand<Catastrophe>(player);
         if (upgraded) card.Upgrade();
         Creature enemy = room.Engine.State.HittableEnemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         int playsBefore = player.PlayerCombatState.CardsPlayedThisTurn;
         int energyBefore = player.PlayerCombatState.Energy;
         int shuffleBefore = player.RunState.Rng.CombatCardSelection.Counter;
@@ -259,7 +259,7 @@ public sealed class AutoPlayCardTests : IDisposable
         }
 
         Creature enemy = room.Engine.State.HittableEnemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         BeatDown card = AddToHand<BeatDown>(player);
         if (upgraded) card.Upgrade();
         int playsBefore = player.PlayerCombatState!.CardsPlayedThisTurn;
@@ -279,7 +279,7 @@ public sealed class AutoPlayCardTests : IDisposable
         var revivalRoom = new CombatRoom(() => (TestSubject)ModelDb.Monster<TestSubject>().MutableClone());
         await revivalRoom.Enter(revivalRun);
         Creature subject = revivalRoom.Engine.State.HittableEnemies.Single();
-        subject.LoseHpInternal(subject.CurrentHp - 1, default);
+        subject.LoseHpInternal(subject.CurrentHp - 1);
         await AddToHand<StrikeRegent>(revivalPlayer).PlayAsync(subject);
         Assert.True(subject.GetPower<AdaptablePower>()!.IsReviving);
         Assert.False(revivalRoom.Engine.IsOverOrEnding);
@@ -333,7 +333,7 @@ public sealed class AutoPlayCardTests : IDisposable
         DecisionsDecisions endingCard = AddToHand<DecisionsDecisions>(endingPlayer);
         endingRoom.Engine.State.CardSelectionSource = new LegacySelectionDecisionSource();
         Creature enemy = endingRoom.Engine.State.HittableEnemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, default);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         await PowerCmd.Apply<SerpentFormPower>(endingRoom.Engine.State, endingPlayer.Creature,
             1m, endingPlayer.Creature, null);
 
@@ -350,7 +350,7 @@ public sealed class AutoPlayCardTests : IDisposable
             CardPileCmd.Remove(c);
         TheBomb burstBomb = AddToHand<TheBomb>(burstPlayer);
         Creature burstEnemy = burstRoom.Engine.State.HittableEnemies.Single();
-        burstEnemy.LoseHpInternal(burstEnemy.CurrentHp - 1, default);
+        burstEnemy.LoseHpInternal(burstEnemy.CurrentHp - 1);
         await PowerCmd.Apply<SerpentFormPower>(burstRoom.Engine.State, burstPlayer.Creature,
             1m, burstPlayer.Creature, null);
         await PowerCmd.Apply<BurstPower>(burstRoom.Engine.State, burstPlayer.Creature,

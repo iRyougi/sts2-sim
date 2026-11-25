@@ -396,9 +396,10 @@ public sealed partial class CombatState
 
         clone.SetMaxHpInternal(source.MaxHp);
         clone.HealInternal(source.MaxHp);
-        clone.LoseHpInternal(source.MaxHp - source.CurrentHp, ValueProp.Unblockable);
+        clone.LoseHpInternal(source.MaxHp - source.CurrentHp);
         clone.GainBlockInternal(source.Block);
         clone.RestoreCumulativeHpLostFrom(source);
+        clone.IsAttacking = source.IsAttacking;
         return clone;
     }
 

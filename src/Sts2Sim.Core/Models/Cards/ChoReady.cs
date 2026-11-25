@@ -14,8 +14,8 @@ public sealed class ChoReady : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Cho];
-    private decimal Block => IsUpgraded ? 11m : 8m;
-    private decimal AimAmount => IsUpgraded ? 5m : 3m;
+    private decimal Block => IsUpgraded ? 9m : 7m;
+    private decimal AimAmount => IsUpgraded ? 4m : 3m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block);
 
     protected override async Task OnPlay(CardPlay cardPlay)

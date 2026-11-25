@@ -538,7 +538,7 @@ public sealed class ShopRelicBatch1Tests : IDisposable
     public async Task DragonFruit_GainsOneMaxAndCurrentHpOnlyAfterItsOwnerGainsGold()
     {
         (_, Player owner, Player other) = CreateTwoPlayerRun("dragon-fruit");
-        owner.Creature.LoseHpInternal(10m, ValueProp.Unpowered);
+        owner.Creature.LoseHpInternal(10m);
         int maxHpBefore = owner.Creature.MaxHp;
         int currentHpBefore = owner.Creature.CurrentHp;
 
@@ -564,7 +564,7 @@ public sealed class ShopRelicBatch1Tests : IDisposable
     public async Task LeesWaffle_IncreasesMaxHpBeforeHealingToTheNewFullAmount()
     {
         (_, Player player) = CreateRun("lees-waffle");
-        player.Creature.LoseHpInternal(20m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(20m);
         int maxHpBefore = player.Creature.MaxHp;
 
         await Obtain<LeesWaffle>(player);

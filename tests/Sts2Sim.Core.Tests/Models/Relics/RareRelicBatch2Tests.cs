@@ -167,8 +167,7 @@ public sealed class RareRelicBatch2Tests : IDisposable
         await lowRoom.Enter(lowRun);
         int halfHp = lowPlayer.Creature.MaxHp / 2;
         lowPlayer.Creature.LoseHpInternal(
-            lowPlayer.Creature.CurrentHp - halfHp,
-            ValueProp.Unpowered);
+            lowPlayer.Creature.CurrentHp - halfHp);
 
         await Hook.AfterCombatVictory(lowRoom.Engine.State);
 
@@ -180,8 +179,7 @@ public sealed class RareRelicBatch2Tests : IDisposable
         await highRoom.Enter(highRun);
         int aboveHalfHp = highPlayer.Creature.MaxHp / 2 + 1;
         highPlayer.Creature.LoseHpInternal(
-            highPlayer.Creature.CurrentHp - aboveHalfHp,
-            ValueProp.Unpowered);
+            highPlayer.Creature.CurrentHp - aboveHalfHp);
 
         await Hook.AfterCombatVictory(highRoom.Engine.State);
 

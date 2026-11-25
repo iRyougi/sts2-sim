@@ -149,7 +149,7 @@ public sealed class SharedEventIntegrationTests : IDisposable
         Player player = run.Players[0];
         if (!victory)
         {
-            player.Creature.LoseHpInternal(player.Creature.CurrentHp - 1, default);
+            player.Creature.LoseHpInternal(player.Creature.CurrentHp - 1);
             foreach (CardModel card in player.Deck.Cards.ToArray()) CardPileCmd.Remove(card);
         }
         var potion = player.AddPotionInternal(ModelDb.Potion<FoulPotion>());

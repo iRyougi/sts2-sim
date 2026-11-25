@@ -7,7 +7,7 @@ namespace Sts2Sim.Core.Models.Cards;
 /// <summary>箭矢攻击伤害按百分比乘算提高（原版 <c>Honing</c>）。</summary>
 public sealed class Honing : CardModel, ICardChoiceBaseValueProvider
 {
-    private const decimal PowerAmount = 50m;
+    private const decimal PowerAmount = 100m;
 
     public override CardType Type => CardType.Power;
     public override CardRarity Rarity => CardRarity.Rare;

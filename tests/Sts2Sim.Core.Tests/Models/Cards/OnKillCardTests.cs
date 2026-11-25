@@ -40,7 +40,7 @@ public sealed class OnKillCardTests : IDisposable
         Creature lastEnemy = room.Engine.State.AddMonster(
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
             Sts2Sim.Core.Combat.CombatSide.Enemy);
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         PlayerCombatState playerCombatState = player.PlayerCombatState!;
         int starsBefore = playerCombatState.Stars;
         decimal starsGainedBefore = playerCombatState.StarsGainedThisTurn;
@@ -54,7 +54,7 @@ public sealed class OnKillCardTests : IDisposable
         Assert.True(playerCombatState.StarsGainedThisTurn == starsGainedBefore + 5m,
             $"seed={seed}, kill=non-final: expected {starsGainedBefore + 5m} stars gained, actual {playerCombatState.StarsGainedThisTurn}");
 
-        lastEnemy.LoseHpInternal(lastEnemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
+        lastEnemy.LoseHpInternal(lastEnemy.CurrentHp - 1);
         playerCombatState.ResetEnergy();
         KnockoutBlow finalCard = AddToHand<KnockoutBlow>(player);
         finalCard.Upgrade();
@@ -92,7 +92,7 @@ public sealed class OnKillCardTests : IDisposable
         HandOfGreed card = AddToHand<HandOfGreed>(player);
         card.Upgrade();
         Creature enemy = room.Engine.State.HittableEnemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp - 1, Sts2Sim.Core.ValueProps.ValueProp.Move);
+        enemy.LoseHpInternal(enemy.CurrentHp - 1);
         if (killedMinion)
         {
             // A lone minion leaves no living primary enemy: native combat is already ending and skips the play.

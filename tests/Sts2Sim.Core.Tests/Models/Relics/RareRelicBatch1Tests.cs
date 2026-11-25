@@ -479,7 +479,7 @@ public sealed class RareRelicBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("lizard-tail-event");
         await Obtain<LizardTail>(player);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 10m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 10m);
         var adventure = (JungleMazeAdventure)ModelDb.Event<JungleMazeAdventure>().MutableClone();
         adventure.AssignOwner(player);
         adventure.BeginEvent(runState);

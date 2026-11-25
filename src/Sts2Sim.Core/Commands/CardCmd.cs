@@ -77,6 +77,7 @@ public static class CardCmd
         }
     }
 
+    /// <summary>v0.114.0 原版 <c>CardCmd.Downgrade</c>：降一级。</summary>
     public static void Downgrade(Models.CardModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
@@ -86,6 +87,18 @@ public static class CardCmd
         }
 
         card.Downgrade();
+    }
+
+    /// <summary>v0.114.0 原版 <c>CardCmd.RemoveAllUpgrades</c>：移除全部升级，保留附魔与苦难。</summary>
+    public static void RemoveAllUpgrades(Models.CardModel card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        if (card.CombatState?.IsEnding() == true)
+        {
+            return;
+        }
+
+        card.RemoveAllUpgrades();
     }
 
     /// <summary>Applies Retain only until this turn's hand flush has completed.</summary>

@@ -35,7 +35,7 @@ public sealed class AmbergrisTests : IDisposable
     public async Task UseOutOfCombat_HealsHalfMaxHpRoundedDown_WithoutPower()
     {
         Player player = CreatePlayer("task11-ambergris-out");
-        player.Creature.LoseHpInternal(65m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(65m);
         int hpBefore = player.Creature.CurrentHp;
         Ambergris potion = (Ambergris)player.AddPotionInternal(ModelDb.Potion<Ambergris>());
 
@@ -53,7 +53,7 @@ public sealed class AmbergrisTests : IDisposable
     {
         (Player player, var room) = await Task11CombatTestSupport.CreateCombatAsync(
             "task11-ambergris-live");
-        player.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(30m);
         Ambergris potion = (Ambergris)player.AddPotionInternal(ModelDb.Potion<Ambergris>());
         int hpBeforePotion = player.Creature.CurrentHp;
         int roundBefore = room.Engine.State.RoundNumber;
@@ -103,7 +103,7 @@ public sealed class AmbergrisTests : IDisposable
         var crossRoom = new CombatRoom(
             () => (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await crossRoom.Enter(crossRun);
-        targetPlayer.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        targetPlayer.Creature.LoseHpInternal(30m);
         int targetHpBefore = targetPlayer.Creature.CurrentHp;
         int ownerHpBefore = potionOwner.Creature.CurrentHp;
         PotionModel crossPotion = potionOwner.AddPotionInternal(ModelDb.Potion<Ambergris>());
@@ -145,9 +145,9 @@ public sealed class AmbergrisTests : IDisposable
     {
         (Player player, var room) = await Task11CombatTestSupport.CreateCombatAsync(
             "task11-ambergris-ended");
-        player.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(30m);
         Creature enemy = Assert.Single(room.Engine.State.Enemies);
-        enemy.LoseHpInternal(enemy.CurrentHp, ValueProp.Unpowered);
+        enemy.LoseHpInternal(enemy.CurrentHp);
         Assert.True(room.Engine.CheckWinCondition());
         Assert.False(room.Engine.State.IsLiveCombat());
         int hpBefore = player.Creature.CurrentHp;

@@ -164,7 +164,7 @@ public sealed class GeneratedCardRepairTask2Tests : IDisposable
         Creature becameUnhittable = room.Engine.State.Enemies[1];
         Creature hittable = room.Engine.State.Enemies[2];
         Creature? laterTarget = mutation == "none" ? null : room.Engine.State.Enemies[3];
-        defeated.LoseHpInternal(defeated.CurrentHp - 1m, ValueProp.Unblockable);
+        defeated.LoseHpInternal(defeated.CurrentHp - 1m);
         await PowerCmd.Apply<Task2UnhittableAfterDamagePower>(
             room.Engine.State,
             becameUnhittable,
@@ -285,7 +285,7 @@ public sealed class GeneratedCardRepairTask2Tests : IDisposable
         Player owner = players[0];
         Player livingAlly = players[1];
         Player deadAlly = players[2];
-        deadAlly.Creature.LoseHpInternal(deadAlly.Creature.CurrentHp, ValueProp.Unblockable);
+        deadAlly.Creature.LoseHpInternal(deadAlly.Creature.CurrentHp);
         Creature nonPlayerAlly = room.Engine.State.AddMonster(
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
             CombatSide.Player);

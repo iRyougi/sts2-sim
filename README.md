@@ -7,7 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/iRyougi/sts2-sim/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white)](https://github.com/iRyougi/sts2-sim/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/iRyougi/sts2-sim?label=release&color=blue)](https://github.com/iRyougi/sts2-sim/releases/latest)
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/9.0)
-[![STS2 v0.113.1](https://img.shields.io/badge/%E6%B8%B8%E6%88%8F%E5%9F%BA%E7%BA%BF-STS2%20v0.113.1-8B0000)](#)
+[![STS2 v0.114.0](https://img.shields.io/badge/%E6%B8%B8%E6%88%8F%E5%9F%BA%E7%BA%BF-STS2%20v0.114.0-8B0000)](#)
 [![License: MIT](https://img.shields.io/github/license/iRyougi/sts2-sim?color=green)](LICENSE)
 [![保真差异](https://img.shields.io/github/issues/iRyougi/sts2-sim/%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82?label=%E6%9C%AA%E4%BF%AE%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82&color=orange)](https://github.com/iRyougi/sts2-sim/issues?q=is%3Aissue+is%3Aopen+label%3A%E4%BF%9D%E7%9C%9F%E5%B7%AE%E5%BC%82)
 [![Stars](https://img.shields.io/github/stars/iRyougi/sts2-sim?style=flat&logo=github)](https://github.com/iRyougi/sts2-sim/stargazers)
@@ -26,11 +26,11 @@
 - **照游戏代码移植，不是重新设计。** 游戏规则尽可能逐字从游戏自身的代码移植过来，因此可以逐个方法对照核对。文档注释会标出对应的原始类型（例如 `MegaCrit.Sts2.Core.Commands.CardCmd`）。
 - **随机数与种子一致。** 随机数生成器和种子派生都照游戏实现，目标是：同样的种子、同样的选择，得到和游戏客户端逐次抽取都一致的对局。
 - **可克隆。** 战斗状态可以克隆（`CombatState.Clone()`），用于搜索；随机数流（`Rng`、`RunRngSet`、`PlayerRngSet`）可以原样复制（`CloneExact`），也可以换一套新随机数复制（`CloneReseeded`），用于采样。整局状态（`RunState`）目前还不支持深克隆。
-- **完整对局。** 地图生成、涅奥等先古之民、战斗、精英与 Boss、事件、商店、休息处、宝箱、奖励、药水、遗物、附魔，以及进阶 0–10 级。游戏 v0.113.1（public-beta）中全部六个角色的全部卡牌与药水、四幕的全部遭遇与事件都已移植；少数机制与后期内容差异见下文。
+- **完整对局。** 地图生成、涅奥等先古之民、战斗、精英与 Boss、事件、商店、休息处、宝箱、奖励、药水、遗物、附魔，以及进阶 0–10 级。游戏 v0.114.0（public-beta）中全部六个角色的全部卡牌与药水、四幕的全部遭遇与事件都已移植；少数机制与后期内容差异见下文。
 
 | | |
 |---|---|
-| 游戏基线 | STS2 v0.113.1 public-beta（release commit `d09d48e5`，`main_assembly_hash 358281912`） |
+| 游戏基线 | STS2 v0.114.0 public-beta（release commit `a7b9a9c0`，`main_assembly_hash -1918903744`） |
 | 角色 | Defect, Fool, Ironclad, Necrobinder, Regent, Silent |
 | 幕 | Overgrowth、Underdocks、Hive、Glory |
 | 多人模式 | 不支持 |

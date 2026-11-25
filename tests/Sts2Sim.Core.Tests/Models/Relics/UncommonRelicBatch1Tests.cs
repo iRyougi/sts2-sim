@@ -405,7 +405,7 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("eternal-feather");
         await Obtain<EternalFeather>(player);
-        player.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(30m);
         int hpBefore = player.Creature.CurrentHp;
         int expectedHeal = 3 * (player.Deck.Cards.Count / 5);
 
@@ -419,7 +419,7 @@ public sealed class UncommonRelicBatch1Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("eternal-feather-dead-owner");
         await Obtain<EternalFeather>(player);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp);
         Assert.False(player.Creature.IsAlive);
 
         await new RestSiteRoom().Enter(runState);

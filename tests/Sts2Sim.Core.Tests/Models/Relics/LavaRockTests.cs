@@ -72,7 +72,7 @@ public sealed class LavaRockTests : IDisposable
             RoomType.Boss);
         runState.PushRoom(room);
         await room.Enter(runState);
-        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue, default);
+        room.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue);
         room.Engine.CheckWinCondition();
 
         await room.ResolveOutcomeAsync();

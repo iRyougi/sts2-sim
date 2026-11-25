@@ -175,10 +175,9 @@ public static class CreatureCmd
         return results;
     }
 
-    /// <summary>原版 <c>CreatureCmd.Damage</c> 对单个目标的结算。未格挡伤害经 BeforeOsty 阶段后由
-    /// <see cref="Hook.ModifyUnblockedDamageTarget"/> 决定承受者（DieForYouPower 会把主人换成 Osty），再对承受者跑
-    /// AfterOsty 阶段；若换了承受者，Osty 的溢出伤害再对原目标跑一次 AfterOsty 并扣血。结果按原版顺序返回
-    /// （承受者在前），格挡量与破盾只记在原目标那一条上。</summary>
+    /// <summary>原版 v0.114.0 <c>CreatureCmd.Damage</c> 对单个目标的结算：ModifyDamage → 空跑
+    /// <see cref="GetDamageResults"/> → <c>BeforeDamageReceived</c> → <see cref="ApplyDamageResults"/> → 按
+    /// <see cref="DamageResults.AllResults"/> 顺序写伤害历史。结果顺序：原目标 → 宠物主人格挡 → 格挡前转移 → 格挡后转移。</summary>
     private static async Task<IReadOnlyList<(DamageResult Result, bool Prevented)>> DamageSingle(
         ICombatState combatState,
         Creature target,
@@ -197,71 +196,194 @@ public static class CreatureCmd
 
         IRunState runState = combatState.RunState;
         decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay, out _, modifyDamageHookType);
+        DamageResults damageResults = GetDamageResults(runState, combatState, target, modifiedAmount, props,
+            dealer, cardSource, cardPlay);
         await Hook.BeforeDamageReceived(combatState, target, modifiedAmount, props, dealer, cardSource);
+        await ApplyDamageResults(runState, combatState, damageResults);
 
+        // 原版 v0.114.0 在结算之后按 AllResults 顺序写伤害历史。
+        var results = new List<(DamageResult Result, bool Prevented)>(4);
+        foreach (DamageResult result in damageResults.AllResults())
+        {
+            (combatState as CombatState)?.DamageHistory.Record(result, result.Receiver, dealer, cardSource, combatState);
+            results.Add((result, false));
+        }
+        return results;
+    }
+
+    /// <summary>原版 v0.114.0 <c>CreatureCmd.GetDamageResultsPreview</c>：空跑结算，返回伤害若真打出会产生的全部结果
+    /// （含转移给 Wuppy/Osty 的部分），不改任何状态。原版供卡面 <c>DamageVar</c> 等预览使用；模拟器没有卡面预览（偏离 #148），
+    /// 这里只保留入口。</summary>
+    public static IReadOnlyList<DamageResult> GetDamageResultsPreview(
+        IRunState runState,
+        ICombatState? combatState,
+        Creature target,
+        decimal damage,
+        ValueProp props,
+        Creature? dealer,
+        CardModel cardSource)
+    {
+        return GetDamageResults(runState, combatState, target, damage, props, dealer, cardSource, null)
+            .AllResults().ToList();
+    }
+
+    /// <summary>原版 v0.114.0 <c>CreatureCmd.GetDamageResults</c>：用 dryRun 的 <see cref="Creature.LoseHpInternal"/> /
+    /// <see cref="Creature.DamageBlockInternal"/> 算出各承受者的结果，不改状态。格挡由宠物主人承担；未格挡伤害经 BeforeOsty
+    /// 阶段后由 <see cref="Hook.ModifyUnblockedDamageTarget"/> 决定承受者，再对承受者跑 AfterOsty；换了承受者时，其溢出伤害
+    /// 再对原目标跑一次 AfterOsty。命中宠物且未转移时，主人另得一条只含格挡信息的结果。</summary>
+    private static DamageResults GetDamageResults(
+        IRunState runState,
+        ICombatState? combatState,
+        Creature target,
+        decimal damage,
+        ValueProp props,
+        Creature? dealer,
+        CardModel? cardSource,
+        CardPlay? cardPlay)
+    {
         Creature blockOwner = target.PetOwner?.Creature ?? target;
-        var results = new List<(DamageResult Result, bool Prevented)>(3);
-        Creature? preBlockTarget = Hook.ModifyPreBlockDamageTarget(combatState, target, amount, props, dealer);
-        decimal damageRemaining = modifiedAmount;
+        var beforeOstyModifiers = new List<AbstractModel>();
+        var beforeWuppyModifiers = new List<AbstractModel>();
+        var afterOstyModifiers = new List<AbstractModel>();
+        var afterOstyModifiers2 = new List<AbstractModel>();
+        DamageResult? preBlockRedirect = null;
+        DamageResult? unblockedRedirect = null;
+        DamageResult? blockRedirect = null;
+        Creature? preBlockTarget = Hook.ModifyPreBlockDamageTarget(combatState, target, damage, props, dealer);
+        decimal remaining = damage;
+        IEnumerable<AbstractModel> modifiers;
         if (preBlockTarget is not null)
         {
-            decimal hpLoss = Hook.ModifyHpLost(runState, combatState, target, damageRemaining, props,
-                dealer, cardSource, HpLossHookPhase.BeforeWuppy, out _);
-            DamageResult absorbed = preBlockTarget.LoseHpInternal(hpLoss, props) with
+            decimal hpLoss = Hook.ModifyHpLost(runState, combatState, target, remaining, props,
+                dealer, cardSource, HpLossHookPhase.BeforeWuppy, out modifiers);
+            beforeWuppyModifiers.AddRange(modifiers);
+            HpLossResult absorbed = preBlockTarget.LoseHpInternal(hpLoss, dryRun: true);
+            preBlockRedirect = new DamageResult(preBlockTarget, props)
             {
-                IntendedHpLoss = (int)damageRemaining, OriginalTarget = target,
+                UnblockedDamage = absorbed.HpLost,
+                WasTargetKilled = absorbed.Killed,
+                OverkillDamage = absorbed.OverkillAmount,
+                IntendedHpLoss = (int)remaining,
+                OriginalTarget = target,
             };
-            results.Add((absorbed, false));
-            damageRemaining = absorbed.OverkillDamage;
+            remaining = absorbed.OverkillAmount;
         }
-        decimal blockedDamage = blockOwner.DamageBlockInternal(damageRemaining, props);
-        damageRemaining = Math.Max(damageRemaining - blockedDamage, 0m);
-        decimal unblocked = Hook.ModifyHpLost(runState, combatState, target,
-            damageRemaining, props, dealer, cardSource,
-            HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
-        await Hook.AfterModifyingHpLostBeforeOsty(runState, combatState, beforeOstyModifiers);
 
+        decimal blocked = blockOwner.DamageBlockInternal(remaining, props, dryRun: true);
+        remaining = Math.Max(remaining - blocked, 0m);
+        decimal unblocked = Hook.ModifyHpLost(runState, combatState, target, remaining, props,
+            dealer, cardSource, HpLossHookPhase.BeforeOsty, out modifiers);
+        beforeOstyModifiers.AddRange(modifiers);
         Creature receiver = Hook.ModifyUnblockedDamageTarget(combatState, target, unblocked, props, dealer);
-        unblocked = Hook.ModifyHpLost(runState, combatState, receiver, unblocked, props, dealer, cardSource,
-            HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
-        await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, afterOstyModifiers);
-        DamageResult received = receiver.LoseHpInternal(unblocked, props) with
+        unblocked = Hook.ModifyHpLost(runState, combatState, receiver, unblocked, props,
+            dealer, cardSource, HpLossHookPhase.AfterOsty, out modifiers);
+        afterOstyModifiers.AddRange(modifiers);
+        HpLossResult receivedLoss = receiver.LoseHpInternal(unblocked, dryRun: true);
+        var received = new DamageResult(receiver, props)
         {
-            IntendedHpLoss = (int)damageRemaining, OriginalTarget = target,
+            UnblockedDamage = receivedLoss.HpLost,
+            WasTargetKilled = receivedLoss.Killed,
+            OverkillDamage = receivedLoss.OverkillAmount,
+            IntendedHpLoss = (int)remaining,
+            OriginalTarget = target,
         };
-        damageRemaining = received.OverkillDamage;
-        // 原版两项都看原始目标：宠物被命中时格挡由主人承担，宠物自身格挡恒为 0；
-        // 完全格挡按承受者最终扣血（转给 Osty 时是 Osty 的扣血）判断。
-        bool blockBroken = target.Block <= 0 && blockedDamage > 0m;
+        remaining = receivedLoss.OverkillAmount;
+        // 原版在空跑阶段（格挡尚未扣减）判定，两项都看原始目标的格挡。
+        bool blockBroken = (decimal)target.Block <= blocked && blocked > 0m;
         bool fullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
-                            (blockedDamage > 0m || target.Block > 0) && (int)unblocked == 0;
+                            (blocked > 0m || target.Block > 0) && (int)unblocked == 0;
 
-        if (ReferenceEquals(receiver, target))
+        DamageResult original;
+        if (ReferenceEquals(target, receiver))
         {
-            results.Add((received with
+            original = received with
             {
-                BlockedDamage = (int)blockedDamage, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
-            }, false));
+                BlockedDamage = (int)blocked, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
+            };
+            if (!ReferenceEquals(original.Receiver, blockOwner))
+            {
+                blockRedirect = new DamageResult(blockOwner, props)
+                {
+                    UnblockedDamage = 0,
+                    WasTargetKilled = false,
+                    OverkillDamage = 0,
+                    IntendedHpLoss = (int)remaining,
+                    BlockedDamage = (int)blocked,
+                    WasBlockBroken = blockBroken,
+                    WasFullyBlocked = fullyBlocked,
+                };
+            }
         }
         else
         {
-            results.Add((received, false));
-            decimal overflow = Hook.ModifyHpLost(runState, combatState, target, damageRemaining, props,
-                dealer, cardSource, HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> overflowModifiers);
-            await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, overflowModifiers);
-            DamageResult original = overflow > 0m
-                ? target.LoseHpInternal(overflow, props)
-                : new DamageResult(target, props);
-            results.Add((original with
+            unblockedRedirect = received;
+            decimal overflow = Hook.ModifyHpLost(runState, combatState, target, remaining, props,
+                dealer, cardSource, HpLossHookPhase.AfterOsty, out modifiers);
+            afterOstyModifiers2.AddRange(modifiers);
+            DamageResult overflowResult;
+            if (overflow > 0m)
             {
-                IntendedHpLoss = (int)damageRemaining,
-                BlockedDamage = (int)blockedDamage, WasBlockBroken = blockBroken, WasFullyBlocked = fullyBlocked,
-            }, false));
+                HpLossResult overflowLoss = target.LoseHpInternal(overflow, dryRun: true);
+                overflowResult = new DamageResult(target, props)
+                {
+                    UnblockedDamage = overflowLoss.HpLost,
+                    WasTargetKilled = overflowLoss.Killed,
+                    OverkillDamage = overflowLoss.OverkillAmount,
+                };
+            }
+            else
+            {
+                overflowResult = new DamageResult(target, props);
+            }
+
+            original = overflowResult with
+            {
+                IntendedHpLoss = (int)remaining,
+                BlockedDamage = (int)blocked,
+                WasBlockBroken = blockBroken,
+                WasFullyBlocked = fullyBlocked,
+            };
         }
 
-        foreach (var (result, _) in results)
-            (combatState as CombatState)?.DamageHistory.Record(result, result.Receiver, dealer, cardSource, combatState);
-        return results;
+        return new DamageResults
+        {
+            Original = original,
+            PreBlockRedirect = preBlockRedirect,
+            UnblockedRedirect = unblockedRedirect,
+            BlockRedirect = blockRedirect,
+            BeforeWuppyHpLossModifiers = beforeWuppyModifiers,
+            BeforeOstyHpLossModifiers = beforeOstyModifiers,
+            AfterOstyHpLossModifiers = afterOstyModifiers,
+            AfterOstyHpLossModifiers2 = afterOstyModifiers2,
+        };
+    }
+
+    /// <summary>原版 v0.114.0 <c>CreatureCmd.ApplyDamageResults</c>：按固定顺序把空跑结果落到状态上，并在对应位置
+    /// 通知 HP 修正者。</summary>
+    private static async Task ApplyDamageResults(IRunState runState, ICombatState? combatState, DamageResults results)
+    {
+        results.PreBlockRedirect?.Receiver.LoseHpInternal(results.PreBlockRedirect.UnblockedDamage);
+        results.BlockRedirect?.Receiver.DamageBlockInternal(results.BlockRedirect.BlockedDamage, results.BlockRedirect.Props);
+        results.Original.Receiver.DamageBlockInternal(results.Original.BlockedDamage, results.Original.Props);
+        if (results.BeforeOstyHpLossModifiers.Count > 0)
+            await Hook.AfterModifyingHpLostBeforeOsty(runState, combatState, results.BeforeOstyHpLossModifiers);
+        results.UnblockedRedirect?.Receiver.LoseHpInternal(results.UnblockedRedirect.UnblockedDamage);
+        if (results.AfterOstyHpLossModifiers.Count > 0)
+            await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, results.AfterOstyHpLossModifiers);
+        results.Original.Receiver.LoseHpInternal(results.Original.UnblockedDamage);
+        if (results.AfterOstyHpLossModifiers2.Count > 0)
+            await Hook.AfterModifyingHpLostAfterOsty(runState, combatState, results.AfterOstyHpLossModifiers2);
+    }
+
+    private static DamageResult LoseHpForDeathPipeline(Creature creature, decimal amount, ValueProp props)
+    {
+        HpLossResult loss = creature.LoseHpInternal(amount);
+        return new DamageResult(creature, props)
+        {
+            UnblockedDamage = loss.HpLost,
+            WasTargetKilled = loss.Killed,
+            OverkillDamage = loss.OverkillAmount,
+        };
     }
 
     /// <summary>Kills a combat creature directly without running the ordinary damage hook pipeline.</summary>
@@ -275,7 +397,8 @@ public static class CreatureCmd
 
         ICombatState combatState = creature.CombatState
             ?? throw new InvalidOperationException("Creature has no combat state.");
-        DamageResult result = creature.LoseHpInternal(
+        DamageResult result = LoseHpForDeathPipeline(
+            creature,
             creature.CurrentHp,
             ValueProp.Unblockable | ValueProp.Unpowered);
         if (result.UnblockedDamage > 0)
@@ -294,7 +417,8 @@ public static class CreatureCmd
             return;
         }
 
-        DamageResult result = creature.LoseHpInternal(
+        DamageResult result = LoseHpForDeathPipeline(
+            creature,
             creature.CurrentHp,
             ValueProp.Unblockable | ValueProp.Unpowered);
         if (result.UnblockedDamage > 0)
@@ -354,26 +478,18 @@ public static class CreatureCmd
             null,
             out _);
         Creature? dealer = cardSource?.Owner.Creature;
-        await Hook.BeforeDamageReceived(runState, null, target, modifiedAmount, props, dealer, cardSource);
-
-        decimal blockedDamage = target.DamageBlockInternal(modifiedAmount, props);
-        // 战斗外没有重定向：原版两个阶段依次跑在同一个目标上。
-        decimal unblocked = Hook.ModifyHpLost(runState, null, target,
-            Math.Max(modifiedAmount - blockedDamage, 0m), props, dealer, cardSource,
-            HpLossHookPhase.BeforeOsty, out IEnumerable<AbstractModel> beforeOstyModifiers);
-        await Hook.AfterModifyingHpLostBeforeOsty(runState, null, beforeOstyModifiers);
-        unblocked = Hook.ModifyHpLost(runState, null, target, unblocked, props, dealer, cardSource,
-            HpLossHookPhase.AfterOsty, out IEnumerable<AbstractModel> afterOstyModifiers);
-        await Hook.AfterModifyingHpLostAfterOsty(runState, null, afterOstyModifiers);
-
-        DamageResult result = target.LoseHpInternal(unblocked, props) with
+        // v0.114.0 同一条管线：先空跑，再 BeforeDamageReceived，再结算。战斗外没有转移；出现即说明前提失效。
+        DamageResults damageResults = GetDamageResults(runState, null, target, modifiedAmount, props,
+            dealer, cardSource, null);
+        if (damageResults.BlockRedirect is not null || damageResults.PreBlockRedirect is not null ||
+            damageResults.UnblockedRedirect is not null)
         {
-            IntendedHpLoss = (int)Math.Max(modifiedAmount - blockedDamage, 0m),
-            BlockedDamage = (int)blockedDamage,
-            WasBlockBroken = target.Block <= 0 && blockedDamage > 0m,
-            WasFullyBlocked = !props.HasFlag(ValueProp.Unblockable) &&
-                              (blockedDamage > 0m || target.Block > 0) && (int)unblocked == 0,
-        };
+            throw new InvalidOperationException("Run-level damage was redirected outside combat.");
+        }
+
+        await Hook.BeforeDamageReceived(runState, null, target, modifiedAmount, props, dealer, cardSource);
+        await ApplyDamageResults(runState, null, damageResults);
+        DamageResult result = damageResults.Original;
 
         if (result.UnblockedDamage > 0)
             await Hook.AfterCurrentHpChanged(runState, null, target, -result.UnblockedDamage);
@@ -389,7 +505,7 @@ public static class CreatureCmd
     {
         ArgumentNullException.ThrowIfNull(runState);
         ArgumentNullException.ThrowIfNull(target);
-        DamageResult result = target.LoseHpInternal(amount, props);
+        DamageResult result = LoseHpForDeathPipeline(target, amount, props);
         if (result.UnblockedDamage > 0)
             await Hook.AfterCurrentHpChanged(runState, null, target, -result.UnblockedDamage);
         return await ResolvePotentialDeath(runState, null, target, result);
@@ -444,14 +560,15 @@ public static class CreatureCmd
         Creature[] livingTeammates = combatState?.GetCreaturesOnSide(target.Side)
             .Where(teammate => !ReferenceEquals(teammate, target) && teammate.IsAlive)
             .ToArray() ?? Array.Empty<Creature>();
-        PowerModel[] powersToRemove = target.Powers.Where(power => combatState is null ||
-            (Hook.ShouldPowerBeRemovedOnDeath(combatState, power) &&
-             Hook.ShouldPowerBeRemovedAfterOwnerDeath(combatState, power))).ToArray();
+        PowerModel[] powersToRemove = PowersRemovedAfterDeath(combatState, target);
+        // v0.114.0：正在行动或正在攻击的生物推迟移出战斗与清空能力，分别由 MonsterModel.PerformMove 与
+        // AttackCommand.Execute 收尾处理。
+        bool deferCleanup = target.Monster?.IsPerformingMove == true || target.IsAttacking;
         if (shouldRemove && target.Side == CombatSide.Enemy &&
-            combatState!.Enemies.Contains(target) && target.Monster?.IsPerformingMove != true)
+            combatState!.Enemies.Contains(target) && !deferCleanup)
             combatState.RemoveCreature(target);
-        foreach (PowerModel power in powersToRemove)
-            await PowerCmd.Remove(power);
+        if (!deferCleanup)
+            await RemovePowers(powersToRemove);
         if (target.IsPlayer)
             target.Player!.PlayerCombatState?.OrbQueue.Clear();
         if (combatState is not null &&
@@ -462,7 +579,8 @@ public static class CreatureCmd
         {
             foreach (Creature teammate in livingTeammates.Where(teammate => teammate.IsAlive))
             {
-                DamageResult teammateDeath = teammate.LoseHpInternal(
+                DamageResult teammateDeath = LoseHpForDeathPipeline(
+                    teammate,
                     teammate.CurrentHp,
                     ValueProp.Unblockable | ValueProp.Unpowered);
                 if (teammateDeath.UnblockedDamage > 0)
@@ -481,6 +599,22 @@ public static class CreatureCmd
         if (target.IsPlayer && combatState is CombatState concrete && !concrete.HasLivingPlayerCreature())
             concrete.Engine?.LoseCombat();
         return result;
+    }
+
+    /// <summary>原版 <c>Creature.RemoveAllPowersAfterDeath</c> 的筛选：死亡时应移除的能力。</summary>
+    internal static PowerModel[] PowersRemovedAfterDeath(ICombatState? combatState, Creature target) =>
+        target.Powers.Where(power => combatState is null ||
+            (Hook.ShouldPowerBeRemovedOnDeath(combatState, power) &&
+             Hook.ShouldPowerBeRemovedAfterOwnerDeath(combatState, power))).ToArray();
+
+    /// <summary>移除死亡生物的能力并逐个触发 <c>AfterRemoved</c>（v0.114.0 攻击收尾与怪物行动收尾同 Kill 共用）。</summary>
+    internal static async Task RemovePowersAfterDeath(ICombatState? combatState, Creature target) =>
+        await RemovePowers(PowersRemovedAfterDeath(combatState, target));
+
+    private static async Task RemovePowers(IEnumerable<PowerModel> powers)
+    {
+        foreach (PowerModel power in powers)
+            await PowerCmd.Remove(power);
     }
 
     public static async Task<decimal> GainBlock(

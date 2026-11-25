@@ -16,7 +16,8 @@ public sealed class KiVersePower : PowerModel
     {
         if (!ReferenceEquals(card.Owner.Creature, Owner))
             return playCount;
-        if (!card.Tags.Contains(CardTag.Wah) && !card.Tags.Contains(CardTag.Cho) && !card.Tags.Contains(CardTag.Ki))
+        // v0.114.0：只对 Wah/Cho 牌生效，仅 Ki 牌不再重放。
+        if (!card.Tags.Contains(CardTag.Wah) && !card.Tags.Contains(CardTag.Cho))
             return playCount;
         return playCount + 1;
     }

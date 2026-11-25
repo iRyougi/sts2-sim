@@ -90,21 +90,18 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Equal(handBeforeHierophant + 3, pcs.Hand.Cards.Count);
                 CardModel[] hierophantCards = pcs.Hand.Cards.Skip(handBeforeHierophant).ToArray();
                 Assert.Equal(3, hierophantCards.Length);
+                // v0.114.0 TheHierophant no longer reduces the generated cards' cost.
                 Assert.All(hierophantCards, c =>
                 {
                     Assert.True(c.IsColorless);
-                    int expected = c.CostsXEnergy || c.CanonicalEnergyCostValue < 0
-                        ? c.CanonicalEnergyCostValue
-                        : Math.Max(0, c.CanonicalEnergyCostValue - 1);
-                    Assert.Equal(expected, c.EnergyCost);
+                    Assert.Equal(c.CanonicalEnergyCostValue, c.EnergyCost);
                 });
-                Assert.Contains(hierophantCards, c => !c.CostsXEnergy && c.CanonicalEnergyCostValue >= 1 && c.EnergyCost == c.CanonicalEnergyCostValue - 1);
 
                 // TheEmpress, Strength, Temperance, Justice, TheChariot, TheTower, TheEmperor, TheHighPriestess.
                 await room.Engine.PlayCardAsync(player, AddToPile<Strength>(player, PileType.Hand), null);
                 Assert.Equal(4, player.Creature.GetPower<StrengthPower>()?.Amount ?? 0);
                 await room.Engine.PlayCardAsync(player, AddToPile<Temperance>(player, PileType.Hand), null);
-                Assert.Equal(30, player.Creature.Block);
+                Assert.Equal(20, player.Creature.Block);
                 await room.Engine.PlayCardAsync(player, AddToPile<TheEmpress>(player, PileType.Hand), enemy);
                 Assert.Equal(3, enemy.GetPower<WeakPower>()?.Amount ?? 0);
                 Assert.Equal(3, enemy.GetPower<VulnerablePower>()?.Amount ?? 0);
@@ -114,7 +111,7 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
 
                 int energyBeforeEmperor = pcs.Energy;
                 await room.Engine.PlayCardAsync(player, AddToPile<TheEmperor>(player, PileType.Hand), null);
-                Assert.Equal(energyBeforeEmperor + 7, pcs.Energy);
+                Assert.Equal(energyBeforeEmperor + 3, pcs.Energy);
 
                 for (int i = 0; i < 4; i++)
                     AddToPile<DefendFool>(player, PileType.Draw);
@@ -123,7 +120,7 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Equal(handBeforePriestess + 4, pcs.Hand.Cards.Count);
 
                 await room.Engine.PlayCardAsync(player, AddToPile<Death>(player, PileType.Hand), enemy2);
-                Assert.Equal(75, enemy2.GetPower<DoomPower>()?.Amount ?? 0);
+                Assert.Equal(66, enemy2.GetPower<DoomPower>()?.Amount ?? 0);
 
                 int e2BeforeJustice = enemy2.CurrentHp;
                 await room.Engine.PlayCardAsync(player, AddToPile<Justice>(player, PileType.Hand), enemy2);
@@ -131,7 +128,8 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
 
                 int e2BeforeTower = enemy2.CurrentHp;
                 await room.Engine.PlayCardAsync(player, AddToPile<TheTower>(player, PileType.Hand), enemy2);
-                Assert.Equal(14, e2BeforeTower - enemy2.CurrentHp);
+                // v0.114.0 TheTower: floor 5 x 1 + 4 Strength = 9.
+                Assert.Equal(9, e2BeforeTower - enemy2.CurrentHp);
 
                 // Judgement only executes <= Threshold HP (30 unupgraded) and runs full death resolution via SetCurrentHp.
                 CompostPower compost = (await PowerCmd.Apply<CompostPower>(
@@ -181,13 +179,14 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Equal(3, player.Creature.GetPower<EnergyNextTurnPower>()?.Amount ?? 0);
                 Assert.Equal(3, player.Creature.GetPower<DrawCardsNextTurnPower>()?.Amount ?? 0);
 
-                // TheSun draws 2, gains 2 energy, generates 1 Soot into Discard.
+                // v0.114.0 TheSun draws 2, gains 2 energy, shuffles 2 Soot into random draw-pile positions.
                 AddToPile<DefendFool>(player, PileType.Draw);
                 AddToPile<DefendFool>(player, PileType.Draw);
                 int eBeforeSun = pcs.Energy;
                 await room.Engine.PlayCardAsync(player, AddToPile<TheSun>(player, PileType.Hand), null);
                 Assert.Equal(eBeforeSun + 2, pcs.Energy);
-                Assert.Single(pcs.DiscardPile.Cards.OfType<Soot>());
+                Assert.Equal(2, pcs.DrawPile.Cards.OfType<Soot>().Count());
+                Assert.Empty(pcs.DiscardPile.Cards.OfType<Soot>());
 
                 // TheHermit discards non-Curse, exhausts Curse; TheWorld pulls from Discard.
                 foreach (CardModel c in pcs.Hand.Cards.ToList())
@@ -228,6 +227,12 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Contains(playable1, pcs.DiscardPile.Cards);
                 Assert.Contains(playable2, pcs.DiscardPile.Cards);
                 Assert.Single(pcs.Hand.Cards.OfType<Sadness>());
+                // v0.114.0 removed the all-hand fallback: with only Unplayable cards TheFool autoplays nothing.
+                int discardBeforeLoneFool = pcs.DiscardPile.Cards.Count;
+                TheFool loneFool = AddToPile<TheFool>(player, PileType.Hand);
+                await room.Engine.PlayCardAsync(player, loneFool, null);
+                Assert.Single(pcs.Hand.Cards.OfType<Sadness>());
+                Assert.Equal(discardBeforeLoneFool, pcs.DiscardPile.Cards.Count);
 
                 // TheMoon+ fills Hand with 10 upgraded Shivs; TheDevil+ exhausts 2 cards & autoplays/upgrades exact 2 from top of Draw.
                 foreach (CardModel c in pcs.Hand.Cards.ToList())
@@ -301,8 +306,8 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
 
                 await room.Engine.PlayCardAsync(player, AddToPile<AllIsWell>(player, PileType.Hand), null);
                 await room.Engine.PlayCardAsync(player, AddToPile<Jest>(player, PileType.Hand), null);
-                // 14 Block (Jest) + 4 Block (AllIsWell triggered by 1 Sadness).
-                Assert.Equal(18, player.Creature.Block);
+                // v0.114.0: 15 Block (Jest) + 4 Block (AllIsWell triggered by 1 Sadness).
+                Assert.Equal(19, player.Creature.Block);
                 Assert.Equal(1, pcs.SadnessGeneratedThisCombat);
 
                 await room.Engine.PlayCardAsync(player, AddToPile<Rummage>(player, PileType.Hand), null);
@@ -345,6 +350,20 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 // then Ecstasy AfterPlayerTurnStart transforms 1 Sadness into Joy.
                 Assert.Equal(9, pcs.SadnessGeneratedThisCombat);
                 Assert.Single(pcs.Hand.Cards.OfType<Joy>());
+
+                // v0.114.0 Optimism (new Rare): exhaust every Sadness in hand, draw that many; exhausts itself.
+                AddToPile<Sadness>(player, PileType.Hand);
+                AddToPile<Sadness>(player, PileType.Hand);
+                int sadnessBeforeOptimism = pcs.Hand.Cards.OfType<Sadness>().Count();
+                int exhaustBeforeOptimism = pcs.ExhaustPile.Cards.Count;
+                int drawnBeforeOptimism = pcs.CardsDrawnThisCombat;
+                Optimism optimism = AddToPile<Optimism>(player, PileType.Hand);
+                Assert.Equal(CardRarity.Rare, optimism.Rarity);
+                await room.Engine.PlayCardAsync(player, optimism, null);
+                Assert.Empty(pcs.Hand.Cards.OfType<Sadness>());
+                Assert.Equal(sadnessBeforeOptimism, pcs.CardsDrawnThisCombat - drawnBeforeOptimism);
+                Assert.Equal(exhaustBeforeOptimism + sadnessBeforeOptimism + 1, pcs.ExhaustPile.Cards.Count);
+                Assert.Equal(PileType.Exhaust, optimism.Pile?.Type);
                 break;
 
             case "mythicform_simpleton_timber_lockedin_dislikeyou_multiplayer":
@@ -353,10 +372,10 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Equal(50, enemy.GetPower<DislikeYouPower>()?.Amount ?? 0);
                 pcs.GainArrow();
                 TheShot shot = AddToPile<TheShot>(player, PileType.Hand);
-                shot.BuffFromFlorescence(1m);
                 int hpBeforeShot = enemy.CurrentHp;
                 await room.Engine.PlayCardAsync(player, shot, enemy);
-                Assert.Equal(15, hpBeforeShot - enemy.CurrentHp);
+                // v0.114.0 TheShot 20 x 1.5 = 30.
+                Assert.Equal(30, hpBeforeShot - enemy.CurrentHp);
 
                 // Timber triggers 30 AoE only when initial hit kills target.
                 Creature enemy2 = state.Enemies[1];
@@ -374,28 +393,26 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 state.CardSelectionSource = new SpecificCardSelector(drawShot);
                 await room.Engine.PlayCardAsync(player, AddToPile<LockedIn>(player, PileType.Hand), null);
                 Assert.Contains(drawShot, pcs.Hand.Cards);
-                // BlotOutTheSky safely handles empty Shoot pool AND generates free Shoot card when owner pool contains Shoot cards.
-                await room.Engine.PlayCardAsync(player, AddToPile<BlotOutTheSky>(player, PileType.Hand), null);
-                var shootRun = new RunState("fool-g4-blot-out-sky", new Overgrowth());
-                Player shootPlayer = Player.CreateForNewRun(new ShootPoolTestCharacter(), shootRun);
-                shootRun.AddPlayer(shootPlayer);
-                var shootRoom = new CombatRoom(() => (TrainingDummy)ModelDb.Monster<TrainingDummy>().MutableClone());
-                await shootRoom.Enter(shootRun);
-                shootPlayer.PlayerCombatState!.Energy = 5;
-                BlotOutTheSky blotCard = AddToPile<BlotOutTheSky>(shootPlayer, PileType.Hand);
-                await shootRoom.Engine.PlayCardAsync(shootPlayer, blotCard, null);
-                HeavyShot generatedShot = Assert.Single(shootPlayer.PlayerCombatState.Hand.Cards.OfType<HeavyShot>());
+                // v0.114.0 BlotOutTheSky always draws from FoolCardPool: a Silent owner now gets a free Fool Shoot card.
+                HashSet<CardModel> handBeforeBlot = pcs.Hand.Cards.ToHashSet();
+                BlotOutTheSky blotCard = AddToPile<BlotOutTheSky>(player, PileType.Hand);
+                await room.Engine.PlayCardAsync(player, blotCard, null);
+                CardModel generatedShot = Assert.Single(pcs.Hand.Cards, c => !handBeforeBlot.Contains(c));
+                Assert.Contains(CardTag.Shoot, generatedShot.Tags);
+                Assert.Contains(FoolCardPool.Instance.AllCards, c => c.Id == generatedShot.Id);
                 Assert.Equal(0, generatedShot.EnergyCost);
-                Assert.Contains(blotCard, shootPlayer.PlayerCombatState.ExhaustPile.Cards);
+                Assert.Contains(blotCard, pcs.ExhaustPile.Cards);
 
-                // MythicForm (upgraded) cannot be generated in combat, preserves _upgradedCount on clone,
-                // and generates 1 upgraded Tarot card into Hand on Turn 2!
+                // v0.114.0 MythicForm: Ethereal (removed on upgrade), may be generated in combat, no upgraded-Tarot count;
+                // generates 1 un-upgraded Tarot card into Hand on Turn 2.
                 MythicForm mythic = AddToPile<MythicForm>(player, PileType.Hand);
-                Assert.False(mythic.CanBeGeneratedInCombat);
+                Assert.True(mythic.CanBeGeneratedInCombat);
+                Assert.Contains(CardKeyword.Ethereal, mythic.Keywords);
                 mythic.Upgrade();
+                Assert.DoesNotContain(CardKeyword.Ethereal, mythic.Keywords);
                 await room.Engine.PlayCardAsync(player, mythic, null);
                 CombatState mythicClone = state.Clone();
-                Assert.Equal(1, Assert.Single(mythicClone.Players).Creature.GetPower<MythicFormPower>()?.UpgradedCount);
+                Assert.Equal(1, Assert.Single(mythicClone.Players).Creature.GetPower<MythicFormPower>()?.Amount);
                 // Regression (#929 SimFuzz): a cloned combat runs on CombatRunStateSnapshot, not Runs.RunState;
                 // BeforeHandDraw must not hard-cast player.RunState and must still generate a Tarot card.
                 Player mythicClonePlayer = Assert.Single(mythicClone.Players);
@@ -425,8 +442,8 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
                 Assert.Equal(playedBeforeTurnEnd + 1, pcs.CardsPlayedThisCombat);
                 Assert.Contains(lowCost, pcs.DiscardPile.Cards);
                 Assert.Contains(highCostTimber, pcs.DiscardPile.Cards);
-                // Turn 2 BeforeHandDraw generated 1 upgraded Tarot card before drawing 5 StrikeFools (so 1 Tarot + 5 = 6 cards).
-                Assert.Single(pcs.Hand.Cards.Where(c => TarotCards.All.Any(t => t.Id == c.Id) && c.IsUpgraded));
+                // Turn 2 BeforeHandDraw generated 1 (un-upgraded since v0.114.0) Tarot card before drawing 5 StrikeFools.
+                Assert.False(Assert.Single(pcs.Hand.Cards, c => TarotCards.All.Any(t => t.Id == c.Id)).IsUpgraded);
 
                 Assert.True(ModelDb.Card<Compost>().IsMultiplayerOnly);
                 Assert.True(ModelDb.Card<Enrapture>().IsMultiplayerOnly);
@@ -448,18 +465,5 @@ public sealed class FoolTarotAndGeneralCardsTests : IDisposable
         public Task<IReadOnlyList<CardModel>> ChooseCardsAsync(CardSelectionRequest request) =>
             Task.FromResult<IReadOnlyList<CardModel>>(
                 request.Candidates.Contains(chosen) ? [chosen] : request.Candidates.Take(request.MinCount).ToArray());
-    }
-
-    private sealed class ShootPoolTestCardPool : CardPoolModel
-    {
-        public override IReadOnlyList<CardModel> AllCards => [(CardModel)ModelDb.Card<HeavyShot>()];
-    }
-
-    private sealed class ShootPoolTestCharacter : CharacterModel
-    {
-        private readonly ShootPoolTestCardPool _cardPool = new();
-        public override int StartingHp => 77;
-        public override int StartingGold => 99;
-        public override CardPoolModel CardPool => _cardPool;
     }
 }

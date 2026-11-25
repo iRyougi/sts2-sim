@@ -130,7 +130,8 @@ public sealed class OstyDamageRedirectionTests : IDisposable
         switch (scenario)
         {
             case "powered-redirects":
-                Assert.Equal(new[] { osty, player.Creature }, results.Select(result => result.Receiver));
+                // v0.114.0 结果顺序：原目标在前，格挡后转移（Osty）在后。
+                Assert.Equal(new[] { player.Creature, osty }, results.Select(result => result.Receiver));
                 Assert.Equal(2, osty.CurrentHp);
                 Assert.Equal(playerHp, player.Creature.CurrentHp);
                 break;
@@ -142,7 +143,7 @@ public sealed class OstyDamageRedirectionTests : IDisposable
             case "overflow-returns-to-owner":
                 Assert.True(osty.IsDead);
                 Assert.Equal(playerHp - 5, player.Creature.CurrentHp);
-                Assert.Equal(5, results[1].UnblockedDamage);
+                Assert.Equal(5, results[0].UnblockedDamage);
                 // 死去的 Osty 留在战斗里，能力保留。
                 Assert.Contains(osty, state.Allies);
                 Assert.NotNull(osty.GetPower<DieForYouPower>());
@@ -154,21 +155,29 @@ public sealed class OstyDamageRedirectionTests : IDisposable
             case "owner-block-first":
                 Assert.Equal(0, player.Creature.Block);
                 Assert.Equal(6, osty.CurrentHp);
-                Assert.Equal(4, results[1].BlockedDamage);
-                Assert.Equal(0, results[0].BlockedDamage);
+                Assert.Equal(4, results[0].BlockedDamage);
+                Assert.Equal(0, results[1].BlockedDamage);
                 // 破盾与完全格挡只记在原始目标那条上；Osty 承受了 4 点，所以不算完全格挡。
-                Assert.True(results[1].WasBlockBroken);
-                Assert.False(results[1].WasFullyBlocked);
-                Assert.False(results[0].WasBlockBroken);
+                Assert.True(results[0].WasBlockBroken);
+                Assert.False(results[0].WasFullyBlocked);
+                Assert.False(results[1].WasBlockBroken);
                 // 直接命中 Osty 时由主人格挡吸收，主人还剩格挡，但原版看 Osty 自身格挡（恒为 0），算打破。
+                // v0.114.0 另给主人一条只含格挡信息的 blockRedirect 结果（排在原目标之后）。
                 player.Creature.GainBlockInternal(5m);
-                DamageResult direct = Assert.Single(await CreatureCmd.Damage(state, [osty], 3m, ValueProp.Move, enemy, null, null));
+                IReadOnlyList<DamageResult> directResults =
+                    await CreatureCmd.Damage(state, [osty], 3m, ValueProp.Move, enemy, null, null);
+                Assert.Equal(new[] { osty, player.Creature }, directResults.Select(result => result.Receiver));
+                DamageResult direct = directResults[0];
+                DamageResult ownerBlock = directResults[1];
                 Assert.Equal(2, player.Creature.Block);
                 Assert.True(direct.WasBlockBroken);
                 Assert.True(direct.WasFullyBlocked);
+                Assert.Equal((3, 0, true, true), (ownerBlock.BlockedDamage, ownerBlock.UnblockedDamage,
+                    ownerBlock.WasBlockBroken, ownerBlock.WasFullyBlocked));
                 break;
             case "phase-order":
-                Assert.Equal(new[] { "hit:player<-enemy:none", "before:player", "after:osty", "after:player" },
+                // v0.114.0：HP 修正先空跑，BeforeDamageReceived 在其后。
+                Assert.Equal(new[] { "before:player", "after:osty", "after:player", "hit:player<-enemy:none" },
                     probe.Calls);
                 break;
         }

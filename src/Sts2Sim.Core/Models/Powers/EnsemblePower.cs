@@ -25,7 +25,7 @@ public sealed class EnsemblePower : PowerModel
 
     public override async Task AfterCardPlayed(CardPlay cardPlay)
     {
-        if (!ReferenceEquals(cardPlay.Player.Creature, Owner))
+        if (!ReferenceEquals(cardPlay.Player.Creature, Owner) && cardPlay.IsLastInSeries)
         {
             await PowerCmd.ModifyAmount(Owner.CombatState!, this, -1m, null, null);
         }

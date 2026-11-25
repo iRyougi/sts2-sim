@@ -3,7 +3,7 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>从手牌选 1 张牌弃置（诅咒牌则消耗），再抽 2（升级 3）张牌并消耗（原版 <c>TheHermit</c>）。</summary>
+/// <summary>从手牌选 1 张牌弃置（诅咒牌则消耗），再抽 3（升级 4）张牌并消耗（原版 <c>TheHermit</c>）。</summary>
 public sealed class TheHermit : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
@@ -11,7 +11,7 @@ public sealed class TheHermit : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 0;
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
-    private int Cards => IsUpgraded ? 3 : 2;
+    private int Cards => IsUpgraded ? 4 : 3;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Cards: Cards);
 
     protected override async Task OnPlay(CardPlay cardPlay)

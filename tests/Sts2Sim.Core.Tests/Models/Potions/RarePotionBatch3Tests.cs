@@ -133,7 +133,7 @@ public sealed class RarePotionBatch3Tests : IDisposable
         Creature first = state.Enemies.Single();
         Creature second = state.AddMonster((WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
         Creature dead = state.AddMonster((WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(), CombatSide.Enemy);
-        dead.LoseHpInternal(dead.CurrentHp, ValueProp.Unpowered);
+        dead.LoseHpInternal(dead.CurrentHp);
 
         await UsePotionAsync("ShacklingPotion", player, target: null);
 

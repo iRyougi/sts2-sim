@@ -261,6 +261,17 @@ public sealed class SharedEventBatchBTests : IDisposable
         await Choose(ev, "LEAVE");
         Assert.Single(player.Deck.Cards, c => c.IsUpgraded);
         Assert.Equal(1, ev.Rng.Counter);
+
+        // v0.114.0 (#1109): CardCmd.Downgrade drops one level, so a multi-level DingyDagger loses only one upgrade.
+        foreach (CardModel upgraded in player.Deck.Cards.Where(c => c.IsUpgraded).ToList())
+            upgraded.Downgrade();
+        var dagger = (DingyDagger)ModelDb.Card<DingyDagger>().MutableClone();
+        dagger.AssignOwner(player);
+        CardPileCmd.Add(dagger, PileType.Deck);
+        for (int level = 0; level < 3; level++)
+            dagger.Upgrade();
+        await Choose(Begin<WelcomeToWongos>(run, player), "LEAVE");
+        Assert.Equal(2, dagger.CurrentUpgradeLevel);
     }
 
     [Fact]

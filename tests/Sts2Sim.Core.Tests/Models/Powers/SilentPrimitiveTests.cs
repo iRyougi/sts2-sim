@@ -86,7 +86,7 @@ public sealed class SilentPrimitiveTests : IDisposable
     {
         (_, CombatRoom room) = await CreateCombatAsync("silent-poison-kill");
         Creature target = room.Engine.State.HittableEnemies.Single();
-        target.LoseHpInternal(target.CurrentHp - 3, ValueProp.Unpowered);
+        target.LoseHpInternal(target.CurrentHp - 3);
         PoisonPower poison = (await PowerCmd.Apply<PoisonPower>(
             room.Engine.State,
             target,

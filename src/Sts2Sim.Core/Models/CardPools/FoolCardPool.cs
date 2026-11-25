@@ -3,9 +3,13 @@ using Sts2Sim.Core.Models.Cards;
 
 namespace Sts2Sim.Core.Models.CardPools;
 
-/// <summary>v0.113.1（d09d48e5）Fool 角色 90 张牌池与 Epoch 解锁过滤（原版 <c>FoolCardPool</c>）。</summary>
+/// <summary>v0.114.0（a7b9a9c0）Fool 角色 91 张牌池与 Epoch 解锁过滤（原版 <c>FoolCardPool</c>）。
+/// v0.114.0：Nock 后插入 Optimism；RapidShot 删除，TwinShot 占其原位。</summary>
 public sealed class FoolCardPool : CardPoolModel
 {
+    /// <summary>无状态共享实例（原版 <c>ModelDb.CardPool&lt;FoolCardPool&gt;()</c>，BlotOutTheSky 用）。</summary>
+    public static FoolCardPool Instance { get; } = new();
+
     public const string Fool2EpochId = "FOOL2_EPOCH";
     public const string Fool5EpochId = "FOOL5_EPOCH";
     public const string Fool7EpochId = "FOOL7_EPOCH";
@@ -25,8 +29,8 @@ public sealed class FoolCardPool : CardPoolModel
         typeof(KiRest), typeof(KiVerse), typeof(KiWhip), typeof(LockedIn),
         typeof(FoolishShot), typeof(LostLute), typeof(Lullaby), typeof(MelodicShot),
         typeof(Motif), typeof(MourningBlow), typeof(MythicForm), typeof(Nail),
-        typeof(Nock), typeof(PunchOfJoy), typeof(QuickShot), typeof(Quietus),
-        typeof(Quiver), typeof(RainShot), typeof(RapidShot), typeof(Recall),
+        typeof(Nock), typeof(Optimism), typeof(PunchOfJoy), typeof(QuickShot), typeof(Quietus),
+        typeof(Quiver), typeof(RainShot), typeof(TwinShot), typeof(Recall),
         typeof(RepeatShot), typeof(RhythmStrike), typeof(Rummage), typeof(SelfDeprecate),
         typeof(SerratedArrows), typeof(ShowOff), typeof(Simpleton), typeof(SkyShot),
         typeof(SongPath), typeof(SorrowfulStrike), typeof(SteadyCadence), typeof(StrikeFool),
@@ -38,7 +42,7 @@ public sealed class FoolCardPool : CardPoolModel
     ];
 
     private static readonly Type[] Fool2Cards =
-        [typeof(ArrowStab), typeof(Quiver), typeof(BlossomShot)];
+        [typeof(ArrowStab), typeof(Honing), typeof(BlossomShot)];
     private static readonly Type[] Fool5Cards =
         [typeof(WahTouch), typeof(KiVerse), typeof(ChoLimbs)];
     private static readonly Type[] Fool7Cards =

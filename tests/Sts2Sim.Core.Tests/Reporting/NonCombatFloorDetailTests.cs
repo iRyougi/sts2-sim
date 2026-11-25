@@ -53,7 +53,7 @@ public sealed class NonCombatFloorDetailTests : IDisposable
     {
         RunState runState = NewTravelRun("detail-rest-driver-heal", MapPointType.RestSite);
         Player player = runState.Players[0];
-        player.Creature.LoseHpInternal(5m, default(ValueProp));
+        player.Creature.LoseHpInternal(5m);
         int hpBefore = player.Creature.CurrentHp;
         var decisions = new ConfigurableDecisionSource
         {

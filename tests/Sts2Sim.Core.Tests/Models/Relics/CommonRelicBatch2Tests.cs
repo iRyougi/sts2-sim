@@ -73,7 +73,7 @@ public sealed class CommonRelicBatch2Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("meal-ticket");
         await Obtain<MealTicket>(player);
-        player.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(30m);
         int woundedHp = player.Creature.CurrentHp;
 
         await new RestSiteRoom().Enter(runState);
@@ -89,7 +89,7 @@ public sealed class CommonRelicBatch2Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("meal-ticket-dead");
         await Obtain<MealTicket>(player);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp);
         Assert.True(player.Creature.IsDead);
 
         await new MerchantRoom().Enter(runState);
@@ -181,13 +181,13 @@ public sealed class CommonRelicBatch2Tests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("regal-pillow");
         await Obtain<RegalPillow>(player);
-        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1);
         int beforeOrdinaryHeal = player.Creature.CurrentHp;
 
         await CreatureCmd.Heal(player.Creature, 5m);
         Assert.Equal(beforeOrdinaryHeal + 5, player.Creature.CurrentHp);
 
-        player.Creature.LoseHpInternal(5m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(5m);
         int beforeRest = player.Creature.CurrentHp;
         var restSite = new RestSiteRoom();
         await restSite.Enter(runState);
@@ -205,7 +205,7 @@ public sealed class CommonRelicBatch2Tests : IDisposable
         (RunState runState, Player player) = CreateRun("rest-heal-fold");
         await Obtain<DoubleRestSiteHealRelic>(player);
         await Obtain<AddFiveRestSiteHealRelic>(player);
-        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1);
         var restSite = new RestSiteRoom();
         await restSite.Enter(runState);
 
@@ -219,7 +219,7 @@ public sealed class CommonRelicBatch2Tests : IDisposable
     public async Task Strawberry_IncreasesCurrentAndMaximumHpBySeven()
     {
         (_, Player player) = CreateRun("strawberry");
-        player.Creature.LoseHpInternal(20m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(20m);
         int currentHp = player.Creature.CurrentHp;
         int maxHp = player.Creature.MaxHp;
 

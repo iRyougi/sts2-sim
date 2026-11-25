@@ -9,7 +9,7 @@ using Sts2Sim.Core.Models.Powers;
 
 namespace Sts2Sim.Core.Commands;
 
-/// <summary>Fool 箭矢发射、穿刺、拔除与销毁命令（逐字移植 <c>MegaCrit.Sts2.Core.Commands.ArrowCmd</c> 语义）。</summary>
+/// <summary>Fool 箭矢发射、穿刺与拔除命令（逐字移植 v0.114.0 <c>MegaCrit.Sts2.Core.Commands.ArrowCmd</c> 语义）。</summary>
 public static class ArrowCmd
 {
     public static void GainArrowSlot(Player player) =>
@@ -17,12 +17,9 @@ public static class ArrowCmd
 
     private static void RetrieveArrow(ArrowSlot arrowSlot)
     {
-        if (arrowSlot.Status == ArrowStatus.Destroyed)
-            throw new InvalidOperationException("Destroyed arrows cannot be retrieved.");
         if (arrowSlot.Status == ArrowStatus.Retrieved)
             throw new InvalidOperationException("This arrow has already been retrieved.");
         arrowSlot.Status = ArrowStatus.Retrieved;
-        arrowSlot.DestroyAfterImpaled = false;
     }
 
     public static bool PlayerHasAnyArrows(Player player) =>
@@ -94,8 +91,12 @@ public static class ArrowCmd
         ArrowSlot arrowSlot,
         AttackCommand attackCommand)
     {
+        // v0.114.0：发射后、命中前目标已死，箭矢直接回收。
         if (target.IsDead)
+        {
+            RetrieveArrow(arrowSlot);
             return;
+        }
 
         ICombatState combatState = arrowSlot.Owner.Creature.CombatState!;
         CardModel? sourceCard = attackCommand.CardPlay?.Card ?? attackCommand.ModelSource as CardModel;
@@ -112,11 +113,7 @@ public static class ArrowCmd
         impaledInstance.AddArrow(arrowSlot);
         await Hook.AfterArrowImpaled(combatState, impaledInstance, arrowSlot, null);
 
-        if (arrowSlot.DestroyAfterImpaled)
-        {
-            await DestroyArrow(target, impaledInstance, arrowSlot);
-        }
-        else if (target.IsDead && impaledInstance.Arrows.Contains(arrowSlot))
+        if (target.IsDead && impaledInstance.Arrows.Contains(arrowSlot))
         {
             await DislodgeArrow(combatState, impaledInstance, sourceCard);
         }
@@ -129,7 +126,10 @@ public static class ArrowCmd
         CardModel? card)
     {
         if (target.IsDead)
+        {
+            RetrieveArrow(arrowSlot);
             return;
+        }
 
         ICombatState combatState = arrowSlot.Owner.Creature.CombatState!;
         if (actionToPerform is not null)
@@ -148,11 +148,7 @@ public static class ArrowCmd
         impaledInstance.AddArrow(arrowSlot);
         await Hook.AfterArrowImpaled(combatState, impaledInstance, arrowSlot, card);
 
-        if (arrowSlot.DestroyAfterImpaled)
-        {
-            await DestroyArrow(target, impaledInstance, arrowSlot);
-        }
-        else if (target.IsDead && impaledInstance.Arrows.Contains(arrowSlot))
+        if (target.IsDead && impaledInstance.Arrows.Contains(arrowSlot))
         {
             await DislodgeArrow(combatState, impaledInstance, card);
         }
@@ -172,25 +168,7 @@ public static class ArrowCmd
     public static async Task DislodgeArrow(ICombatState combatState, ImpaledPower impaledArrow, CardModel? source)
     {
         ArrowSlot arrow = impaledArrow.RemoveFirstArrow();
-        if (arrow.DestroyAfterImpaled)
-        {
-            arrow.Status = ArrowStatus.Destroyed;
-            return;
-        }
-
         await Hook.AfterArrowDislodged(combatState, impaledArrow, arrow, source);
         RetrieveArrow(arrow);
-    }
-
-    private static async Task DestroyArrow(Creature target, ImpaledPower impaledInstance, ArrowSlot arrow)
-    {
-        if (arrow.Status != ArrowStatus.Destroyed)
-        {
-            if (target.IsAlive)
-            {
-                await impaledInstance.ForceRemoveArrow(arrow);
-            }
-            arrow.Status = ArrowStatus.Destroyed;
-        }
     }
 }

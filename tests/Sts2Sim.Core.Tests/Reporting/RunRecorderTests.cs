@@ -121,7 +121,7 @@ public sealed class RunRecorderTests : IDisposable
             playerAfterEnemy,
             [enemyAfterCard],
             new CombatRewards(0, [], null, null, null));
-        player.Creature.LoseHpInternal(5m, (ValueProp)0);
+        player.Creature.LoseHpInternal(5m);
         player.Gold += 10;
         contract.ExitFloor();
         now = StartedAt.AddMinutes(3);

@@ -155,7 +155,7 @@ public class AttackCommandTests
         Creature target = Creature.CreateStandaloneForTests(30, 30);
         target.CombatState = combatState;
         combatState.AlliesList.Add(target);
-        attacker.LoseHpInternal(999m, ValueProp.Move);
+        attacker.LoseHpInternal(999m);
 
         AttackCommand result = await DamageCmd.Attack(6m).WithHitCount(3).FromMonster(monster).Execute();
 

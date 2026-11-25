@@ -48,7 +48,7 @@ public sealed class StoneHumidifierTests : IDisposable
         RunState runState = CreateRun("stone-humidifier-resolve", out Player owner, out _);
         await RelicCmd.Obtain(ModelDb.Relic<StoneHumidifier>(), owner);
         int maxBefore = owner.Creature.MaxHp;
-        owner.Creature.LoseHpInternal(maxBefore - 1, default(ValueProp));
+        owner.Creature.LoseHpInternal(maxBefore - 1);
         int hpBefore = owner.Creature.CurrentHp;
 
         await new RestSiteRoom().ResolveAsync(owner, new RestSiteDecision.Heal());

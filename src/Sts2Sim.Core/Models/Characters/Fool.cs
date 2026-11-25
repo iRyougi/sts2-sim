@@ -6,7 +6,7 @@ using Sts2Sim.Core.Models.Relics;
 
 namespace Sts2Sim.Core.Models.Characters;
 
-/// <summary>v0.113.1（d09d48e5）Fool 角色定义、完整卡池与专属遗物/药水池。</summary>
+/// <summary>v0.114.0（a7b9a9c0）Fool 角色定义、完整卡池与专属遗物/药水池。</summary>
 public sealed class Fool : CharacterModel
 {
     private FoolCardPool? _cardPool;

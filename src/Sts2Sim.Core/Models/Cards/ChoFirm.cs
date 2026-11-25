@@ -13,7 +13,7 @@ public sealed class ChoFirm : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Cho];
-    private decimal Block => IsUpgraded ? 8m : 6m;
+    private decimal Block => IsUpgraded ? 7m : 5m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block);
 
     protected override bool ShouldGlowGoldInternal => ArrowCmd.PlayerHasAnyArrows(Owner);

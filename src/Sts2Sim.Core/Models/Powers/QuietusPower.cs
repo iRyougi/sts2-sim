@@ -4,29 +4,18 @@ using Sts2Sim.Core.Commands;
 using Sts2Sim.Core.Commands.Builders;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
-using Sts2Sim.Core.Entities.FoolArrows;
-using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Powers;
 using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Powers;
 
-/// <summary>下一张打出的箭矢牌乘以层数伤害并在穿刺后销毁箭矢（原版 <c>QuietusPower</c>）。</summary>
+/// <summary>下一张打出的箭矢牌乘以层数伤害（v0.114.0 原版 <c>QuietusPower</c>；不再销毁箭矢）。</summary>
 public sealed class QuietusPower : PowerModel
 {
     private AttackCommand? _commandToModify;
 
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;
-
-    public override Task AfterArrowShot(Player owner, ArrowSlot? arrow, CardModel? source)
-    {
-        if (arrow is not null && source is not null && ReferenceEquals(owner.Creature, Owner))
-        {
-            arrow.DestroyAfterImpaled = true;
-        }
-        return Task.CompletedTask;
-    }
 
     public override Task BeforeAttack(AttackCommand command)
     {

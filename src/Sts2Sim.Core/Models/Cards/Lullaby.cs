@@ -10,13 +10,12 @@ public sealed class Lullaby : CardModel, ICardChoiceBaseValueProvider
     public override CardType Type => CardType.Power;
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.Self;
-    protected override int CanonicalEnergyCost => 0;
+    protected override int CanonicalEnergyCost => 1;
+    private decimal PowerAmount => IsUpgraded ? 16m : 12m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        await PowerCmd.Apply<LullabyPower>(CombatState!, Owner.Creature, 20m, Owner.Creature, this);
+        await PowerCmd.Apply<LullabyPower>(CombatState!, Owner.Creature, PowerAmount, Owner.Creature, this);
     }
-
-    protected override void OnUpgrade() => AddKeyword(CardKeyword.Innate);
 }

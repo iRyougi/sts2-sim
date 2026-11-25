@@ -8,7 +8,7 @@ namespace Sts2Sim.Core.Models.Cards;
 public sealed class Motif : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Power;
-    public override CardRarity Rarity => CardRarity.Uncommon;
+    public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 2;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();

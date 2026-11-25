@@ -33,7 +33,7 @@ public sealed class RestSiteOpenDecisionTests : IDisposable
         var run = new RunState("open-rest-" + optionId, new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), run);
         run.AddPlayer(player);
-        player.Creature.LoseHpInternal(74, default);
+        player.Creature.LoseHpInternal(74);
         CardModel firstCard = player.Deck.Cards[0];
         CardModel penultimateCard = player.Deck.Cards[8];
         CardModel lastCard = player.Deck.Cards[9];

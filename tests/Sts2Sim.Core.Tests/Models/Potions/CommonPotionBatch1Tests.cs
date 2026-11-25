@@ -163,7 +163,7 @@ public sealed class CommonPotionBatch1Tests : IDisposable
         Creature deadEnemy = room.Engine.State.AddMonster(
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone(),
             Sts2Sim.Core.Combat.CombatSide.Enemy);
-        deadEnemy.LoseHpInternal(deadEnemy.CurrentHp, ValueProp.Unpowered);
+        deadEnemy.LoseHpInternal(deadEnemy.CurrentHp);
         int firstHpBefore = firstLiving.CurrentHp;
         int secondHpBefore = secondLiving.CurrentHp;
 

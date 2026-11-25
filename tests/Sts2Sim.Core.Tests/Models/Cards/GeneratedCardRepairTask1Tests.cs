@@ -139,7 +139,7 @@ public sealed class GeneratedCardRepairTask1Tests : IDisposable
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("task1-crush-snapshot", enemyCount: 2);
         Creature defeatedEnemy = room.Engine.State.HittableEnemies.First();
-        defeatedEnemy.LoseHpInternal(defeatedEnemy.CurrentHp - 8, ValueProp.Unpowered);
+        defeatedEnemy.LoseHpInternal(defeatedEnemy.CurrentHp - 8);
         CrushUnder card = AddToHand<CrushUnder>(player);
 
         await card.PlayAsync(target: null);

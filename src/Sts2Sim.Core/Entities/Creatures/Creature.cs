@@ -71,6 +71,10 @@ public sealed class Creature
 
     public bool IsPrimaryEnemy => Side == CombatSide.Enemy && !IsSecondaryEnemy;
 
+    /// <summary>v0.114.0 <c>Creature.IsAttacking</c>：正在执行一次攻击。攻击途中死亡（例如被荆棘打死）时不立即移出战斗、
+    /// 不立即移除能力，由 <c>AttackCommand.Execute</c> 在攻击结束后统一处理。</summary>
+    public bool IsAttacking { get; set; }
+
     public IReadOnlyList<PowerModel> Powers => _powers;
 
     /// <summary>The same list as <see cref="Powers"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
@@ -207,31 +211,38 @@ public sealed class Creature
         return checked((int)selected);
     }
 
-    /// <summary>格挡吸收伤害。Unblockable 伤害完全穿透。逐字移植。</summary>
-    public decimal DamageBlockInternal(decimal amount, ValueProp props)
+    /// <summary>格挡吸收伤害。Unblockable 伤害完全穿透。逐字移植 v0.114.0：<paramref name="dryRun"/> 为真时不扣格挡，
+    /// 返回值照常。</summary>
+    public decimal DamageBlockInternal(decimal amount, ValueProp props, bool dryRun = false)
     {
         decimal blocked = props.HasFlag(ValueProp.Unblockable) ? 0m : Math.Min(Block, amount);
         // 故意保留原游戏的截断行为：Block 按 (int)blocked 扣减,但方法返回未截断的 blocked——
         // amount 若为小数（Task 9 引入百分比类 power 修正后可能出现）,返回值与 Block 实际扣减量可相差 <1。
-        // 这是 v0.109 反编译源码的逐字行为,不是移植 bug；修改前务必先核对真实游戏源码。
-        Block -= (int)blocked;
+        // 这是反编译源码的逐字行为,不是移植 bug；修改前务必先核对真实游戏源码。
+        if (!dryRun)
+        {
+            Block -= (int)blocked;
+        }
         return blocked;
     }
 
-    /// <summary>扣除未被格挡吸收的伤害。逐字移植（含击杀/超杀判定）。</summary>
-    public DamageResult LoseHpInternal(decimal amount, ValueProp props)
+    /// <summary>扣除未被格挡吸收的伤害。逐字移植 v0.114.0（含击杀/超杀判定）：<paramref name="dryRun"/> 为真时不扣 HP，
+    /// 返回值照常。<see cref="CumulativeHpLost"/> 是模拟器自有统计，只在真正扣血时累计。</summary>
+    public HpLossResult LoseHpInternal(decimal amount, bool dryRun = false)
     {
-        bool willKill = CurrentHp > 0 && amount >= (decimal)CurrentHp;
         int hpBefore = CurrentHp;
+        bool willKill = hpBefore > 0 && amount >= (decimal)hpBefore;
         int loss = (int)Math.Clamp(amount, 0m, 999999999m);
-        CurrentHp = Math.Max(CurrentHp - loss, 0);
-        CumulativeHpLost = checked(CumulativeHpLost + hpBefore - CurrentHp);
-        return new DamageResult(this, props)
+        int hpAfter = Math.Max(hpBefore - loss, 0);
+        if (!dryRun)
         {
-            UnblockedDamage = hpBefore - CurrentHp,
-            WasTargetKilled = willKill,
-            OverkillDamage = willKill ? Math.Max(loss - hpBefore, 0) : 0,
-        };
+            CurrentHp = hpAfter;
+            CumulativeHpLost = checked(CumulativeHpLost + hpBefore - hpAfter);
+        }
+        return new HpLossResult(
+            hpBefore - hpAfter,
+            willKill,
+            willKill ? Math.Max(loss - hpBefore, 0) : 0);
     }
 
     public void GainBlockInternal(decimal amount)

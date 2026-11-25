@@ -94,7 +94,7 @@ public sealed class RelicStatusTests : IDisposable
     /// (MegaCrit.Sts2.Core.Models.Relics.*), not from the simulator's previous behaviour.</summary>
     [Theory]
     [InlineData(typeof(Kunai))]            // Kunai.UpdateDisplay: AttacksPlayedThisTurn % 3 == 2 -> Active; reset on turn start / combat end
-    [InlineData(typeof(HappyFlower))]      // HappyFlower.AfterSideTurnStart: TurnsSeen == 2 -> Active; AfterCombatEnd -> Normal
+    [InlineData(typeof(HappyFlower))]      // HappyFlower.BeforeSideTurnStart (v0.114.0): TurnsSeen == 2 -> Active; AfterCombatEnd -> Normal
     [InlineData(typeof(RedSkull))]         // RedSkull.ModifyStrengthIfNecessary: hp <= 50% -> Active; AfterCombatEnd -> Normal
     [InlineData(typeof(PenNib))]           // PenNib.UpdateDisplay: AttacksPlayed % 10 == 9 -> Active; no combat-end reset
     [InlineData(typeof(VenerableTeaSet))]  // VenerableTeaSet.GainEnergyInNextCombat setter: armed -> Active

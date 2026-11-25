@@ -3,14 +3,15 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>v0.113.1 colorless rare (#927): 1 damage per hit, hits = (int)(Gold / GoldPerHit); upgrade lowers the
-/// divisor from 20 to 10. Native CalculatedVar is 0 outside combat. 偏离 #148：Gold 与 CalculationBase/Extra 用字段。</summary>
+/// <summary>v0.114.0 colorless rare (#1110): 2 damage per hit, hits = (int)(1 + Gold / 25); upgrade adds 1 damage
+/// (v0.113.1 was 1 damage, hits = Gold / 20, upgrade lowered the divisor to 10). Outside combat the native multiplier
+/// term is 0, so the hit count is the CalculationBase. 偏离 #148：Gold 与 CalculationBase/Extra 用字段。</summary>
 public sealed class MyShinies : CardModel, ICardChoiceBaseValueProvider, ICardDamageVariableProvider
 {
-    private const decimal CalculationBase = 0m;
+    private const decimal CalculationBase = 1m;
     private const decimal CalculationExtra = 1m;
-    private decimal _damage = 1m;
-    private decimal _goldPerHit = 20m;
+    private decimal _damage = 2m;
+    private decimal _goldPerHit = 25m;
 
     public bool TryGetThrashDamageVariable(out decimal amount)
     {
@@ -37,5 +38,5 @@ public sealed class MyShinies : CardModel, ICardChoiceBaseValueProvider, ICardDa
             .Targeting(cardPlay.Target).Execute();
     }
 
-    protected override void OnUpgrade() => _goldPerHit -= 10m;
+    protected override void OnUpgrade() => _damage += 1m;
 }

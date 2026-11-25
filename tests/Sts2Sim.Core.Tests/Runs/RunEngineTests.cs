@@ -77,7 +77,7 @@ public class RunEngineTests : IDisposable
         runState.Map.StartingMapPoint.PointType = MapPointType.Monster;
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
-        player.Creature.LoseHpInternal(player.Creature.MaxHp, default(ValueProp));
+        player.Creature.LoseHpInternal(player.Creature.MaxHp);
         Assert.True(runState.IsGameOver);
 
         var engine = new RunEngine(runState, PickFirstByCoord);

@@ -119,7 +119,7 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
         Creature firstLiving = room.Engine.State.HittableEnemies.Single();
         Creature secondLiving = AddEnemy(room);
         Creature deadEnemy = AddEnemy(room);
-        deadEnemy.LoseHpInternal(deadEnemy.CurrentHp, ValueProp.Unpowered);
+        deadEnemy.LoseHpInternal(deadEnemy.CurrentHp);
         PotionModel potion = (PotionModel)GetCanonicalPotion("PotionOfBinding").MutableClone();
         potion.AssignOwner(player);
 
@@ -149,7 +149,7 @@ public sealed class UncommonPotionBatch2Tests : IDisposable
         Creature consumerFirst = consumerRoom.Engine.State.HittableEnemies.Single();
         Creature consumerSecond = AddEnemy(consumerRoom);
         Creature consumerDead = AddEnemy(consumerRoom);
-        consumerDead.LoseHpInternal(consumerDead.CurrentHp, ValueProp.Unpowered);
+        consumerDead.LoseHpInternal(consumerDead.CurrentHp);
         SleightOfFlesh ownerCard = Task11CombatTestSupport.AddToHand<SleightOfFlesh>(potionOwner);
         SleightOfFlesh otherCard = Task11CombatTestSupport.AddToHand<SleightOfFlesh>(otherPlayer);
         otherCard.Upgrade();

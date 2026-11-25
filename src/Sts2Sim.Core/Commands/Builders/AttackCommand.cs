@@ -160,8 +160,48 @@ public sealed class AttackCommand
         return this;
     }
 
-    /// <summary>执行攻击。逐字移植调用序：Hook.BeforeAttack → 折叠命中次数 → 逐次结算 → Hook.AfterAttack。</summary>
+    /// <summary>执行攻击。逐字移植 v0.114.0：攻击期间置 <see cref="Creature.IsAttacking"/>（try/finally 恢复原值）；
+    /// 攻击者在本次攻击中死亡且不在怪物行动中时，攻击结束后统一收尾——可移除的敌人移出战斗，按死亡规则移除能力并触发
+    /// <c>AfterRemoved</c>。原版此处还有 <c>Player.DeactivateHooks()</c>，模拟器没有停用玩家钩子的机制（Kill 也不调），不加。</summary>
     public async Task<AttackCommand> Execute()
+    {
+        Creature? attacker = Attacker;
+        bool wasAttacking = attacker?.IsAttacking ?? false;
+        bool attackerWasDead = attacker?.IsDead ?? false;
+        if (attacker != null)
+        {
+            attacker.IsAttacking = true;
+        }
+
+        try
+        {
+            await ExecuteInternal();
+        }
+        finally
+        {
+            if (attacker != null)
+            {
+                attacker.IsAttacking = wasAttacking;
+            }
+        }
+
+        if (attacker != null && attacker.IsDead && !attackerWasDead && !(attacker.Monster?.IsPerformingMove ?? false))
+        {
+            ICombatState? combatState = attacker.CombatState;
+            if (combatState != null && Hook.ShouldCreatureBeRemovedFromCombatAfterDeath(combatState, attacker) &&
+                attacker.Side == CombatSide.Enemy && combatState.Enemies.Contains(attacker))
+            {
+                combatState.RemoveCreature(attacker);
+            }
+
+            await Commands.CreatureCmd.RemovePowersAfterDeath(combatState, attacker);
+        }
+
+        return this;
+    }
+
+    /// <summary>逐字移植调用序：Hook.BeforeAttack → 折叠命中次数 → 逐次结算 → Hook.AfterAttack。</summary>
+    private async Task ExecuteInternal()
     {
         if (Attacker == null)
         {
@@ -171,7 +211,7 @@ public sealed class AttackCommand
         ICombatState combatState = Attacker.CombatState ?? throw new InvalidOperationException("Attacker has no combat state.");
         if (combatState.IsOverOrEnding() || Attacker.IsDead)
         {
-            return this;
+            return;
         }
 
         if (!IsSingleTargeted && !IsMultiTargeted)
@@ -213,7 +253,6 @@ public sealed class AttackCommand
             concreteState.SemanticHistory.Record(concreteState, CombatSemanticHistory.ActorEvent.OstyAttack, ostyOwner);
 
         await Hook.AfterAttack(combatState, this);
-        return this;
     }
 
     internal void IncrementHitsInternal() => _hitCount++;

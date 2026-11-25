@@ -5,10 +5,10 @@ namespace Sts2Sim.Core.Models.Cards;
 
 public sealed class Quiver : CardModel, ICardChoiceBaseValueProvider
 {
-    private int Repeat => IsUpgraded ? 2 : 1;
+    private const int Repeat = 1;
 
     public override CardType Type => CardType.Power;
-    public override CardRarity Rarity => CardRarity.Rare;
+    public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
 
@@ -23,4 +23,6 @@ public sealed class Quiver : CardModel, ICardChoiceBaseValueProvider
 
         return Task.CompletedTask;
     }
+
+    protected override void OnUpgrade() => AddKeyword(CardKeyword.Innate);
 }

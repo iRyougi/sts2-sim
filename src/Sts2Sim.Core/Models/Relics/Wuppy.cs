@@ -70,8 +70,10 @@ public sealed class Wuppy : RelicModel
         AssertMutable();
         _combatWuppy = combatState.CreateCreature(monster, Owner.Creature.Side, slotName: null);
         await PowerCmd.Apply<WuppysLoyaltyPower>(combatState, _combatWuppy, 1m, null, null);
-        await CreatureCmd.SetMaxHp(_combatWuppy, MaxHp);
-        await CreatureCmd.SetCurrentHp(_combatWuppy, CurrentHp);
+        // v0.114.0 (#1110): native sets the pet's HP through the internal setters, so no HP hook runs on summon
+        // (v0.113.1 went through CreatureCmd.SetMaxHp / SetCurrentHp).
+        _combatWuppy.SetMaxHpInternal(MaxHp);
+        _combatWuppy.SetCurrentHpInternal(CurrentHp);
         await PlayerCmd.AddPet(_combatWuppy, Owner);
     }
 

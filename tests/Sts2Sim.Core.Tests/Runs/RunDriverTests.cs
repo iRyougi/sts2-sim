@@ -460,7 +460,7 @@ public class RunDriverTests : IDisposable
     {
         RunState runState = NewRunState("run-driver-dead");
         Player player = runState.Players[0];
-        player.Creature.LoseHpInternal(player.Creature.MaxHp, default);
+        player.Creature.LoseHpInternal(player.Creature.MaxHp);
 
         var driver = new RunDriver(runState, new FirstChoiceDecisionSource());
         RunDriver.Result result = await driver.RunAsync(maxFloors: 200);
@@ -768,7 +768,7 @@ public class RunDriverTests : IDisposable
         string seed = $"event-death-527-{initialHp}";
         RunState lethalRun = NewRunState(seed);
         Player player = lethalRun.Players[0];
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - initialHp, default);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - initialHp);
         lethalRun.AddVisitedMapCoord(lethalRun.Map.StartingMapPoint.coord);
         var room = new EventRoom(() => (EventModel)ModelDb.Event<SlipperyBridge>().MutableClone());
         lethalRun.PushRoom(room);

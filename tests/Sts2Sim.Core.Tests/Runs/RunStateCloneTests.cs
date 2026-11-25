@@ -929,7 +929,7 @@ public sealed partial class RunStateCloneTests
         Assert.NotSame(childEnemy.Monster, siblingEnemy.Monster);
         Assert.Same(childCombat, childEnemy.CombatState);
         int originalHp = enemy.CurrentHp;
-        childEnemy.LoseHpInternal(1m, Sts2Sim.Core.ValueProps.ValueProp.Unblockable);
+        childEnemy.LoseHpInternal(1m);
         Assert.Equal(originalHp - 1, childEnemy.CurrentHp);
         Assert.Equal(originalHp, enemy.CurrentHp);
         Assert.Equal(originalHp, siblingEnemy.CurrentHp);

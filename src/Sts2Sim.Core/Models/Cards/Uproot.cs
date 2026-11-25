@@ -11,7 +11,7 @@ public sealed class Uproot : CardModel, ICardChoiceBaseValueProvider
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.AnyEnemy;
-    protected override int CanonicalEnergyCost => 1;
+    protected override int CanonicalEnergyCost => 0;
 
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 

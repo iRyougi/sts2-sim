@@ -11,7 +11,7 @@ public sealed class ViolentChord : CardModel, ICardChoiceBaseValueProvider
     public override CardRarity Rarity => CardRarity.Uncommon;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
-    private decimal PowerAmount => IsUpgraded ? 12m : 9m;
+    private decimal PowerAmount => IsUpgraded ? 9m : 7m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
     protected override async Task OnPlay(CardPlay cardPlay)

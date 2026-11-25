@@ -10,6 +10,4 @@ public sealed class ArrowSlot(Player owner)
     public bool IsAvailable => Status == ArrowStatus.Retrieved;
 
     public ArrowStatus Status { get; set; }
-
-    public bool DestroyAfterImpaled { get; set; }
 }

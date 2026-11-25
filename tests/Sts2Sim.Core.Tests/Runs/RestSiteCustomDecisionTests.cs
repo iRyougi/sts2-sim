@@ -34,7 +34,7 @@ public sealed class RestSiteCustomDecisionTests : IDisposable
         runState.Map.StartingMapPoint.PointType = MapPointType.Monster;
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
-        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1, default(ValueProp));
+        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1);
         int hpBefore = player.Creature.CurrentHp;
         runState.Map.StartingMapPoint.Children.OrderBy(point => point.coord.col).First().PointType =
             MapPointType.RestSite;

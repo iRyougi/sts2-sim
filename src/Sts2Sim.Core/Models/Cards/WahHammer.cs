@@ -14,7 +14,7 @@ public sealed class WahHammer : CardModel, ICardChoiceBaseValueProvider, ICardDa
     public override TargetType TargetType => TargetType.AnyEnemy;
     protected override int CanonicalEnergyCost => 1;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Wah];
-    private decimal Damage => IsUpgraded ? 12m : 9m;
+    private decimal Damage => IsUpgraded ? 11m : 9m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 

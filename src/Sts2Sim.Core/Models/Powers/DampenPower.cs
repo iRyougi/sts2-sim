@@ -23,7 +23,7 @@ public sealed class DampenPower : PowerModel
                      .Where(card => card.IsUpgraded))
         {
             _downgraded[card] = card.CurrentUpgradeLevel;
-            CardCmd.Downgrade(card);
+            CardCmd.RemoveAllUpgrades(card);
         }
 
         return Task.CompletedTask;

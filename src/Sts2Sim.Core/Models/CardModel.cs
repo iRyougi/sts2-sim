@@ -647,7 +647,22 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
     }
 
-    public void Downgrade()
+    /// <summary>v0.114.0 原版 <c>CardModel.RemoveAllUpgradesInternal</c>：降级全部等级。
+    /// 0 级牌：原版 <c>DowngradeInternal(0)</c> 只按同一规则重建 0 级关键字，结果与现状相同，这里直接返回。</summary>
+    public void RemoveAllUpgrades()
+    {
+        AssertMutable();
+        if (CurrentUpgradeLevel == 0)
+        {
+            return;
+        }
+
+        Downgrade(CurrentUpgradeLevel);
+    }
+
+    /// <summary>v0.114.0 原版 <c>CardModel.DowngradeInternal(int downgradeAmount = 1)</c>：先回到 0 级，
+    /// 再静默升级回 <c>原等级 - downgradeAmount</c>。单级牌与旧版"回到 0 级"相同；多级牌（DingyDagger）只降指定级数。</summary>
+    public void Downgrade(int downgradeAmount = 1)
     {
         AssertMutable();
         if (CurrentUpgradeLevel <= 0)
@@ -655,7 +670,15 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             throw new InvalidOperationException("Card is not upgraded.");
         }
 
-        // Native DowngradeInternal always returns to level 0; identical to one step for single-level cards (#927).
+        if (downgradeAmount <= 0 || downgradeAmount > CurrentUpgradeLevel)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(downgradeAmount),
+                downgradeAmount,
+                $"Downgrade amount must be within 1..{CurrentUpgradeLevel}.");
+        }
+
+        int targetLevel = CurrentUpgradeLevel - downgradeAmount;
         CardModel lowerLevel = CreateCanonicalReplay(0);
         CardModel currentLevel = CreateCanonicalReplay(CurrentUpgradeLevel);
         Dictionary<FieldInfo, object> lowerNumeric = lowerLevel.CaptureUpgradeNumericState();
@@ -686,6 +709,12 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
         CurrentUpgradeLevel = 0;
         SetEffectiveKeywords(restoredKeywords);
+
+        // 原版重建 0 级后 UpgradeInternal(silent: true) 逐级升回目标等级（模拟器没有 Upgraded 事件，静默无差别）。
+        for (int level = 0; level < targetLevel; level++)
+        {
+            Upgrade();
+        }
     }
 
     private Dictionary<FieldInfo, object> CaptureUpgradeNumericState()

@@ -1,21 +1,35 @@
-using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Commands;
-using Sts2Sim.Core.Entities.Creatures;
+using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Powers;
+using Sts2Sim.Core.Helpers;
 
 namespace Sts2Sim.Core.Models.Powers;
 
-/// <summary>若我方回合结束时本回合打出过 Ki，则获得 FreeCardPower（原版 <c>TunePower</c>）。</summary>
+/// <summary>每回合首次打出 Ki 牌后，随机升级手牌中层数张可升级牌（v0.114.0 原版 <c>TunePower</c>）。</summary>
 public sealed class TunePower : PowerModel
 {
     public override PowerType Type => PowerType.Buff;
     public override PowerStackType StackType => PowerStackType.Counter;
 
-    public override async Task AfterSideTurnEnd(CombatSide side, IEnumerable<Creature> participants)
+    public override Task AfterCardPlayed(CardPlay cardPlay)
     {
-        if (side != CombatSide.Enemy && Owner.Player is { } player && MelodyCmd.PlayedKiThisTurn(player))
+        if (!ReferenceEquals(cardPlay.Card.Owner, Owner.Player) ||
+            !cardPlay.Card.Tags.Contains(CardTag.Ki) ||
+            !MelodyCmd.IsFirstPlayThisTurn(cardPlay, CardTag.Ki))
         {
-            await PowerCmd.Apply<FreeCardPower>(Owner.CombatState!, Owner, Amount, Owner, null);
+            return Task.CompletedTask;
         }
+
+        Entities.Players.Player player = Owner.Player!;
+        List<CardModel> toUpgrade = player.PlayerCombatState!.Hand.Cards
+            .Where(card => card.IsUpgradable)
+            .TakeRandom(Amount, player.RunState.Rng.CombatCardSelection)
+            .ToList();
+        foreach (CardModel card in toUpgrade)
+        {
+            CardCmd.Upgrade(card);
+        }
+
+        return Task.CompletedTask;
     }
 }

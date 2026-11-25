@@ -85,7 +85,7 @@ public sealed class MultiActRunStateTests : IDisposable
         var distinctiveRelic = (RelicModel)ModelDb.Relic<Vajra>().MutableClone();
         distinctiveRelic.AssignOwner(player);
         player.AddRelicInternal(distinctiveRelic);
-        player.Creature.LoseHpInternal(7, default);
+        player.Creature.LoseHpInternal(7);
         int hpBefore = player.Creature.CurrentHp;
 
         runState.AdvanceToNextAct();

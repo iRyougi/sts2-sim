@@ -103,7 +103,7 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
     public async Task RegenPotion_HealsDescendingAmountsOnlyAtOwnerSideEarlyEndThenRemoves()
     {
         (Player player, CombatRoom room) = await CreateCombatAsync("regen-descending");
-        player.Creature.LoseHpInternal(30m, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(30m);
 
         await UsePotionAsync("RegenPotion", player, player.Creature);
 
@@ -164,7 +164,7 @@ public sealed class UncommonPotionBatch3Tests : IDisposable
         PowerModel regen = Assert.Single(
             player.Creature.Powers,
             power => power.GetType() == RequireTask9Type("RegenPower"));
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp);
 
         await Hook.BeforeSideTurnEndEarly(
             room.Engine.State,

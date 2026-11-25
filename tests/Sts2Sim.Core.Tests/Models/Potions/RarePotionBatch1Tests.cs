@@ -160,7 +160,7 @@ public sealed class RarePotionBatch1Tests : IDisposable
         PowerModel shrink = Assert.Single(
             enemy.Powers,
             power => power.GetType() == RequireTask10Type("ShrinkPower"));
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp, ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp);
 
         await Hook.AfterDeath(room.Engine.State, player.Creature);
 

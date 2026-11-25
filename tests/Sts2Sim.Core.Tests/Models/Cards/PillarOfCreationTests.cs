@@ -133,7 +133,7 @@ public sealed class PillarOfCreationTests : IDisposable
         (Player player, CombatRoom room) = await CreateCombatAsync("pillar-ended-combat");
         await ApplyPillarAsync(room.Engine.State, player, 5m);
         Creature endedCreature = victory ? room.Engine.State.Enemies.Single() : player.Creature;
-        endedCreature.LoseHpInternal(decimal.MaxValue, default);
+        endedCreature.LoseHpInternal(decimal.MaxValue);
         Assert.True(room.Engine.CheckWinCondition());
         Assert.False(room.Engine.IsInProgress);
         Assert.Equal(victory, room.Engine.Won);

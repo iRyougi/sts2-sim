@@ -12,7 +12,7 @@ public sealed class SelfDeprecate : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.AllAllies;
     public override bool IsMultiplayerOnly => true;
     protected override int CanonicalEnergyCost => 1;
-    private int JoyCount => IsUpgraded ? 3 : 2;
+    private int JoyCount => IsUpgraded ? 2 : 1;
     private const int SadnessCount = 1;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 

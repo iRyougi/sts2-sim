@@ -4,7 +4,7 @@ using Sts2Sim.Core.ValueProps;
 
 namespace Sts2Sim.Core.Models.Cards;
 
-/// <summary>获得 14（升级 18）点格挡并向手牌生成 1 张 Sadness（原版 <c>Jest</c>）。</summary>
+/// <summary>获得 15（升级 19）点格挡并向手牌生成 1 张 Sadness（原版 <c>Jest</c>）。</summary>
 public sealed class Jest : CardModel, ICardChoiceBaseValueProvider
 {
     public override bool GainsBlock => true;
@@ -12,7 +12,7 @@ public sealed class Jest : CardModel, ICardChoiceBaseValueProvider
     public override CardRarity Rarity => CardRarity.Common;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 2;
-    private decimal Block => IsUpgraded ? 18m : 14m;
+    private decimal Block => IsUpgraded ? 19m : 15m;
     private const int Cards = 1;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Block: (double)Block, Cards: Cards);
 

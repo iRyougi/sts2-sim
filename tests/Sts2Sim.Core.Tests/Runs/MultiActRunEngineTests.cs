@@ -189,7 +189,7 @@ public sealed class MultiActRunEngineTests : IDisposable
         {
             if (runState.CurrentActIndex == 1)
             {
-                player.Creature.LoseHpInternal(player.Creature.CurrentHp, default(ValueProp));
+                player.Creature.LoseHpInternal(player.Creature.CurrentHp);
             }
         };
 
@@ -217,7 +217,7 @@ public sealed class MultiActRunEngineTests : IDisposable
         {
             if (runState.CurrentActIndex == actCount - 1)
             {
-                player.Creature.LoseHpInternal(player.Creature.CurrentHp, default(ValueProp));
+                player.Creature.LoseHpInternal(player.Creature.CurrentHp);
             }
         };
 

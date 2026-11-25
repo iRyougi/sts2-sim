@@ -130,11 +130,17 @@ public sealed class CombatSemanticHistory
         if (owner.Player is not { } player)
             return 0;
         int actorIndex = PlayerIndex(state, player);
-        return _cardBlockGains.Count(entry =>
-            entry.ActorIndex == actorIndex &&
-            entry.Turn.HappenedThisTurn(state) &&
-            (currentPlay is null ||
-             entry.PlayOrdinal != currentPlay.PlayOrdinal));
+        // v0.114.0 (#1110): native UnmovablePower counts distinct CardPlays (.DistinctBy(e => e.CardPlay)), so one card
+        // play that gains block several times (a multi-hit or repeated gain) counts once.
+        return _cardBlockGains
+            .Where(entry =>
+                entry.ActorIndex == actorIndex &&
+                entry.Turn.HappenedThisTurn(state) &&
+                (currentPlay is null ||
+                 entry.PlayOrdinal != currentPlay.PlayOrdinal))
+            .Select(entry => entry.PlayOrdinal)
+            .Distinct()
+            .Count();
     }
 
     internal CombatSemanticHistory Clone()

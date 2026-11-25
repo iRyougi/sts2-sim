@@ -71,8 +71,9 @@ public static class TransplantFieldRegistry
         "TheBall._damage", "Wither._fakeUpgradeLevel",
         "Disintegration.<PowerAmount>k__BackingField",
         "Wuppy._combatWuppy",
-        "TheShot._cardsExhaustedByFlorescence",
         "Bounce._lastFinishedPlayerTurn",
+        // v0.114.0（#1110）：原生非 [SavedProperty]；每个己方回合 BeforeSideTurnStart 先写、AfterPlayerTurnStartEarly 再消费。
+        "HappyFlower._grantEnergyThisTurn", "FakeHappyFlower._grantEnergyThisTurn",
     ];
     private static readonly HashSet<string> CombatOnlyPowerFields =
     [
@@ -81,7 +82,6 @@ public static class TransplantFieldRegistry
         "EncorePower._numberOfCardsPlayedSinceApplied",
         "LullabyPower._proccdThisTurn",
         "EnnuiPower._sadnessAmount",
-        "MythicFormPower._upgradedCount",
         "ShowOffPower._showOffInstance",
     ];
 

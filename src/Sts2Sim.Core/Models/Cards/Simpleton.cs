@@ -15,8 +15,6 @@ public sealed class Simpleton : CardModel, ICardChoiceBaseValueProvider
 
     protected override async Task OnPlay(CardPlay cardPlay)
     {
-        await PowerCmd.Apply<SimpletonPower>(CombatState!, Owner.Creature, 1m, Owner.Creature, this);
+        await PowerCmd.Apply<SimpletonPower>(CombatState!, Owner.Creature, IsUpgraded ? 2m : 1m, Owner.Creature, this);
     }
-
-    protected override void OnUpgrade() => ReduceEnergyCost(1);
 }

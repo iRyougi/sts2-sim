@@ -188,7 +188,7 @@ public sealed class ByrdpipTests : IDisposable
             (WanderingGrunt)ModelDb.Monster<WanderingGrunt>().MutableClone());
         await combatRoom.Enter(runState);
         ByrdonisEgg combatEgg = Assert.Single(CombatCards(player).OfType<ByrdonisEgg>());
-        combatRoom.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue, default);
+        combatRoom.Engine.State.Enemies[0].LoseHpInternal(decimal.MaxValue);
         Assert.True(combatRoom.Engine.CheckWinCondition());
         Assert.False(combatRoom.Engine.IsInProgress);
 

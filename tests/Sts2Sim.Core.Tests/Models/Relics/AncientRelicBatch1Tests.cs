@@ -374,7 +374,7 @@ public sealed class AncientRelicBatch1Tests : IDisposable
     public async Task NutritiousOyster_GainsAndHealsExactlyElevenMaxHp()
     {
         (_, Player player) = CreateRun("nutritious-oyster");
-        player.Creature.LoseHpInternal(20m, Sts2Sim.Core.ValueProps.ValueProp.Unpowered);
+        player.Creature.LoseHpInternal(20m);
         int maxHpBefore = player.Creature.MaxHp;
         int currentHpBefore = player.Creature.CurrentHp;
 

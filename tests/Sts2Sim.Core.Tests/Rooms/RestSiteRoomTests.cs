@@ -23,7 +23,7 @@ public class RestSiteRoomTests
         var runState = new RunState("rest-a", new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
         runState.AddPlayer(player);
-        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1, default(ValueProp));
+        player.Creature.LoseHpInternal(player.Creature.MaxHp - 1);
         int hpBefore = player.Creature.CurrentHp;
 
         var room = new RestSiteRoom();

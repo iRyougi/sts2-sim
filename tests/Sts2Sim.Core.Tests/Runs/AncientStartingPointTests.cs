@@ -99,7 +99,7 @@ public sealed class AncientStartingPointTests : IDisposable
         public override Task EnterInternal(RunState? runState)
         {
             Player player = runState!.Players[0];
-            player.Creature.LoseHpInternal(player.Creature.MaxHp, default);
+            player.Creature.LoseHpInternal(player.Creature.MaxHp);
             return Task.CompletedTask;
         }
 

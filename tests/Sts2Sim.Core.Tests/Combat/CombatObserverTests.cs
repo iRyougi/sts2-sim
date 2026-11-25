@@ -192,7 +192,7 @@ public sealed class CombatObserverTests : IDisposable
         var potion = (StrengthPotion)ModelDb.Potion<StrengthPotion>().MutableClone();
         player.AddPotionInternal(potion);
         Creature enemy = room.Engine.State.Enemies[0];
-        enemy.LoseHpInternal(enemy.CurrentHp, Sts2Sim.Core.ValueProps.ValueProp.Unblockable);
+        enemy.LoseHpInternal(enemy.CurrentHp);
 
         bool used = await CombatPotionPolicy.TryUseFirstAvailableAsync(room.Engine, player);
 

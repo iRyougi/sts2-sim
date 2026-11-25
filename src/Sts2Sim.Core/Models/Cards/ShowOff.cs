@@ -16,7 +16,7 @@ public sealed class ShowOff : CardModel, ICardChoiceBaseValueProvider, ICardComp
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.Self;
-    protected override int CanonicalEnergyCost => 1;
+    protected override int CanonicalEnergyCost => 0;
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust];
 
     public int CurrentAim => _currentAim;

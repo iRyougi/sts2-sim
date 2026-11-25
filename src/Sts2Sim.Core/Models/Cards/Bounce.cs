@@ -15,7 +15,7 @@ public sealed class Bounce : CardModel, ICardChoiceBaseValueProvider
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 1;
-    private decimal StretchAmount => IsUpgraded ? 13m : 10m;
+    private decimal StretchAmount => IsUpgraded ? 11m : 8m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
     protected override async Task OnPlay(CardPlay cardPlay)

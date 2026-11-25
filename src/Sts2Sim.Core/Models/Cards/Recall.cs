@@ -3,12 +3,14 @@ using Sts2Sim.Core.Entities.Cards;
 
 namespace Sts2Sim.Core.Models.Cards;
 
+/// <summary>0 费、消耗、保留：拔出目标身上自己的全部箭矢；升级去掉消耗（v0.114.0 原版 <c>Recall</c>）。</summary>
 public sealed class Recall : CardModel, ICardChoiceBaseValueProvider
 {
     public override CardType Type => CardType.Skill;
     public override CardRarity Rarity => CardRarity.Common;
     public override TargetType TargetType => TargetType.AnyEnemy;
-    protected override int CanonicalEnergyCost => 1;
+    protected override int CanonicalEnergyCost => 0;
+    protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords => [CardKeyword.Exhaust, CardKeyword.Retain];
 
     public CardChoiceBaseValues? CardChoiceBaseValues => new();
 
@@ -23,21 +25,8 @@ public sealed class Recall : CardModel, ICardChoiceBaseValueProvider
             {
                 await ArrowCmd.DislodgeArrow(cardPlay.Target, cardPlay.Player, this);
             }
-
-            CardModel? selected = (await CardSelectCmd.FromCombatPile(
-                CombatState!,
-                Owner,
-                Owner.PlayerCombatState!.DiscardPile,
-                1,
-                1,
-                this,
-                cancelable: false)).FirstOrDefault();
-            if (selected is not null)
-            {
-                CardPileCmd.Add(selected, PileType.Draw, CardPilePosition.Top);
-            }
         }
     }
 
-    protected override void OnUpgrade() => ReduceEnergyCost(1);
+    protected override void OnUpgrade() => RemoveKeyword(CardKeyword.Exhaust);
 }

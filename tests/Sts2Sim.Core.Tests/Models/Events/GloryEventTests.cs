@@ -273,6 +273,20 @@ public sealed class GloryEventTests : IDisposable
         Assert.Equal(4, player.Deck.Cards.Count(card => card.IsUpgraded));
         Assert.Equal(6, ev.Rng.Counter - rngBefore);
         Assert.True(ev.IsFinished);
+
+        // v0.114.0 (#1109): a lone DingyDagger+3 is downgraded one level (3 -> 2) and then upgraded back (-> 3);
+        // v0.113.1 reset it to 0 before the upgrade (-> 1).
+        foreach (CardModel card in player.Deck.Cards.ToList())
+        {
+            CardPileCmd.Remove(card);
+        }
+        var dagger = (DingyDagger)await AddCard<DingyDagger>(player);
+        for (int level = 0; level < 3; level++)
+        {
+            CardCmd.Upgrade(dagger);
+        }
+        await Choose(Begin<Reflections>(runState, player), "TOUCH_A_MIRROR");
+        Assert.Equal(3, dagger.CurrentUpgradeLevel);
     }
 
     [Fact]
@@ -293,11 +307,11 @@ public sealed class GloryEventTests : IDisposable
     {
         (RunState runState, Player player) = CreateRun("tea-enjoy");
         var prototype = ModelDb.Event<RoundTeaParty>();
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 11, default);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 11);
         Assert.False(prototype.IsAllowed(runState));
         player.Creature.HealInternal(1);
         Assert.True(prototype.IsAllowed(runState));
-        player.Creature.LoseHpInternal(5, default);
+        player.Creature.LoseHpInternal(5);
         RoundTeaParty ev = Begin<RoundTeaParty>(runState, player);
 
         await Choose(ev, "ENJOY_TEA");
@@ -349,7 +363,7 @@ public sealed class GloryEventTests : IDisposable
     public async Task Trial_NobleVerdictsHealTenOrTradeRegretForThreeHundredGold()
     {
         (_, Player guiltyPlayer, Trial guilty) = await FindTrialPage("NOBLE");
-        guiltyPlayer.Creature.LoseHpInternal(20, default);
+        guiltyPlayer.Creature.LoseHpInternal(20);
         int hpBefore = guiltyPlayer.Creature.CurrentHp;
         await Choose(guilty, "NOBLE_GUILTY");
         Assert.Equal(hpBefore + 10, guiltyPlayer.Creature.CurrentHp);

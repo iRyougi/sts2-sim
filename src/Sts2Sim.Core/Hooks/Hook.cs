@@ -1987,12 +1987,12 @@ public static class Hook
         }
     }
 
-    /// <summary>原版遍历战斗侧监听者且不经过结束守卫（<c>combatState.IterateHookListeners()</c>）。</summary>
-    public static Creature ModifyUnblockedDamageTarget(ICombatState combatState, Creature originalTarget,
+    /// <summary>原版遍历战斗侧监听者且不经过结束守卫（<c>combatState?.IterateHookListeners()</c>）；战斗外原样返回。</summary>
+    public static Creature ModifyUnblockedDamageTarget(ICombatState? combatState, Creature originalTarget,
         decimal amount, ValueProp props, Creature? dealer)
     {
         Creature target = originalTarget;
-        foreach (AbstractModel item in combatState.IterateHookListeners())
+        foreach (AbstractModel item in combatState is null ? [] : combatState.IterateHookListeners())
         {
             if (HookOverrideIndex.Skips(item, HookOverrideIndex.HookSlot.ModifyUnblockedDamageTarget)) continue;
             if (!IsEligibleHookListener(item)) continue;

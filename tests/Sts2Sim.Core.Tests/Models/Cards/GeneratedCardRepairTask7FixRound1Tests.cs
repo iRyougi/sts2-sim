@@ -124,7 +124,7 @@ public sealed class GeneratedCardRepairTask7FixRound1Tests : IDisposable
         Player owner = players[0];
         ClearCombatPiles(owner);
         Creature enemy = room.Engine.State.Enemies.Single();
-        enemy.LoseHpInternal(enemy.CurrentHp, ValueProp.Unblockable);
+        enemy.LoseHpInternal(enemy.CurrentHp);
         Task7FixAnyEnemyCard card = AddTo<Task7FixAnyEnemyCard>(
             owner, PileType.Draw, CardPilePosition.Top);
 

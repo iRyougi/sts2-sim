@@ -13,6 +13,8 @@ public class CreatureTests
         Creature creature = MakeStandalone(50);
         creature.GainBlockInternal(10m);
 
+        Assert.Equal(6m, creature.DamageBlockInternal(6m, ValueProps.ValueProp.Move, dryRun: true));
+        Assert.Equal(10, creature.Block);
         decimal blocked = creature.DamageBlockInternal(6m, ValueProps.ValueProp.Move);
 
         Assert.Equal(6m, blocked);
@@ -36,12 +38,18 @@ public class CreatureTests
     {
         Creature creature = MakeStandalone(10);
 
-        DamageResult result = creature.LoseHpInternal(15m, ValueProp.Move);
+        // v0.114.0 dryRun：返回值照常，HP 与 CumulativeHpLost 不变。
+        HpLossResult preview = creature.LoseHpInternal(15m, dryRun: true);
+        Assert.Equal(10, creature.CurrentHp);
+        Assert.Equal(0, creature.CumulativeHpLost);
 
+        HpLossResult result = creature.LoseHpInternal(15m);
+
+        Assert.Equal(preview, result);
         Assert.Equal(0, creature.CurrentHp);
-        Assert.Equal(10, result.UnblockedDamage);
-        Assert.True(result.WasTargetKilled);
-        Assert.Equal(5, result.OverkillDamage);
+        Assert.Equal(10, result.HpLost);
+        Assert.True(result.Killed);
+        Assert.Equal(5, result.OverkillAmount);
     }
 
     [Fact]
@@ -49,12 +57,12 @@ public class CreatureTests
     {
         Creature creature = MakeStandalone(10);
 
-        DamageResult result = creature.LoseHpInternal(3m, ValueProp.Move);
+        HpLossResult result = creature.LoseHpInternal(3m);
 
         Assert.Equal(7, creature.CurrentHp);
-        Assert.Equal(3, result.UnblockedDamage);
-        Assert.False(result.WasTargetKilled);
-        Assert.Equal(0, result.OverkillDamage);
+        Assert.Equal(3, result.HpLost);
+        Assert.False(result.Killed);
+        Assert.Equal(0, result.OverkillAmount);
     }
 
     [Fact]
@@ -107,7 +115,7 @@ public class CreatureTests
         Creature creature = MakeStandalone(1);
         Assert.True(creature.IsAlive);
 
-        creature.LoseHpInternal(1m, ValueProp.Move);
+        creature.LoseHpInternal(1m);
         Assert.False(creature.IsAlive);
         Assert.True(creature.IsDead);
     }

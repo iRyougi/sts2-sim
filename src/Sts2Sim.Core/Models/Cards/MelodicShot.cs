@@ -12,7 +12,7 @@ public sealed class MelodicShot : CardModel, ICardChoiceBaseValueProvider, ICard
     public override TargetType TargetType => TargetType.AnyEnemy;
     protected override int CanonicalEnergyCost => 1;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Shoot];
-    private decimal Damage => IsUpgraded ? 13m : 12m;
+    private decimal Damage => IsUpgraded ? 14m : 12m;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Damage: (double)Damage);
     public bool TryGetThrashDamageVariable(out decimal amount) { amount = Damage; return true; }
 
@@ -29,6 +29,4 @@ public sealed class MelodicShot : CardModel, ICardChoiceBaseValueProvider, ICard
             .Targeting(cardPlay.Target);
         await ArrowCmd.ShootArrowAtTarget(cardPlay.Target, Owner, command);
     }
-
-    protected override void OnUpgrade() => ReduceEnergyCost(1);
 }

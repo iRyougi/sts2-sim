@@ -49,7 +49,6 @@ public sealed class PlayerCombatState
             _arrows.Add(new ArrowSlot(_player)
             {
                 Status = source.Status,
-                DestroyAfterImpaled = source.DestroyAfterImpaled,
             });
         }
     }
@@ -164,12 +163,6 @@ public sealed class PlayerCombatState
     public int ChoStartedThisTurn { get; private set; }
     public int KiStartedThisTurn { get; private set; }
 
-    /// <summary>本回合已完成的含对应旋律标签出牌次数（含自动出牌与重放）。</summary>
-    public int WahFinishedThisTurn { get; private set; }
-    public int ChoFinishedThisTurn { get; private set; }
-    public int KiFinishedThisTurn { get; private set; }
-    public int MelodyCardsFinishedThisTurn { get; private set; }
-
     internal void RecordCardPlayStarted(CardPlay cardPlay)
     {
         CardType type = cardPlay.Card.Type;
@@ -238,14 +231,6 @@ public sealed class PlayerCombatState
         {
             ShivsPlayedThisTurn++;
         }
-
-        bool hasWah = card.Tags.Contains(CardTag.Wah);
-        bool hasCho = card.Tags.Contains(CardTag.Cho);
-        bool hasKi = card.Tags.Contains(CardTag.Ki);
-        if (hasWah) WahFinishedThisTurn++;
-        if (hasCho) ChoFinishedThisTurn++;
-        if (hasKi) KiFinishedThisTurn++;
-        if (hasWah || hasCho || hasKi) MelodyCardsFinishedThisTurn++;
     }
 
     public void RecordCardGenerated() => CardsGeneratedThisCombat++;
@@ -351,10 +336,6 @@ public sealed class PlayerCombatState
         FirstWahPlayOrdinalThisTurn = 0;
         FirstChoPlayOrdinalThisTurn = 0;
         FirstKiPlayOrdinalThisTurn = 0;
-        WahFinishedThisTurn = 0;
-        ChoFinishedThisTurn = 0;
-        KiFinishedThisTurn = 0;
-        MelodyCardsFinishedThisTurn = 0;
     }
 
     internal PlayerCombatState CloneForCombat(
@@ -389,10 +370,6 @@ public sealed class PlayerCombatState
             FirstWahPlayOrdinalThisTurn = FirstWahPlayOrdinalThisTurn,
             FirstChoPlayOrdinalThisTurn = FirstChoPlayOrdinalThisTurn,
             FirstKiPlayOrdinalThisTurn = FirstKiPlayOrdinalThisTurn,
-            WahFinishedThisTurn = WahFinishedThisTurn,
-            ChoFinishedThisTurn = ChoFinishedThisTurn,
-            KiFinishedThisTurn = KiFinishedThisTurn,
-            MelodyCardsFinishedThisTurn = MelodyCardsFinishedThisTurn,
             OrbQueue = OrbQueue.CloneForCombat(clonedPlayer),
         };
 

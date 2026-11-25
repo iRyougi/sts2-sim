@@ -78,8 +78,13 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
     {
         AssertMutable();
         MoveState move = NextMove ?? throw new InvalidOperationException("No move has been rolled.");
-        IReadOnlyList<Creature> targets = Creature.CombatState!.PlayerCreatures;
-        using IDisposable? rngScope = (Creature.CombatState as CombatState)?.BeginMonsterRngScope(Creature);
+        // 原版 v0.114.0：CombatState 为空时直接返回。
+        if (Creature.CombatState is not { } combatState)
+        {
+            return;
+        }
+        IReadOnlyList<Creature> targets = combatState.PlayerCreatures;
+        using IDisposable? rngScope = (combatState as CombatState)?.BeginMonsterRngScope(Creature);
         IsPerformingMove = true;
         try
         {
@@ -91,10 +96,15 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
             IsPerformingMove = false;
         }
 
-        if (Creature.CombatState is { } combatState && Creature.IsDead &&
-            Hook.ShouldCreatureBeRemovedFromCombatAfterDeath(combatState, Creature))
+        // v0.114.0：行动中死亡的生物在行动结束后才移出战斗并清空能力（Kill 对 IsPerformingMove 推迟了两者）。
+        if (Creature.IsDead)
         {
-            combatState.RemoveCreature(Creature);
+            if (Hook.ShouldCreatureBeRemovedFromCombatAfterDeath(combatState, Creature))
+            {
+                combatState.RemoveCreature(Creature);
+            }
+
+            await Commands.CreatureCmd.RemovePowersAfterDeath(combatState, Creature);
         }
     }
 

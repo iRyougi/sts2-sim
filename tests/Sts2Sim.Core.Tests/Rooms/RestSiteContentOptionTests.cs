@@ -94,6 +94,13 @@ public sealed class RestSiteContentOptionTests : IDisposable
                 Assert.Same(player, copy.Owner);
                 Assert.NotSame(marked!.Enchantments.Single(), copy.Enchantments.Single());
                 Assert.Equal(4m, copy.Enchantments.Single().Magnitude);
+                // v0.114.0 (#1110): the option belongs to the Clone enchantment, not to Pael's Growth, and is
+                // enabled only while a Clone card is in the deck.
+                Assert.True(decision.IsEnabled);
+                foreach (CardModel cloned in player.Deck.Cards.Where(card => card.Enchantments.Any(e => e is Clone)).ToArray())
+                    await CardPileCmd.RemoveFromDeck(player, cloned);
+                Assert.False(decision.IsEnabled);
+                Assert.DoesNotContain(new RestSiteRoom().GetAvailableDecisions(run, player), item => item.OptionId == "clone");
                 break;
             case "kindle":
                 Assert.Equal(9, player.Relics.OfType<PumpkinCandle>().Single().KindleCount);

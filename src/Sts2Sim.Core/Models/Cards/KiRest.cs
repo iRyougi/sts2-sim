@@ -14,7 +14,7 @@ public sealed class KiRest : CardModel, ICardChoiceBaseValueProvider
     public override TargetType TargetType => TargetType.Self;
     protected override int CanonicalEnergyCost => 2;
     protected override IReadOnlyCollection<CardTag> CanonicalTags => [CardTag.Ki];
-    private int Energy => IsUpgraded ? 6 : 5;
+    private int Energy => IsUpgraded ? 5 : 4;
     public CardChoiceBaseValues? CardChoiceBaseValues => new(Energy: Energy);
 
     protected override async Task OnPlay(CardPlay cardPlay)

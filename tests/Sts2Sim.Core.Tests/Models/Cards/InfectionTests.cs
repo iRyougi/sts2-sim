@@ -122,7 +122,7 @@ public sealed class InfectionTests : IDisposable
         var infection = (Infection)ModelDb.Card<Infection>().MutableClone();
         infection.AssignOwner(player);
         await CardPileCmd.Generate(room.Engine.State, infection, PileType.Hand);
-        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 3m, default);
+        player.Creature.LoseHpInternal(player.Creature.CurrentHp - 3m);
 
         await room.Engine.EndPlayerTurnAsync();
 

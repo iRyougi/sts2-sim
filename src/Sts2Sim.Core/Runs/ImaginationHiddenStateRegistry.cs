@@ -158,6 +158,9 @@ internal static class ImaginationHiddenStateRegistry
 
         Add(typeof(RestSiteDecision).FullName! + "+Smith", V, "Card target was chosen by the player.", "<Card>k__BackingField");
         Add(typeof(Entities.RestSite.RestoreRestSiteOption).FullName!, V, "Displayed enabled state of RESTORE (Wuppy below max HP).", "<Enabled>k__BackingField");
+        Add(typeof(Entities.RestSite.CloneRestSiteOption).FullName!, N,
+            "Owner player binding (v0.114.0 #1110); remapped through the run-clone identity memo, carries no random content.",
+            "<Owner>k__BackingField");
         return fields;
     }
 }
