@@ -10,10 +10,11 @@ namespace Sts2Sim.Core.Runs;
 /// A one-shot draw pool partitioned by rarity. Common, Uncommon, Rare, and Shop relics are
 /// independently shuffled into queues. Reward draws remove from the front, shop draws from the
 /// back, and removed relics cannot reappear within the run.
-/// 偏离 #70：省略真实游戏的多人 <c>_mpFallbackDequeue</c>，且某稀有度桶抽空时不做"自动降级找别档"
-/// （真实游戏 <c>GetAvailableDeque</c> 会按 Shop→Common→Uncommon→Rare 顺序降级），直接返回 null。
-/// Common、Uncommon、Rare、Shop 四档现在均有真实内容；保留严格分桶可让单档耗尽保持可观察，避免静默改变
-/// 调用方请求的稀有度。单机场景不需要多人兜底，商店、精英奖励与宝箱继续显式以 Circlet 兜底。
+/// 带 <see cref="IRunState"/> 的取用入口逐字移植原生 <c>RelicGrabBag.GetAvailableDeque</c>（#1120，v0.111.0–v0.114.0
+/// 三版相同）：先永久剔除不允许的遗物；请求档为空且允许 refresh 时按原始顺序补回（不耗 RNG）；仍无符合过滤器的
+/// 遗物就按 Shop→Common→Uncommon→Rare 降级；都没有返回 null，由调用方以 Circlet 兜底。
+/// 单人化简（见偏离登记册 #1120 节）：不移植多人共享宝箱专用的 <c>_mpFallbackDequeue</c>/<c>MoveToFallback</c>（单人恒空）；
+/// 原生共享袋 <c>refreshAllowed = players.Count &gt; 1</c>，模拟器只跑单人局，构造参数默认 false。
 /// </summary>
 public sealed class RelicGrabBag
 {
@@ -24,45 +25,106 @@ public sealed class RelicGrabBag
 
     private readonly Dictionary<RelicRarity, List<RelicModel>> _buckets = new();
 
-    private RelicGrabBag(Dictionary<RelicRarity, List<RelicModel>> buckets)
+    /// <summary>原生 <c>_refreshAllowed</c>：玩家袋恒 false；读档（Transplant 导入）恒 false。</summary>
+    private readonly bool _refreshAllowed;
+
+    /// <summary>原生 <c>_originalRelics</c>：构造时过滤后的原始池（未洗牌顺序），只读共享；读档为 null。</summary>
+    private readonly IReadOnlyList<RelicModel>? _originalRelics;
+
+    private RelicGrabBag(
+        Dictionary<RelicRarity, List<RelicModel>> buckets,
+        bool refreshAllowed,
+        IReadOnlyList<RelicModel>? originalRelics)
     {
         _buckets = buckets;
+        _refreshAllowed = refreshAllowed;
+        _originalRelics = originalRelics;
     }
 
-    public RelicGrabBag(Rng shuffleRng, IEnumerable<RelicModel> pool, bool includeAllRarities = false)
+    public RelicGrabBag(
+        Rng shuffleRng, IEnumerable<RelicModel> pool, bool includeAllRarities = false, bool refreshAllowed = false)
     {
         // Upstream inserts rarity buckets in the order first encountered in the source pool.
         // Preserve that order: each shuffle advances the shared initialization stream.
-        foreach (IGrouping<RelicRarity, RelicModel> group in pool
-                     .Where(relic => includeAllRarities || _bucketedRarities.Contains(relic.Rarity))
-                     .GroupBy(relic => relic.Rarity))
+        RelicModel[] original = pool
+            .Where(relic => includeAllRarities || _bucketedRarities.Contains(relic.Rarity))
+            .ToArray();
+        foreach (IGrouping<RelicRarity, RelicModel> group in original.GroupBy(relic => relic.Rarity))
         {
             List<RelicModel> bucket = group.ToList();
             bucket.UnstableShuffle(shuffleRng);
             _buckets[group.Key] = bucket;
         }
+        _refreshAllowed = refreshAllowed;
+        _originalRelics = Array.AsReadOnly(original);
     }
 
-    public RelicModel? PullFromFront(RelicRarity rarity) => Pull(rarity, fromFront: true);
+    /// <summary>严格单桶的测试/诊断入口：不剔除、不降级。生产路径一律用带 <see cref="IRunState"/> 的重载。</summary>
+    public RelicModel? PullFromFront(RelicRarity rarity) => PullStrict(rarity, fromFront: true);
 
-    public RelicModel? PullFromFront(RelicRarity rarity, IRunState runState)
+    /// <summary>原生 <c>PullFromFront(rarity, runState)</c>。</summary>
+    public RelicModel? PullFromFront(RelicRarity rarity, IRunState runState) =>
+        PullFromFront(rarity, runState, static _ => true);
+
+    /// <summary>严格单桶的测试/诊断入口：不剔除、不降级。生产路径一律用带 <see cref="IRunState"/> 的重载。</summary>
+    public RelicModel? PullFromBack(RelicRarity rarity) => PullStrict(rarity, fromFront: false);
+
+    /// <summary>原生 <c>PullFromFront(rarity, filter, runState)</c>：在可用桶里取第一件符合过滤器的遗物。</summary>
+    public RelicModel? PullFromFront(RelicRarity rarity, IRunState runState, Predicate<RelicModel> filter)
     {
         ArgumentNullException.ThrowIfNull(runState);
-        return Pull(rarity, fromFront: true, relic => relic.IsAllowed(runState));
+        ArgumentNullException.ThrowIfNull(filter);
+        List<RelicModel>? deque = GetAvailableDeque(rarity, runState, filter);
+        if (deque is null || deque.Count == 0)
+            return null;
+        for (int i = 0; i < deque.Count; i++)
+        {
+            RelicModel relic = deque[i];
+            if (filter(relic))
+            {
+                deque.RemoveAt(i);
+                return relic;
+            }
+        }
+        return null;
     }
 
-    public RelicModel? PullFromBack(RelicRarity rarity) => Pull(rarity, fromFront: false);
+    /// <summary>原生 <c>PullFromBack(rarity, filter, runState)</c>（商店）：在可用桶里取最后一件符合过滤器的遗物。</summary>
+    public RelicModel? PullFromBack(RelicRarity rarity, Predicate<RelicModel> filter, IRunState runState)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(runState);
+        List<RelicModel>? deque = GetAvailableDeque(rarity, runState, filter);
+        if (deque is null || deque.Count == 0)
+            return null;
+        for (int i = deque.Count - 1; i >= 0; i--)
+        {
+            RelicModel relic = deque[i];
+            if (filter(relic))
+            {
+                deque.RemoveAt(i);
+                return relic;
+            }
+        }
+        return null;
+    }
 
-    /// <summary>Event-shop front draw; rejected relics remain available for other sources.</summary>
-    public RelicModel? PullFromFront(RelicRarity rarity, IRunState runState, Predicate<RelicModel> predicate)
+    /// <summary>原生 <c>HasAvailableRelics(runState)</c>：与原生一样会剔除不允许的遗物（及 refresh 副作用）。</summary>
+    public bool HasAvailableRelics(IRunState runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
-        ArgumentNullException.ThrowIfNull(predicate);
-        return Pull(rarity, fromFront: true, relic => relic.IsAllowed(runState) && predicate(relic));
+        foreach (RelicRarity rarity in _bucketedRarities)
+        {
+            if (GetAvailableDeque(rarity, runState, static _ => true) is not null)
+                return true;
+        }
+        return false;
     }
 
+    /// <summary>严格单桶计数的测试/诊断入口；生产路径用 <see cref="HasAvailableRelics(IRunState)"/>。</summary>
     public bool HasAvailableRelics() => _bucketedRarities.Any(HasAvailableRelics);
 
+    /// <summary>严格单桶计数的测试/诊断入口。</summary>
     public bool HasAvailableRelics(RelicRarity rarity) =>
         _buckets.TryGetValue(rarity, out List<RelicModel>? bucket) && bucket.Count > 0;
 
@@ -77,7 +139,9 @@ public sealed class RelicGrabBag
     internal RelicGrabBag Clone() => new(
         _buckets.ToDictionary(
             pair => pair.Key,
-            pair => pair.Value.ToList()));
+            pair => pair.Value.ToList()),
+        _refreshAllowed,
+        _originalRelics);
 
     internal RelicGrabBag CloneReshuffled(Rng rng)
     {
@@ -93,7 +157,7 @@ public sealed class RelicGrabBag
             bucket.UnstableShuffle(rng);
             buckets.Add(rarity, bucket);
         }
-        return new RelicGrabBag(buckets);
+        return new RelicGrabBag(buckets, _refreshAllowed, _originalRelics);
     }
 
     internal RelicBagSnapshot ExportForTransplant() => new(
@@ -132,38 +196,77 @@ public sealed class RelicGrabBag
             }
             buckets.Add(rarity, relics);
         }
-        return new RelicGrabBag(buckets);
+        // 对应原生 FromSerializable：无参构造，refresh 关闭、无原始池。
+        return new RelicGrabBag(buckets, refreshAllowed: false, originalRelics: null);
     }
-    /// <summary>Removes the last shop- and run-eligible relic while leaving ineligible relics in the bucket.</summary>
-    public RelicModel? PullForShop(RelicRarity rarity, IRunState runState)
-    {
-        ArgumentNullException.ThrowIfNull(runState);
-        return Pull(
-            rarity,
-            fromFront: false,
-            relic => relic.IsAllowedInShops && relic.IsAllowed(runState));
-    }
-
-    private RelicModel? Pull(
-        RelicRarity rarity,
-        bool fromFront,
-        Predicate<RelicModel>? predicate = null)
+    private RelicModel? PullStrict(RelicRarity rarity, bool fromFront)
     {
         if (!_buckets.TryGetValue(rarity, out List<RelicModel>? bucket) || bucket.Count == 0)
-        {
             return null;
-        }
-
-        int index = predicate is null
-            ? fromFront ? 0 : bucket.Count - 1
-            : fromFront ? bucket.FindIndex(predicate) : bucket.FindLastIndex(predicate);
-        if (index < 0)
-        {
-            return null;
-        }
-
+        int index = fromFront ? 0 : bucket.Count - 1;
         RelicModel relic = bucket[index];
         bucket.RemoveAt(index);
         return relic;
+    }
+
+    /// <summary>原生 <c>GetAvailableDeque</c> 逐字移植。</summary>
+    private List<RelicModel>? GetAvailableDeque(RelicRarity rarity, IRunState runState, Predicate<RelicModel> filter)
+    {
+        RemoveDisallowedRelicsFromDeques(runState);
+        List<RelicModel>? deque = GetDeque(rarity);
+        if (deque.Count == 0 && _refreshAllowed)
+        {
+            RefreshRarity(rarity);
+            RemoveDisallowedRelicsFromDeques(runState);
+        }
+        while (deque is not null && !deque.Exists(filter))
+        {
+            rarity = rarity switch
+            {
+                RelicRarity.Shop => RelicRarity.Common,
+                RelicRarity.Common => RelicRarity.Uncommon,
+                RelicRarity.Uncommon => RelicRarity.Rare,
+                _ => RelicRarity.None,
+            };
+            deque = rarity == RelicRarity.None ? null : GetDeque(rarity);
+        }
+        // 原生此处回退到多人 _mpFallbackDequeue；单人恒空，不移植。
+        return deque;
+    }
+
+    private void RemoveDisallowedRelicsFromDeques(IRunState runState)
+    {
+        foreach (List<RelicModel> bucket in _buckets.Values)
+        {
+            for (int i = 0; i < bucket.Count; i++)
+            {
+                if (!bucket[i].IsAllowed(runState))
+                {
+                    bucket.RemoveAt(i);
+                    i--;
+                }
+            }
+        }
+    }
+
+    /// <summary>原生 <c>GetDeque</c>：不存在的桶返回一个不入字典的新空表。</summary>
+    private List<RelicModel> GetDeque(RelicRarity rarity) =>
+        _buckets.TryGetValue(rarity, out List<RelicModel>? bucket) ? bucket : new List<RelicModel>();
+
+    private void RefreshRarity(RelicRarity rarity)
+    {
+        if (_originalRelics is null)
+            throw new InvalidOperationException("Tried to refresh relics but original list is null");
+        foreach (RelicModel original in _originalRelics)
+        {
+            if (original.Rarity != rarity)
+                continue;
+            if (!_buckets.TryGetValue(original.Rarity, out List<RelicModel>? bucket))
+            {
+                bucket = new List<RelicModel>();
+                _buckets[original.Rarity] = bucket;
+            }
+            bucket.Add(original);
+        }
     }
 }

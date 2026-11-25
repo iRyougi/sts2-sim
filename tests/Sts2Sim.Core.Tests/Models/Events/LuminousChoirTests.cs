@@ -205,7 +205,7 @@ public sealed class LuminousChoirTests : IDisposable
     }
 
     [Fact]
-    public void PullNextRelicForRewardFromFront_WhenRolledBucketIsEmpty_ReturnsCircletWithoutCrossRarityFallback()
+    public void PullNextRelicForRewardFromFront_WhenRolledBucketIsEmpty_DowngradesLikeNativeThenCirclet()
     {
         var runState = new RunState("luminous-relic-empty", new Overgrowth());
         Player player = Player.CreateForNewRun(ModelDb.Character<Regent>(), runState);
@@ -216,7 +216,18 @@ public sealed class LuminousChoirTests : IDisposable
 
         RelicModel pulled = RelicFactory.PullNextRelicForRewardFromFront(player);
 
-        Assert.IsType<Sts2Sim.Core.Models.Relics.Circlet>(pulled);
+        // #1120：原生 GetAvailableDeque 按 Common→Uncommon→Rare 降级，Rare 之后才兜底 Circlet（MSA-04：旧断言锁定了不降级）。
+        // 本种子掷出 Uncommon，只走降级分支；Rare→null→Circlet 由 RelicGrabBagTests 的 Rare 档与 RelicFactory 的 ?? Circlet 覆盖。
+        RelicRarity downgraded = expected switch
+        {
+            RelicRarity.Common => RelicRarity.Uncommon,
+            RelicRarity.Uncommon => RelicRarity.Rare,
+            _ => RelicRarity.None,
+        };
+        if (downgraded == RelicRarity.None)
+            Assert.IsType<Sts2Sim.Core.Models.Relics.Circlet>(pulled);
+        else
+            Assert.True(pulled.Rarity == downgraded, $"rolled={expected}: expected {downgraded}, got {pulled.Id}");
     }
     [Fact]
     public async Task OfferTribute_CostUsesInclusiveRangeOneHundredThroughOneHundredFortyNine()

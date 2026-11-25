@@ -28,7 +28,7 @@ public sealed class LuminousChoir : EventModel
     protected override void CalculateVars() => _cost = 149m - Rng.NextInt(0, 50);
     public override bool IsAllowed(IRunState runState) =>
         runState.Players.All(player => player.Gold >= BaseTributeCost &&
-                                       player.RelicGrabBag.HasAvailableRelics());
+                                       player.RelicGrabBag.HasAvailableRelics(runState));
 
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
@@ -37,6 +37,8 @@ public sealed class LuminousChoir : EventModel
         {
             new("REACH_INTO_THE_FLESH", ReachIntoTheFleshAsync),
         };
+        // 原生只看金币；多出的单桶判断等价：事件能出现说明 IsAllowed 的 HasAvailableRelics(runState) 为真（某档有可用遗物），
+        // 进事件到生成选项之间不取遗物，故此处恒为真（#1120）。
         if (Owner.Gold >= _cost && Owner.RelicGrabBag.HasAvailableRelics())
         {
             options.Add(new EventOption("OFFER_TRIBUTE", OfferTributeAsync));

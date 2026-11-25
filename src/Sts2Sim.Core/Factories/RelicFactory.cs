@@ -18,7 +18,6 @@ public static class RelicFactory
     {
         ArgumentNullException.ThrowIfNull(player);
         ArgumentNullException.ThrowIfNull(rng);
-        // 偏离 #70：严格从所滚稀有度桶 front 抽取；空桶直接兜底 Circlet，不跨桶降级。
         return PullNextRelicFromFront(player, RollRarity(rng));
     }
 
@@ -34,6 +33,8 @@ public static class RelicFactory
 
     public static RelicRarity RollRarityForReward(Player player) => RollRarity(player.PlayerRng.Rewards);
 
+    /// <summary>原生 <c>PullNextRelicFromFront(player, rarity, filter)</c>：袋内按 <c>GetAvailableDeque</c> 剔除、降级（#1120），
+    /// 都没有才给 <c>FallbackRelic</c>（Circlet）。</summary>
     public static RelicModel PullNextRelicFromFront(
         Player player, RelicRarity rarity, Predicate<RelicModel>? filter = null)
     {
@@ -43,9 +44,13 @@ public static class RelicFactory
         return relic;
     }
 
+    /// <summary>原生 <c>MerchantRelicEntry.FillSlot</c> → <c>PullNextRelicFromBack(player, rarity, r =&gt; r.IsAllowedInShops)</c>；
+    /// 降级时同样只看可上架的遗物（#1120）。原生补货（<c>RestockAfterPurchase</c>）另传当前货架的 blacklist，
+    /// 单人局等价：货架上的遗物已从袋中取出，blacklist 匹配不到袋内任何遗物。</summary>
     public static RelicModel PullNextRelicFromBack(Player player, RelicRarity rarity)
     {
-        RelicModel relic = player.RelicGrabBag.PullForShop(rarity, player.RunState)
+        RelicModel relic = player.RelicGrabBag.PullFromBack(
+                rarity, static candidate => candidate.IsAllowedInShops, player.RunState)
             ?? ModelDb.Relic<Circlet>();
         RemoveFromSharedBag(player, relic);
         return relic;

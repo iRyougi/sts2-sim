@@ -9,10 +9,8 @@ using Sts2Sim.Core.Entities.Rngs;
 
 namespace Sts2Sim.Core.Rewards;
 
-/// <summary>One relic reward drawn from the player's relic grab bag. 偏离 #70：抽空的稀有度桶直接
-/// 兜底 Circlet，不做真实游戏 <c>RelicGrabBag.GetAvailableDeque</c> 那种 Shop→Common→Uncommon→Rare
-/// 的跨稀有度降级，与 <see cref="Sts2Sim.Core.Rooms.TreasureRoom"/>/<see cref="Sts2Sim.Core.Entities.Merchant.MerchantInventory"/>
-/// 的兜底方式保持一致。</summary>
+/// <summary>One relic reward drawn from the player's relic grab bag. 所滚稀有度桶在剔除后没有可用遗物时，
+/// 袋内按原生 <c>RelicGrabBag.GetAvailableDeque</c> 的 Shop→Common→Uncommon→Rare 顺序降级，都没有才兜底 Circlet（#1120）。</summary>
 public sealed class RelicReward : TakeableReward
 {
     private readonly RelicModel? _predeterminedRelic;

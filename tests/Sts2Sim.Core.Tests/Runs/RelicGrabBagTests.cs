@@ -18,6 +18,30 @@ file sealed class ShopForbiddenCommonRelic : RelicModel
     public override bool IsAllowedInShops => false;
 }
 file sealed class FakeStarterRelic : RelicModel { public override RelicRarity Rarity => RelicRarity.Starter; }
+file sealed class LadderCommonRelic : RelicModel { public override RelicRarity Rarity => RelicRarity.Common; }
+file sealed class LadderUncommonRelic : RelicModel { public override RelicRarity Rarity => RelicRarity.Uncommon; }
+file sealed class LadderRareRelic : RelicModel { public override RelicRarity Rarity => RelicRarity.Rare; }
+file sealed class LadderShopRelic : RelicModel { public override RelicRarity Rarity => RelicRarity.Shop; }
+file sealed class DisallowedCommonRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Common;
+    public override bool IsAllowed(IRunState runState) => false;
+}
+file sealed class DisallowedUncommonRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Uncommon;
+    public override bool IsAllowed(IRunState runState) => false;
+}
+file sealed class DisallowedRareRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Rare;
+    public override bool IsAllowed(IRunState runState) => false;
+}
+file sealed class DisallowedShopRelic : RelicModel
+{
+    public override RelicRarity Rarity => RelicRarity.Shop;
+    public override bool IsAllowed(IRunState runState) => false;
+}
 
 public class RelicGrabBagTests : IDisposable
 {
@@ -53,13 +77,13 @@ public class RelicGrabBagTests : IDisposable
     }
 
     [Fact]
-    public void PullForShop_ForbiddenOnlyBucket_ReturnsNullWithoutConsumingRelic()
+    public void PullFromBack_ShopFilterRejectsOnlyRelic_ReturnsNullWithoutConsumingRelic()
     {
         var forbidden = new ShopForbiddenCommonRelic();
         var bag = new RelicGrabBag(new Rng(3), new[] { forbidden });
         var runState = new FakeRunState();
 
-        Assert.Null(bag.PullForShop(RelicRarity.Common, runState));
+        Assert.Null(bag.PullFromBack(RelicRarity.Common, relic => relic.IsAllowedInShops, runState));
         Assert.Same(forbidden, bag.PullFromFront(RelicRarity.Common));
     }
     [Fact]
@@ -122,6 +146,48 @@ public class RelicGrabBagTests : IDisposable
         Assert.False(subject.HasAvailableRelics(RelicRarity.Common));
         Assert.Null(subject.PullFromFront(RelicRarity.Common));
         Assert.Null(control.PullFromFront(RelicRarity.Common));
+    }
+
+    /// <summary>#1120：原生 <c>GetAvailableDeque</c>——先永久剔除不允许的遗物；请求档为空且允许 refresh 时
+    /// 按原始顺序补回；仍无符合项则按 Shop→Common→Uncommon→Rare 降级，Rare 之后为 null（调用方给 Circlet）。</summary>
+    [Theory]
+    [InlineData(RelicRarity.Shop, false, RelicRarity.Uncommon)]
+    [InlineData(RelicRarity.Common, false, RelicRarity.Uncommon)]
+    [InlineData(RelicRarity.Uncommon, false, RelicRarity.Rare)]
+    [InlineData(RelicRarity.Rare, false, RelicRarity.None)]
+    [InlineData(RelicRarity.Common, true, RelicRarity.Common)]
+    public void PullFromFront_EmptiedBucket_RefreshesThenDowngradesInNativeOrder(
+        RelicRarity requested, bool refreshAllowed, RelicRarity expected)
+    {
+        // 商店档：Common 只放一件不可上架的遗物，锁住"降级判定也按 IsAllowedInShops 过滤"（应越过 Common 到 Uncommon）。
+        RelicModel common = requested == RelicRarity.Shop ? new ShopForbiddenCommonRelic() : new LadderCommonRelic();
+        RelicModel[] ladder = { common, new LadderUncommonRelic(), new LadderRareRelic(), new LadderShopRelic() };
+        RelicModel disallowed = requested switch
+        {
+            RelicRarity.Common => new DisallowedCommonRelic(),
+            RelicRarity.Uncommon => new DisallowedUncommonRelic(),
+            RelicRarity.Rare => new DisallowedRareRelic(),
+            _ => new DisallowedShopRelic(),
+        };
+        var bag = new RelicGrabBag(new Rng(10), ladder.Append(disallowed).ToArray(), refreshAllowed: refreshAllowed);
+        var run = new FakeRunState();
+        bool fromBack = requested == RelicRarity.Shop;
+        RelicModel? Pull() => fromBack
+            ? bag.PullFromBack(requested, relic => relic.IsAllowedInShops, run)
+            : bag.PullFromFront(requested, run);
+
+        RelicModel? first = Pull();
+        Assert.Equal(requested, first?.Rarity);
+        RelicModel? second = Pull();
+
+        string context = $"requested={requested} refresh={refreshAllowed}";
+        Assert.DoesNotContain(
+            bag.ExportForTransplant().Buckets.Values.SelectMany(ids => ids),
+            id => id == disallowed.Id.ToString());
+        if (expected == RelicRarity.None)
+            Assert.True(second is null, $"{context}: expected null, got {second?.Id}");
+        else
+            Assert.True(second?.Rarity == expected, $"{context}: expected {expected}, got {second?.Id}");
     }
 
     private static IEnumerable<RelicModel> CreateCommonRelics() =>

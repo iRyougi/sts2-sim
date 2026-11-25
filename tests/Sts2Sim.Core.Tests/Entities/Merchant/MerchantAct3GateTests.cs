@@ -58,7 +58,7 @@ public sealed class MerchantAct3GateTests : IDisposable
         (HashSet<Type> at, RelicGrabBag atBag) =
             ObserveExhaustiveShopOffers(thresholdFloor, playerCount);
 
-        AssertGatedRelicsRemainInExpectedBuckets(atBag);
+        AssertGatedRelicsRemovedFromBag(atBag);
         AssertExpectedInvestmentRelics(before);
         Assert.Empty(at);
     }
@@ -94,7 +94,7 @@ public sealed class MerchantAct3GateTests : IDisposable
         foreach (RelicRarity rarity in new[]
                  { RelicRarity.Common, RelicRarity.Uncommon, RelicRarity.Rare, RelicRarity.Shop })
         {
-            while (runState.Players[0].RelicGrabBag.PullForShop(rarity, runState) is RelicModel relic)
+            while (runState.Players[0].RelicGrabBag.PullFromBack(rarity, relic => relic.IsAllowedInShops, runState) is RelicModel relic)
             {
                 if (SellableInvestmentRelicSet.Contains(relic.GetType()))
                 {
@@ -162,32 +162,18 @@ public sealed class MerchantAct3GateTests : IDisposable
             .Select(entry => entry.Relic.GetType())
             .Where(SellableInvestmentRelicSet.Contains));
 
-    private static void AssertGatedRelicsRemainInExpectedBuckets(RelicGrabBag bag)
+    /// <summary>#1120：原生 <c>RemoveDisallowedRelicsFromDeques</c> 在取用前把门槛后不允许的遗物从所有桶永久移除
+    /// （MSA-04：旧断言锁定了"留在原稀有度桶里"）。</summary>
+    private static void AssertGatedRelicsRemovedFromBag(RelicGrabBag bag)
     {
-        var expectedByRarity = new Dictionary<RelicRarity, Type[]>
-        {
-            [RelicRarity.Common] =
-                [typeof(BookOfFiveRings), typeof(JuzuBracelet), typeof(MealTicket)],
-            [RelicRarity.Uncommon] = [typeof(Planisphere)],
-            [RelicRarity.Rare] = [typeof(FrozenEgg), typeof(MoltenEgg), typeof(ToxicEgg), typeof(WhiteBeastStatue), typeof(WhiteStar)],
-            [RelicRarity.Shop] = [typeof(DragonFruit)],
-        };
-
-        foreach ((RelicRarity rarity, Type[] expectedTypes) in expectedByRarity)
-        {
-            var actualTypes = new HashSet<Type>();
-            while (bag.PullFromFront(rarity) is RelicModel relic)
-            {
-                if (SellableInvestmentRelicSet.Contains(relic.GetType()))
-                {
-                    actualTypes.Add(relic.GetType());
-                }
-            }
-
-            Assert.Equal(
-                expectedTypes.Select(type => type.Name).Order(),
-                actualTypes.Select(type => type.Name).Order());
-        }
+        Type[] gated =
+        [
+            typeof(BookOfFiveRings), typeof(JuzuBracelet), typeof(MealTicket), typeof(Planisphere),
+            typeof(FrozenEgg), typeof(MoltenEgg), typeof(ToxicEgg), typeof(WhiteBeastStatue), typeof(WhiteStar),
+            typeof(DragonFruit),
+        ];
+        HashSet<string> remaining = bag.ExportForTransplant().Buckets.Values.SelectMany(ids => ids).ToHashSet();
+        Assert.Empty(gated.Where(type => remaining.Contains(ModelDb.GetId(type).ToString())).Select(type => type.Name));
     }
 
     private static void AssertExpectedInvestmentRelics(HashSet<Type> actual) =>
