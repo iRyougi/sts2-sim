@@ -364,14 +364,20 @@ public class CreatureCmdTests
     [Fact]
     public async Task Damage_ModifyDamageHookIncreasesFinalAmount()
     {
-        var combatState = new FakeCombatState(new FakeRunState(new AddFlatDamage(4m)));
+        var calls = new List<string>();
+        var probe = new RunLevelDamageProbe(calls);
+        probe.ExecutionFinished += _ => calls.Add("finished");
+        var combatState = new FakeCombatState(new FakeRunState(new AddFlatDamage(4m), probe));
         Creature target = MakeCreature(30);
 
         IReadOnlyList<DamageResult> results =
             await CreatureCmd.Damage(combatState, new[] { target }, 6m, ValueProp.Move, null, null, null);
 
-        Assert.Equal(20, target.CurrentHp);
-        Assert.Equal(10, results[0].UnblockedDamage);
+        // 6 + 4 + 2（probe 的加法修正），HP 修正 -1。
+        Assert.Equal(19, target.CurrentHp);
+        Assert.Equal(11, results[0].UnblockedDamage);
+        // 原版 v0.114.0：战斗内 ModifyDamage 之后立即 AfterModifyingDamageAmount 通知修正者，早于 HP 修正空跑（#1114）。
+        Assert.Equal(["modify-damage", "finished", "modify-hp"], calls.Take(3));
     }
 
     [Fact]
@@ -443,18 +449,19 @@ public class CreatureCmdTests
     }
 
     [Fact]
-    public async Task RunLevelDamage_ConsumesBlockAndReportsBlockedAndUnblockedDamage()
+    public async Task RunLevelDamage_BrokenBlockOutsideCombat_FailsClosedAfterApplying()
     {
         var runState = new FakeRunState();
         Creature target = MakeCreature(30);
         target.GainBlockInternal(5m);
 
-        DamageResult result = await CreatureCmd.Damage(runState, target, 8m, ValueProp.Move);
+        // 战斗外格挡恒为 0（Player.AfterCombatEnd 清空）；原版此处对 null 战斗状态调 AfterBlockBroken 会抛 NRE，
+        // 模拟器在结算之后显式失败。
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CreatureCmd.Damage(runState, target, 8m, ValueProp.Move));
 
         Assert.Equal(0, target.Block);
         Assert.Equal(27, target.CurrentHp);
-        Assert.Equal(5, result.BlockedDamage);
-        Assert.Equal(3, result.UnblockedDamage);
     }
 
     [Fact]
@@ -465,17 +472,16 @@ public class CreatureCmdTests
         probe.ExecutionFinished += _ => calls.Add("finished");
         var runState = new FakeRunState(probe);
         Creature target = MakeCreature(30);
-        target.GainBlockInternal(3m);
 
         DamageResult result = await CreatureCmd.Damage(runState, target, 8m, ValueProp.Move);
 
-        Assert.Equal(0, target.Block);
-        Assert.Equal(24, target.CurrentHp);
-        Assert.Equal(3, result.BlockedDamage);
-        Assert.Equal(6, result.UnblockedDamage);
+        Assert.Equal(21, target.CurrentHp);
+        Assert.Equal(0, result.BlockedDamage);
+        Assert.Equal(9, result.UnblockedDamage);
         Assert.Equal(
-            // v0.114.0：HP 修正先空跑，BeforeDamageReceived 之后才结算并通知修正者。
-            ["modify-damage", "modify-hp", "before", "finished", "finished", "finished", "after", "finished"],
+            // v0.114.0：ModifyDamage 后立即 AfterModifyingDamageAmount 通知修正者（#1114）；HP 修正先空跑，
+            // BeforeDamageReceived 之后才结算并通知修正者；再 AfterCurrentHpChanged、AfterDamageReceived。
+            ["modify-damage", "finished", "modify-hp", "before", "finished", "finished", "finished", "after", "finished"],
             calls);
     }
 

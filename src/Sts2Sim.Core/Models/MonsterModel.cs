@@ -104,7 +104,8 @@ public abstract class MonsterModel : AbstractModel, ICombatStateDescriptionContr
                 combatState.RemoveCreature(Creature);
             }
 
-            await Commands.CreatureCmd.RemovePowersAfterDeath(combatState, Creature);
+            // 原版先移出战斗再 Creature.RemoveAllPowersAfterDeath()：已移出的生物不再咨询监听者。
+            await Commands.CreatureCmd.RemoveAllPowersAfterDeath(Creature);
         }
     }
 

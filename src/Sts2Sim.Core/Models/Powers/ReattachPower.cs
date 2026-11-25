@@ -35,8 +35,8 @@ public sealed class ReattachPower : PowerModel
     public override bool ShouldCreatureBeRemovedFromCombatAfterDeath(Creature creature) =>
         !ReferenceEquals(creature, Owner);
 
-    public override bool ShouldPowerBeRemovedOnDeath(PowerModel power) =>
-        !ReferenceEquals(power, this);
+    // 原版 v0.114.0：自身不随持有者死亡移除（PowerModel 覆写，不是监听者钩子）。
+    public override bool ShouldPowerBeRemovedAfterOwnerDeath() => false;
 
     public override bool ShouldOwnerDeathTriggerFatal() => AreAllOtherSegmentsDead();
 

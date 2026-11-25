@@ -126,7 +126,7 @@ public sealed class UnrestSiteTests : IDisposable
     }
 
     [Fact]
-    public async Task LoseMaxHp_LethalLossRunsDamageAndDeathHooks_ThenClampsMaximumToOne()
+    public async Task LoseMaxHp_LethalLossSkipsDamageReceivedAndRunsDeathHooks_ThenClampsMaximumToOne()
     {
         (RunState runState, Player player) = SetupPlayer("unrest-lose-max-lethal");
         await RelicCmd.Obtain(ModelDb.Relic<LoseMaxHpProbeRelic>(), player);
@@ -141,7 +141,8 @@ public sealed class UnrestSiteTests : IDisposable
         Assert.Equal(1, player.Creature.MaxHp);
         Assert.Equal(0, player.Creature.CurrentHp);
         Assert.Equal(1, probe.DeathCount);
-        Assert.Single(probe.DamageProps);
+        // 原版 v0.114.0 CreatureCmd.Damage：被击杀且已死的目标不调 AfterDamageReceived，直接进 Kill（#1114）。
+        Assert.Empty(probe.DamageProps);
     }
 
     [Fact]

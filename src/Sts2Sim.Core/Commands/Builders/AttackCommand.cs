@@ -194,7 +194,8 @@ public sealed class AttackCommand
                 combatState.RemoveCreature(attacker);
             }
 
-            await Commands.CreatureCmd.RemovePowersAfterDeath(combatState, attacker);
+            // 原版先移出战斗再 attacker.RemoveAllPowersAfterDeath()：已移出的攻击者不再咨询监听者。
+            await Commands.CreatureCmd.RemoveAllPowersAfterDeath(attacker);
         }
 
         return this;

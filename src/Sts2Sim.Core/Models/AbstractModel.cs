@@ -688,6 +688,9 @@ public abstract class AbstractModel : IComparable<AbstractModel>
 
     public virtual Task AfterModifyingHpLostAfterOsty() => Task.CompletedTask;
 
+    /// <summary>原版 v0.114.0：本次伤害被该模型修正后调用。原版只有 Intangible、Slow 覆写（<c>Flash()</c>，视觉，模拟器省略）。</summary>
+    public virtual Task AfterModifyingDamageAmount(CardModel? cardSource) => Task.CompletedTask;
+
     public virtual Task AfterBlockGained(Creature creature, decimal amount, ValueProp props, CardModel? cardSource)
     {
         return Task.CompletedTask;

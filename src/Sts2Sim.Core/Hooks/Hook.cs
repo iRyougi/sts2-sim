@@ -1777,8 +1777,15 @@ public static class Hook
         return true;
     }
 
-    public static bool ShouldPowerBeRemovedOnDeath(ICombatState combatState, PowerModel power)
+    /// <summary>原版 v0.114.0 <c>Hook.ShouldPowerBeRemovedOnDeath(power)</c>：持有者已不在战斗中（已移出）时直接返回 true，
+    /// 不咨询任何监听者；否则遍历持有者所在战斗的监听者。</summary>
+    public static bool ShouldPowerBeRemovedOnDeath(PowerModel power)
     {
+        ArgumentNullException.ThrowIfNull(power);
+        ICombatState? combatState = power.Owner.CombatState;
+        if (combatState is null)
+            return true;
+
         foreach (AbstractModel model in combatState.IterateHookListeners().ToArray())
         {
             if (!IsEligibleHookListener(model)) continue;
@@ -1789,13 +1796,6 @@ public static class Hook
         }
 
         return true;
-    }
-
-    public static bool ShouldPowerBeRemovedAfterOwnerDeath(ICombatState combatState, PowerModel power)
-    {
-        ArgumentNullException.ThrowIfNull(combatState);
-        ArgumentNullException.ThrowIfNull(power);
-        return power.ShouldPowerBeRemovedAfterOwnerDeath();
     }
 
     public static decimal ModifyDamage(
@@ -1959,6 +1959,24 @@ public static class Hook
 
         modifiers = changed;
         return result;
+    }
+
+    /// <summary>原版 v0.114.0 <c>Hook.AfterModifyingDamageAmount</c>：按监听顺序通知本次 <c>ModifyDamage</c> 的修正者。
+    /// 修正者为空时原版遍历后什么也不做，这里直接返回。</summary>
+    public static async Task AfterModifyingDamageAmount(IRunState runState,
+        ICombatState? combatState, CardModel? cardSource, IEnumerable<AbstractModel> modifiers)
+    {
+        AbstractModel[] changed = modifiers as AbstractModel[] ?? modifiers.ToArray();
+        if (changed.Length == 0)
+            return;
+
+        foreach (AbstractModel model in runState.IterateHookListeners(combatState))
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            if (!changed.Contains(model)) continue;
+            await model.AfterModifyingDamageAmount(cardSource);
+            model.InvokeExecutionFinished();
+        }
     }
 
     public static async Task AfterModifyingHpLostBeforeOsty(IRunState runState,

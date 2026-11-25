@@ -454,7 +454,8 @@ public sealed class AncientRelicBatch1Tests : IDisposable
         var probe = Assert.Single(player.Relics.OfType<PrecariousShearsOrderProbe>());
         CardModel[] removed = player.Deck.Cards.Take(2).ToArray();
         CardModel[] remaining = player.Deck.Cards.Skip(2).ToArray();
-        player.Creature.GainBlockInternal(10m);
+        // 只验证伤害可被格挡：格挡不被打破（战斗外打破格挡在游戏中不可达，原版会对 null 战斗状态调 AfterBlockBroken，#1114）。
+        player.Creature.GainBlockInternal(20m);
         int hpBefore = player.Creature.CurrentHp;
 
         await RelicCmd.Obtain(ModelDb.Relic<PrecariousShears>(), player);
@@ -468,8 +469,8 @@ public sealed class AncientRelicBatch1Tests : IDisposable
         Assert.Equal(remaining, probe.DeckCardsAtDamage);
         Assert.Equal(16m, probe.ObservedAmount);
         Assert.Equal(Sts2Sim.Core.ValueProps.ValueProp.Unpowered, probe.ObservedProps);
-        Assert.Equal(0, player.Creature.Block);
-        Assert.Equal(hpBefore - 6, player.Creature.CurrentHp);
+        Assert.Equal(4, player.Creature.Block);
+        Assert.Equal(hpBefore, player.Creature.CurrentHp);
         PrecariousShears relic = Assert.Single(player.Relics.OfType<PrecariousShears>());
         Assert.Equal(RelicRarity.Ancient, relic.Rarity);
         Assert.True(relic.HasUponPickupEffect);

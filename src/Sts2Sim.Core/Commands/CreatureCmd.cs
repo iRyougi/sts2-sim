@@ -195,7 +195,9 @@ public static class CreatureCmd
         }
 
         IRunState runState = combatState.RunState;
-        decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay, out _, modifyDamageHookType);
+        decimal modifiedAmount = Hook.ModifyDamage(combatState, target, dealer, amount, props, cardSource, cardPlay,
+            out IEnumerable<AbstractModel> modifiers, modifyDamageHookType);
+        await Hook.AfterModifyingDamageAmount(runState, combatState, cardSource, modifiers);
         DamageResults damageResults = GetDamageResults(runState, combatState, target, modifiedAmount, props,
             dealer, cardSource, cardPlay);
         await Hook.BeforeDamageReceived(combatState, target, modifiedAmount, props, dealer, cardSource);
@@ -476,7 +478,8 @@ public static class CreatureCmd
             props,
             cardSource,
             null,
-            out _);
+            out IEnumerable<AbstractModel> modifiers);
+        await Hook.AfterModifyingDamageAmount(runState, null, cardSource, modifiers);
         Creature? dealer = cardSource?.Owner.Creature;
         // v0.114.0 同一条管线：先空跑，再 BeforeDamageReceived，再结算。战斗外没有转移；出现即说明前提失效。
         DamageResults damageResults = GetDamageResults(runState, null, target, modifiedAmount, props,
@@ -491,9 +494,22 @@ public static class CreatureCmd
         await ApplyDamageResults(runState, null, damageResults);
         DamageResult result = damageResults.Original;
 
+        // 原版结果循环：AfterBlockBroken(target.CombatState) → AfterCurrentHpChanged → 未被击杀才 AfterDamageReceived，否则进 Kill。
+        // 战斗外格挡恒为 0（Player.AfterCombatEnd 清空），WasBlockBroken 不可达；原版此时对 null 战斗状态调钩子会抛 NRE，
+        // 这里显式失败（fail-closed）。
+        if (result.WasBlockBroken)
+        {
+            ICombatState blockCombatState = target.CombatState
+                ?? throw new InvalidOperationException("Run-level damage broke block outside combat.");
+            await Hook.AfterBlockBroken(blockCombatState, target, dealer);
+        }
         if (result.UnblockedDamage > 0)
             await Hook.AfterCurrentHpChanged(runState, null, target, -result.UnblockedDamage);
-        await Hook.AfterDamageReceived(runState, null, target, result, props, dealer, cardSource);
+        if (!result.WasTargetKilled || !target.IsDead)
+        {
+            await Hook.AfterDamageReceived(runState, null, target, result, props, dealer, cardSource);
+            return result;
+        }
         return await ResolvePotentialDeath(runState, null, target, result, cardSource);
     }
 
@@ -560,15 +576,15 @@ public static class CreatureCmd
         Creature[] livingTeammates = combatState?.GetCreaturesOnSide(target.Side)
             .Where(teammate => !ReferenceEquals(teammate, target) && teammate.IsAlive)
             .ToArray() ?? Array.Empty<Creature>();
-        PowerModel[] powersToRemove = PowersRemovedAfterDeath(combatState, target);
         // v0.114.0：正在行动或正在攻击的生物推迟移出战斗与清空能力，分别由 MonsterModel.PerformMove 与
         // AttackCommand.Execute 收尾处理。
         bool deferCleanup = target.Monster?.IsPerformingMove == true || target.IsAttacking;
         if (shouldRemove && target.Side == CombatSide.Enemy &&
             combatState!.Enemies.Contains(target) && !deferCleanup)
             combatState.RemoveCreature(target);
+        // 原版先 RemoveCreature 再 RemoveAllPowersAfterDeath：已移出战斗的生物不再咨询监听者。
         if (!deferCleanup)
-            await RemovePowers(powersToRemove);
+            await RemoveAllPowersAfterDeath(target);
         if (target.IsPlayer)
             target.Player!.PlayerCombatState?.OrbQueue.Clear();
         if (combatState is not null &&
@@ -601,20 +617,19 @@ public static class CreatureCmd
         return result;
     }
 
-    /// <summary>原版 <c>Creature.RemoveAllPowersAfterDeath</c> 的筛选：死亡时应移除的能力。</summary>
-    internal static PowerModel[] PowersRemovedAfterDeath(ICombatState? combatState, Creature target) =>
-        target.Powers.Where(power => combatState is null ||
-            (Hook.ShouldPowerBeRemovedOnDeath(combatState, power) &&
-             Hook.ShouldPowerBeRemovedAfterOwnerDeath(combatState, power))).ToArray();
-
-    /// <summary>移除死亡生物的能力并逐个触发 <c>AfterRemoved</c>（v0.114.0 攻击收尾与怪物行动收尾同 Kill 共用）。</summary>
-    internal static async Task RemovePowersAfterDeath(ICombatState? combatState, Creature target) =>
-        await RemovePowers(PowersRemovedAfterDeath(combatState, target));
-
-    private static async Task RemovePowers(IEnumerable<PowerModel> powers)
+    /// <summary>原版 v0.114.0 <c>Creature.RemoveAllPowersAfterDeath()</c> 加调用方的通知循环（Kill、攻击收尾、行动收尾共用）：
+    /// 按**调用时**的持有者战斗状态筛选（<see cref="PowerModel.ShouldPowerBeRemovedAfterOwnerDeath"/> 且
+    /// <see cref="Hook.ShouldPowerBeRemovedOnDeath"/>），先整批 <c>RemoveInternal</c>，再逐个 <c>AfterRemoved(creature)</c>。
+    /// 调用方须先 <c>RemoveCreature</c>：已移出战斗的生物不咨询监听者。</summary>
+    internal static async Task RemoveAllPowersAfterDeath(Creature creature)
     {
-        foreach (PowerModel power in powers)
-            await PowerCmd.Remove(power);
+        PowerModel[] removed = creature.Powers
+            .Where(power => power.ShouldPowerBeRemovedAfterOwnerDeath() && Hook.ShouldPowerBeRemovedOnDeath(power))
+            .ToArray();
+        foreach (PowerModel power in removed)
+            power.RemoveInternal();
+        foreach (PowerModel power in removed)
+            await power.AfterRemoved(creature);
     }
 
     public static async Task<decimal> GainBlock(
