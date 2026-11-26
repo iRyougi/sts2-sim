@@ -98,6 +98,25 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 
 只会结束回合的策略当然会死在第一层。实现 `IRunDecisionSource` 就能接入你自己的 AI；`tests/Sts2Sim.Core.Tests` 下的测试展示了更多入口（单场战斗、事件、商店、特定卡牌和遗物等）。
 
+### 事件显示数据
+
+模拟器的事件选项只有一个键（`EventOption.Key`），没有游戏里的文本键、数值和悬浮提示。`Sts2Sim.Core.Events.Display.EventDisplay` 按游戏的形状只读地给出这些数据，不改状态、不读 RNG 状态：
+
+```csharp
+using Sts2Sim.Core.Events.Display;
+
+EventModel ev = /* 当前事件，例如 (runState.CurrentRoom as EventRoom)?.Event */;
+foreach (EventDynamicVar v in EventDisplay.GetDynamicVars(ev))       // 游戏 EventModel.DynamicVars，定义顺序
+    Console.WriteLine($"{v.Name} ({v.VarType}) = {v.BaseValue}");
+foreach (EventOption option in ev.CurrentOptions)
+{
+    EventOptionDisplay d = EventDisplay.DescribeOption(ev, option);
+    // d.TextKey：如 "ABYSSAL_BATHS.pages.INITIAL.options.IMMERSE"；d.IsProceed、d.Relic、d.HoverObject
+}
+```
+
+只有标识符和数值，没有本地化文本；`StringVar` 的值为 0。数值是模拟器能重建的当前 BaseValue（模拟器不显示也不保存的量取游戏字面默认值）。
+
 ## 版本号
 
 发布标签跟随所针对的游戏版本。`v0.111.0` 是针对游戏 v0.111.0 的首次发布；同一游戏基线上的后续修复依次是 `v0.111.0.1`、`v0.111.0.2`……。游戏更新后，从新的游戏版本号重新开始（例如 `v0.112.0`）。所以前三段数字永远告诉你该和哪个游戏版本对比。

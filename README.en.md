@@ -98,6 +98,25 @@ sealed class FirstChoiceDecisions : IRunDecisionSource
 
 A policy that only ends its turn dies on the first floor, of course. Implement `IRunDecisionSource` to plug in your own agent; the tests under `tests/Sts2Sim.Core.Tests` show many more entry points (single combats, events, shops, specific cards and relics).
 
+### Event display data
+
+The simulator's event options carry only a key (`EventOption.Key`), without the game's text keys, numbers and hover tips. `Sts2Sim.Core.Events.Display.EventDisplay` provides them read-only, in the game's shape; it changes no state and reads no RNG state:
+
+```csharp
+using Sts2Sim.Core.Events.Display;
+
+EventModel ev = /* the current event, e.g. (runState.CurrentRoom as EventRoom)?.Event */;
+foreach (EventDynamicVar v in EventDisplay.GetDynamicVars(ev))       // the game's EventModel.DynamicVars, definition order
+    Console.WriteLine($"{v.Name} ({v.VarType}) = {v.BaseValue}");
+foreach (EventOption option in ev.CurrentOptions)
+{
+    EventOptionDisplay d = EventDisplay.DescribeOption(ev, option);
+    // d.TextKey, e.g. "ABYSSAL_BATHS.pages.INITIAL.options.IMMERSE"; d.IsProceed, d.Relic, d.HoverObject
+}
+```
+
+Identifiers and numbers only, no localized text; a `StringVar` reads 0. Values are the current BaseValues the simulator can reconstruct (quantities it neither displays nor stores read the game's literal default).
+
 ## Versioning
 
 Release tags follow the game version they target. `v0.111.0` is the first release for game v0.111.0; later simulator fixes on the same game baseline are `v0.111.0.1`, `v0.111.0.2`, and so on. When the game updates, numbering restarts at the new game version (for example `v0.112.0`). The first three numbers therefore always tell you which game version to compare against.

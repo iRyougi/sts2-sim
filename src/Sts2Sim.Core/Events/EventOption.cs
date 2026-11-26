@@ -5,7 +5,8 @@ namespace Sts2Sim.Core.Events;
 /// <summary>A selectable event option identified by its event-local key. 偏离 #82：省略真实游戏里
 /// UI/本地化/多人相关部分（<c>Title</c>/<c>HoverTips</c>/<c>Description</c>/<c>DialogueSet</c>/
 /// <c>IsShared</c>），只保留状态机骨架——无头模拟器没有渲染/本地化层，<see cref="Key"/> 字段够决策层
-/// 引用即可。</summary>
+/// 引用即可。游戏形状的显示数据（<c>TextKey</c>、<c>IsProceed</c>、<c>Relic</c>、悬浮对象，以及事件的
+/// <c>DynamicVars</c>）由只读的 <see cref="Display.EventDisplay"/> 提供。</summary>
 public sealed class EventOption
 {
     private readonly Func<Task>? _onChosen;
