@@ -17,6 +17,25 @@ namespace Sts2Sim.Core.Combat.StateDescription;
 /// <summary>Accurate in-process combat descriptions; not a player-visible serialization contract.</summary>
 public static class CombatStateDescription
 {
+    private static readonly RunRngType[] AllRunRngTypes = Enum.GetValues<RunRngType>();
+    private static readonly PlayerRngType[] AllPlayerRngTypes = Enum.GetValues<PlayerRngType>();
+
+    internal static int IndexOfReference<T>(IReadOnlyList<T> items, T? target) where T : class
+    {
+        if (target is null)
+        {
+            return -1;
+        }
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (ReferenceEquals(items[i], target))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public static void AppendExactState(ref CombatStateDescriptionBuilder builder, CombatState state)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -28,22 +47,25 @@ public static class CombatStateDescription
         builder.Append(state.Engine?.Won ?? false);
         builder.Append(state.RunState.Rng.Seed);
         AppendRunRng(ref builder, state.RunState.Rng);
-        builder.Append(state.Players.Count);
-        foreach (Player player in state.Players)
+        IReadOnlyList<Player> players = state.Players;
+        builder.Append(players.Count);
+        for (int i = 0; i < players.Count; i++)
         {
-            AppendPlayer(ref builder, state, player);
+            AppendPlayer(ref builder, state, players[i]);
         }
 
-        builder.Append(state.Allies.Count);
-        foreach (Creature ally in state.Allies)
+        IReadOnlyList<Creature> allies = state.Allies;
+        builder.Append(allies.Count);
+        for (int i = 0; i < allies.Count; i++)
         {
-            AppendCreature(ref builder, state, ally);
+            AppendCreature(ref builder, state, allies[i]);
         }
 
-        builder.Append(state.Enemies.Count);
-        foreach (Creature enemy in state.Enemies)
+        IReadOnlyList<Creature> enemies = state.Enemies;
+        builder.Append(enemies.Count);
+        for (int i = 0; i < enemies.Count; i++)
         {
-            AppendCreature(ref builder, state, enemy);
+            AppendCreature(ref builder, state, enemies[i]);
         }
 
         AppendRemovedCreatures(ref builder, state);
@@ -55,15 +77,17 @@ public static class CombatStateDescription
         ref CombatStateDescriptionBuilder builder,
         CombatState state)
     {
-        if (state.RemovedCreatures.Count == 0)
+        IReadOnlyList<Creature> removed = state.RemovedCreatures;
+        if (removed.Count == 0)
         {
             return;
         }
 
         builder.Append("removed-creatures");
-        builder.Append(state.RemovedCreatures.Count);
-        foreach (Creature creature in state.RemovedCreatures)
+        builder.Append(removed.Count);
+        for (int i = 0; i < removed.Count; i++)
         {
+            Creature creature = removed[i];
             builder.Append(creature.CombatState is not null);
             AppendCreature(ref builder, state, creature);
         }
@@ -73,13 +97,17 @@ public static class CombatStateDescription
         ref CombatStateDescriptionBuilder builder,
         CombatState state)
     {
-        CombatDamageHistoryEntry[] entries = state.DamageHistory.Entries.ToArray();
-        builder.Append(entries.Length);
-        var detachedSourceOrdinals = new Dictionary<CardModel, int>(
-            ReferenceEqualityComparer.Instance);
-
-        foreach (CombatDamageHistoryEntry entry in entries)
+        IReadOnlyList<CombatDamageHistoryEntry> entries = state.DamageHistory.Entries;
+        builder.Append(entries.Count);
+        if (entries.Count == 0)
         {
+            return;
+        }
+
+        Dictionary<CardModel, int>? detachedSourceOrdinals = null;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            CombatDamageHistoryEntry entry = entries[i];
             AppendCreatureReference(ref builder, state, entry.Receiver);
             AppendCreatureReference(ref builder, state, entry.Dealer);
             builder.Append((int)entry.Result.Props);
@@ -92,16 +120,12 @@ public static class CombatStateDescription
             if (entry.CardSource is { } cardSource)
             {
                 AppendDamageHistoryCardSource(
-                    ref builder, state, cardSource, detachedSourceOrdinals);
+                    ref builder, state, cardSource, ref detachedSourceOrdinals);
             }
 
             builder.Append(entry.RoundNumber);
             builder.Append((int)entry.CurrentSide);
-            builder.Append(entry.PlayerTurnNumbers.Count);
-            foreach (int turnNumber in entry.PlayerTurnNumbers)
-            {
-                builder.Append(turnNumber);
-            }
+            entry.AppendPlayerTurnNumbers(ref builder);
         }
     }
 
@@ -109,10 +133,10 @@ public static class CombatStateDescription
         ref CombatStateDescriptionBuilder builder,
         CombatState state,
         CardModel cardSource,
-        Dictionary<CardModel, int> detachedSourceOrdinals)
+        ref Dictionary<CardModel, int>? detachedSourceOrdinals)
     {
         int ownerIndex = cardSource.HasOwner
-            ? state.Players.ToList().IndexOf(cardSource.Owner)
+            ? IndexOfReference(state.Players, cardSource.Owner)
             : -1;
         if (cardSource.HasOwner && ownerIndex < 0)
         {
@@ -123,7 +147,7 @@ public static class CombatStateDescription
         builder.Append(ownerIndex);
         if (cardSource.Pile is { } pile)
         {
-            int pileIndex = pile.Cards.ToList().IndexOf(cardSource);
+            int pileIndex = IndexOfReference(pile.CardList, cardSource);
             if (ownerIndex < 0 || pileIndex < 0)
             {
                 throw new InvalidOperationException(
@@ -136,6 +160,7 @@ public static class CombatStateDescription
         }
         else
         {
+            detachedSourceOrdinals ??= new Dictionary<CardModel, int>(ReferenceEqualityComparer.Instance);
             if (!detachedSourceOrdinals.TryGetValue(cardSource, out int ordinal))
             {
                 ordinal = detachedSourceOrdinals.Count;
@@ -162,7 +187,7 @@ public static class CombatStateDescription
             return;
         }
 
-        int allyIndex = state.Allies.ToList().IndexOf(creature);
+        int allyIndex = IndexOfReference(state.Allies, creature);
         if (allyIndex >= 0)
         {
             builder.Append(0);
@@ -170,7 +195,7 @@ public static class CombatStateDescription
             return;
         }
 
-        int escapedIndex = state.EscapedCreatures.ToList().IndexOf(creature);
+        int escapedIndex = IndexOfReference(state.EscapedCreatures, creature);
         if (escapedIndex >= 0)
         {
             // Preserve the established ally/enemy tags; escaped creatures can remain in
@@ -180,7 +205,7 @@ public static class CombatStateDescription
             return;
         }
 
-        int removedIndex = state.RemovedCreatures.ToList().IndexOf(creature);
+        int removedIndex = IndexOfReference(state.RemovedCreatures, creature);
         if (removedIndex >= 0)
         {
             builder.Append(3);
@@ -188,7 +213,7 @@ public static class CombatStateDescription
             return;
         }
 
-        int enemyIndex = state.Enemies.ToList().IndexOf(creature);
+        int enemyIndex = IndexOfReference(state.Enemies, creature);
         if (enemyIndex < 0)
         {
             throw new InvalidOperationException("Damage history contains a creature outside the combat state.");
@@ -209,14 +234,17 @@ public static class CombatStateDescription
             player,
             includeDominanceMeasuredResources: true);
         AppendPile(ref builder, player.Deck, state);
-        foreach (CardPile pile in player.PlayerCombatState!.AllPiles)
+        IReadOnlyList<CardPile> allPiles = player.PlayerCombatState!.AllPiles;
+        for (int i = 0; i < allPiles.Count; i++)
         {
-            AppendPile(ref builder, pile, state);
+            AppendPile(ref builder, allPiles[i], state);
         }
 
-        builder.Append(player.PotionSlots.Count);
-        foreach (PotionModel? potion in player.PotionSlots)
+        List<PotionModel?> potionSlots = player.PotionSlotList;
+        builder.Append(potionSlots.Count);
+        for (int i = 0; i < potionSlots.Count; i++)
         {
+            PotionModel? potion = potionSlots[i];
             builder.Append(potion is not null);
             if (potion is not null)
             {
@@ -224,10 +252,11 @@ public static class CombatStateDescription
             }
         }
 
-        builder.Append(player.Relics.Count);
-        foreach (RelicModel relic in player.Relics)
+        List<RelicModel> relics = player.RelicList;
+        builder.Append(relics.Count);
+        for (int i = 0; i < relics.Count; i++)
         {
-            AppendModel(ref builder, state, relic);
+            AppendModel(ref builder, state, relics[i]);
         }
     }
 
@@ -281,23 +310,27 @@ public static class CombatStateDescription
         builder.Append(combat.FirstWahPlayOrdinalThisTurn);
         builder.Append(combat.FirstChoPlayOrdinalThisTurn);
         builder.Append(combat.FirstKiPlayOrdinalThisTurn);
-        builder.Append(combat.Arrows.Count);
-        foreach (var arrow in combat.Arrows)
+        IReadOnlyList<Entities.FoolArrows.ArrowSlot> arrows = combat.Arrows;
+        builder.Append(arrows.Count);
+        for (int i = 0; i < arrows.Count; i++)
         {
-            builder.Append((int)arrow.Status);
+            builder.Append((int)arrows[i].Status);
         }
-        builder.Append(combat.Pets.Count);
-        foreach (Creature pet in combat.Pets)
+        IReadOnlyList<Creature> pets = combat.Pets;
+        builder.Append(pets.Count);
+        for (int i = 0; i < pets.Count; i++)
         {
-            AppendCreatureReference(ref builder, state, pet);
+            AppendCreatureReference(ref builder, state, pets[i]);
         }
         builder.Append(combat.OrbQueue.Capacity);
-        builder.Append(combat.OrbQueue.Orbs.Count);
-        foreach (OrbModel orb in combat.OrbQueue.Orbs)
+        List<OrbModel> orbs = combat.OrbQueue.OrbList;
+        builder.Append(orbs.Count);
+        for (int i = 0; i < orbs.Count; i++)
         {
+            OrbModel orb = orbs[i];
             builder.Append(orb.Id);
             builder.Append(orb.HasBeenRemovedFromState);
-            int ownerIndex = state.Players.ToList().IndexOf(orb.Owner);
+            int ownerIndex = IndexOfReference(state.Players, orb.Owner);
             if (ownerIndex < 0)
                 throw new InvalidOperationException("Orb owner is outside the combat state.");
             builder.Append(ownerIndex);
@@ -337,7 +370,7 @@ public static class CombatStateDescription
     {
         builder.Append(creature.PetOwner is null
             ? -1
-            : state.Players.ToList().IndexOf(creature.PetOwner));
+            : IndexOfReference(state.Players, creature.PetOwner));
         builder.Append(creature.IsPrimaryEnemy);
         builder.Append(creature.IsSecondaryEnemy);
         builder.Append(creature.IsAttacking);
@@ -354,10 +387,11 @@ public static class CombatStateDescription
                 builder.Append(moveStateMachine.CurrentState.Id);
                 builder.Append(moveStateMachine.CurrentState.CanTransitionAway);
                 builder.Append(moveStateMachine.PerformedFirstMove);
-                builder.Append(moveStateMachine.StateLog.Count);
-                foreach (var stateLogEntry in moveStateMachine.StateLog)
+                var stateLog = moveStateMachine.StateLog;
+                builder.Append(stateLog.Count);
+                for (int i = 0; i < stateLog.Count; i++)
                 {
-                    builder.Append(stateLogEntry.Id);
+                    builder.Append(stateLog[i].Id);
                 }
             }
 
@@ -369,9 +403,11 @@ public static class CombatStateDescription
             builder.Append(ModelId.none);
         }
 
-        builder.Append(creature.Powers.Count);
-        foreach (PowerModel power in creature.Powers)
+        List<PowerModel> powers = creature.PowerList;
+        builder.Append(powers.Count);
+        for (int i = 0; i < powers.Count; i++)
         {
+            PowerModel power = powers[i];
             builder.Append(power.Id);
             builder.Append(power.Amount);
             builder.Append(power.SkipNextDurationTick);
@@ -386,10 +422,11 @@ public static class CombatStateDescription
         CombatState state)
     {
         builder.Append((int)pile.Type);
-        builder.Append(pile.Cards.Count);
-        foreach (CardModel card in pile.Cards)
+        List<CardModel> cards = pile.CardList;
+        builder.Append(cards.Count);
+        for (int i = 0; i < cards.Count; i++)
         {
-            AppendCard(ref builder, card, state);
+            AppendCard(ref builder, cards[i], state);
         }
     }
 
@@ -432,10 +469,10 @@ public static class CombatStateDescription
             builder.Append(card.DeckVersion is not null);
             if (card.DeckVersion is { } deckVersion)
             {
-                int ownerIndex = state?.Players.ToList().IndexOf(deckVersion.Owner) ?? -1;
+                int ownerIndex = state is null ? -1 : IndexOfReference(state.Players, deckVersion.Owner);
                 int deckIndex = ownerIndex < 0
                     ? -1
-                    : state!.Players[ownerIndex].Deck.Cards.ToList().IndexOf(deckVersion);
+                    : IndexOfReference(state!.Players[ownerIndex].Deck.CardList, deckVersion);
                 if (ownerIndex < 0 || deckIndex < 0)
                 {
                     throw new InvalidOperationException(
@@ -448,20 +485,23 @@ public static class CombatStateDescription
             builder.Append((int)(card.Pile?.Type ?? PileType.None));
         }
 
-        CardKeyword[] keywords = card.Keywords.OrderBy(keyword => keyword).ToArray();
-        builder.Append(keywords.Length);
-        foreach (CardKeyword keyword in keywords)
-        {
-            builder.Append((int)keyword);
-        }
+        AppendSortedKeywords(ref builder, card.Keywords);
 
-        builder.Append(card.Enchantments.Count);
-        foreach (EnchantmentModel enchantment in card.Enchantments)
+        if (card.EnchantmentList is { Count: > 0 } enchantments)
         {
-            builder.Append(enchantment.Id);
-            builder.Append((int)enchantment.Status);
-            builder.Append(enchantment.Magnitude);
-            if (state is not null) AppendModel(ref builder, state, enchantment);
+            builder.Append(enchantments.Count);
+            for (int i = 0; i < enchantments.Count; i++)
+            {
+                EnchantmentModel enchantment = enchantments[i];
+                builder.Append(enchantment.Id);
+                builder.Append((int)enchantment.Status);
+                builder.Append(enchantment.Magnitude);
+                if (state is not null) AppendModel(ref builder, state, enchantment);
+            }
+        }
+        else
+        {
+            builder.Append(0);
         }
 
         builder.Append(card.Affliction is not null);
@@ -474,6 +514,52 @@ public static class CombatStateDescription
         if (state is not null)
         {
             AppendModel(ref builder, state, card);
+        }
+    }
+
+    private static void AppendSortedKeywords(
+        ref CombatStateDescriptionBuilder builder,
+        IReadOnlyCollection<CardKeyword> keywords)
+    {
+        int count = keywords.Count;
+        builder.Append(count);
+        if (count == 0)
+        {
+            return;
+        }
+
+        Span<int> buffer = count <= 16 ? stackalloc int[count] : new int[count];
+        int index = 0;
+        if (keywords is HashSet<CardKeyword> set)
+        {
+            foreach (CardKeyword kw in set)
+            {
+                buffer[index++] = (int)kw;
+            }
+        }
+        else if (keywords is IReadOnlyList<CardKeyword> list)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                buffer[index++] = (int)list[i];
+            }
+        }
+        else
+        {
+            foreach (CardKeyword kw in keywords)
+            {
+                buffer[index++] = (int)kw;
+            }
+        }
+
+        if (count > 1)
+        {
+            buffer.Sort();
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            builder.Append(buffer[i]);
         }
     }
 
@@ -506,8 +592,9 @@ public static class CombatStateDescription
 
     public static void AppendRunRng(ref CombatStateDescriptionBuilder builder, RunRngSet rngSet)
     {
-        foreach (RunRngType type in Enum.GetValues<RunRngType>())
+        for (int i = 0; i < AllRunRngTypes.Length; i++)
         {
+            RunRngType type = AllRunRngTypes[i];
             builder.Append((int)type);
             AppendRng(ref builder, rngSet.GetRng(type));
         }
@@ -516,22 +603,16 @@ public static class CombatStateDescription
     public static void AppendPlayerRng(ref CombatStateDescriptionBuilder builder, PlayerRngSet rngSet)
     {
         builder.Append(rngSet.Seed);
-        foreach (PlayerRngType type in Enum.GetValues<PlayerRngType>())
+        for (int i = 0; i < AllPlayerRngTypes.Length; i++)
         {
+            PlayerRngType type = AllPlayerRngTypes[i];
             builder.Append((int)type);
             AppendRng(ref builder, rngSet.GetRng(type));
         }
     }
 
-    private static void AppendRng(ref CombatStateDescriptionBuilder builder, Rng rng)
-    {
-        SerializableRng state = rng.ToSerializable();
-        builder.Append(state.counter);
-        builder.Append(state.state0);
-        builder.Append(state.state1);
-        builder.Append(state.state2);
-        builder.Append(state.state3);
-    }
+    private static void AppendRng(ref CombatStateDescriptionBuilder builder, Rng rng) =>
+        rng.AppendStateTo(ref builder);
 
     public static PocketwatchStateDescription GetPocketwatchState(Pocketwatch relic) => new(
         relic.CardsPlayedThisTurn, relic.CardsPlayedPreviousTurn, relic.ShouldDrawExtra,

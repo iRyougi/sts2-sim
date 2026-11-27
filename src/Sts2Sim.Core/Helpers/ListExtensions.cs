@@ -16,12 +16,7 @@ public static class ListExtensions
     /// </summary>
     public static List<T> StableShuffle<T>(this List<T> list, Rng rng) where T : IComparable<T>
     {
-        List<T> sorted = list.ToList();
-        sorted.Sort();
-        for (int i = 0; i < list.Count; i++)
-        {
-            list[i] = sorted[i];
-        }
+        list.Sort();
         return list.UnstableShuffle(rng);
     }
 

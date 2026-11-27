@@ -1,3 +1,4 @@
+using Sts2Sim.Core.Combat.StateDescription;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
@@ -8,7 +9,9 @@ namespace Sts2Sim.Core.Combat;
 /// <summary>A resolved damage event with the turn snapshot needed by dynamic card formulas.</summary>
 public sealed class CombatDamageHistoryEntry
 {
-    private readonly int[] _playerTurnNumbers;
+    private readonly int _playerCount;
+    private readonly int _player0TurnNumber;
+    private readonly int[]? _extraPlayerTurnNumbers;
 
     internal CombatDamageHistoryEntry(
         DamageResult result,
@@ -16,15 +19,28 @@ public sealed class CombatDamageHistoryEntry
         Creature? dealer,
         CardModel? cardSource,
         ICombatState combatState)
-        : this(
-            result,
-            receiver,
-            dealer,
-            cardSource,
-            combatState.RoundNumber,
-            combatState.CurrentSide,
-            combatState.Players.Select(player => player.PlayerCombatState!.TurnNumber).ToArray())
     {
+        Result = result;
+        Receiver = receiver;
+        Dealer = dealer;
+        CardSource = cardSource;
+        RoundNumber = combatState.RoundNumber;
+        CurrentSide = combatState.CurrentSide;
+        IReadOnlyList<Player> players = combatState.Players;
+        _playerCount = players.Count;
+        if (_playerCount > 0)
+        {
+            _player0TurnNumber = players[0].PlayerCombatState!.TurnNumber;
+            if (_playerCount > 1)
+            {
+                var extra = new int[_playerCount - 1];
+                for (int i = 1; i < _playerCount; i++)
+                {
+                    extra[i - 1] = players[i].PlayerCombatState!.TurnNumber;
+                }
+                _extraPlayerTurnNumbers = extra;
+            }
+        }
     }
 
     private CombatDamageHistoryEntry(
@@ -34,7 +50,9 @@ public sealed class CombatDamageHistoryEntry
         CardModel? cardSource,
         int roundNumber,
         CombatSide currentSide,
-        int[] playerTurnNumbers)
+        int playerCount,
+        int player0TurnNumber,
+        int[]? extraPlayerTurnNumbers)
     {
         Result = result;
         Receiver = receiver;
@@ -42,7 +60,9 @@ public sealed class CombatDamageHistoryEntry
         CardSource = cardSource;
         RoundNumber = roundNumber;
         CurrentSide = currentSide;
-        _playerTurnNumbers = playerTurnNumbers;
+        _playerCount = playerCount;
+        _player0TurnNumber = player0TurnNumber;
+        _extraPlayerTurnNumbers = extraPlayerTurnNumbers;
     }
 
     public DamageResult Result { get; }
@@ -57,20 +77,41 @@ public sealed class CombatDamageHistoryEntry
 
     public CombatSide CurrentSide { get; }
 
-    internal IReadOnlyList<int> PlayerTurnNumbers => _playerTurnNumbers;
+    internal void AppendPlayerTurnNumbers(ref CombatStateDescriptionBuilder builder)
+    {
+        builder.Append(_playerCount);
+        if (_playerCount > 0)
+        {
+            builder.Append(_player0TurnNumber);
+            for (int i = 1; i < _playerCount; i++)
+            {
+                builder.Append(_extraPlayerTurnNumbers![i - 1]);
+            }
+        }
+    }
 
     public bool HappenedThisTurn(ICombatState combatState)
     {
         if (RoundNumber != combatState.RoundNumber ||
             CurrentSide != combatState.CurrentSide ||
-            _playerTurnNumbers.Length != combatState.Players.Count)
+            _playerCount != combatState.Players.Count)
         {
             return false;
         }
 
-        for (int i = 0; i < _playerTurnNumbers.Length; i++)
+        if (_playerCount == 0)
         {
-            if (_playerTurnNumbers[i] != combatState.Players[i].PlayerCombatState!.TurnNumber)
+            return true;
+        }
+
+        if (_player0TurnNumber != combatState.Players[0].PlayerCombatState!.TurnNumber)
+        {
+            return false;
+        }
+
+        for (int i = 1; i < _playerCount; i++)
+        {
+            if (_extraPlayerTurnNumbers![i - 1] != combatState.Players[i].PlayerCombatState!.TurnNumber)
             {
                 return false;
             }
@@ -85,15 +126,21 @@ public sealed class CombatDamageHistoryEntry
         if (player.PlayerCombatState is not { } playerCombatState)
             return false;
         IReadOnlyList<Player> players = player.RunState.Players;
-        for (int i = 0; i < players.Count && i < _playerTurnNumbers.Length; i++)
+        for (int i = 0; i < players.Count && i < _playerCount; i++)
+        {
             if (ReferenceEquals(players[i], player))
-                return _playerTurnNumbers[i] == playerCombatState.TurnNumber - 1;
+            {
+                int recorded = i == 0 ? _player0TurnNumber : _extraPlayerTurnNumbers![i - 1];
+                return recorded == playerCombatState.TurnNumber - 1;
+            }
+        }
         return false;
     }
 
     internal CombatDamageHistoryEntry Clone(
         IReadOnlyDictionary<Creature, Creature> creatureMap,
-        Dictionary<CardModel, CardModel> cardMap)
+        Dictionary<CardModel, CardModel> cardMap,
+        ref List<CardModel>? newlyAddedSources)
     {
         Creature receiver = creatureMap[Receiver];
         Creature? dealer = Dealer is null ? null : creatureMap[Dealer];
@@ -107,6 +154,7 @@ public sealed class CombatDamageHistoryEntry
                       throw new InvalidOperationException("Detached card source owner was not rebound to a player.")
                     : null);
             cardMap.Add(CardSource, cardSource);
+            (newlyAddedSources ??= new List<CardModel>(2)).Add(CardSource);
         }
 
         var result = new DamageResult(receiver, Result.Props)
@@ -127,6 +175,8 @@ public sealed class CombatDamageHistoryEntry
             cardSource,
             RoundNumber,
             CurrentSide,
-            _playerTurnNumbers.ToArray());
+            _playerCount,
+            _player0TurnNumber,
+            _extraPlayerTurnNumbers?.ToArray());
     }
 }

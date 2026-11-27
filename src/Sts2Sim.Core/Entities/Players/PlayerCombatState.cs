@@ -14,15 +14,24 @@ public sealed class PlayerCombatState
 {
     private readonly Player _player;
     private readonly List<ArrowSlot> _arrows = new();
+    private readonly CardPile[] _allPiles;
 
     public PlayerCombatState(Player player)
     {
         _player = player;
+        _allPiles = [Hand, DrawPile, DiscardPile, ExhaustPile, PlayPile];
         OrbQueue = NewOrbQueue(player);
         for (int i = 0; i < player.Character.BaseArrowSlotCount; i++)
         {
             GainArrow();
         }
+    }
+
+    private PlayerCombatState(Player player, OrbQueue clonedOrbQueue)
+    {
+        _player = player;
+        _allPiles = [Hand, DrawPile, DiscardPile, ExhaustPile, PlayPile];
+        OrbQueue = clonedOrbQueue;
     }
 
     private static OrbQueue NewOrbQueue(Player owner)
@@ -37,18 +46,34 @@ public sealed class PlayerCombatState
 
     public IReadOnlyList<ArrowSlot> Arrows => _arrows;
 
-    public int AvailableArrowCount => _arrows.Count(arrow => arrow.IsAvailable);
+    public int AvailableArrowCount
+    {
+        get
+        {
+            int count = 0;
+            for (int i = 0; i < _arrows.Count; i++)
+            {
+                if (_arrows[i].IsAvailable) count++;
+            }
+            return count;
+        }
+    }
 
     public void GainArrow() => _arrows.Add(new ArrowSlot(_player));
 
-    internal void ReplaceClonedArrows(IEnumerable<ArrowSlot> sourceArrows)
+    internal void ReplaceClonedArrows(List<ArrowSlot> sourceArrows)
     {
         _arrows.Clear();
-        foreach (ArrowSlot source in sourceArrows)
+        if (sourceArrows.Count == 0)
+        {
+            return;
+        }
+        _arrows.EnsureCapacity(sourceArrows.Count);
+        for (int i = 0; i < sourceArrows.Count; i++)
         {
             _arrows.Add(new ArrowSlot(_player)
             {
-                Status = source.Status,
+                Status = sourceArrows[i].Status,
             });
         }
     }
@@ -82,7 +107,7 @@ public sealed class PlayerCombatState
 
     public CardPile PlayPile { get; } = new(PileType.Play);
 
-    public IReadOnlyList<CardPile> AllPiles => new[] { Hand, DrawPile, DiscardPile, ExhaustPile, PlayPile };
+    public IReadOnlyList<CardPile> AllPiles => _allPiles;
 
     public void ResetEnergy() => Energy = MaxEnergy;
 
@@ -279,8 +304,18 @@ public sealed class PlayerCombatState
         _pets.Add(pet);
     }
 
-    public Creature? GetPet<T>() where T : MonsterModel =>
-        _pets.FirstOrDefault(pet => pet.Monster is T);
+    public Creature? GetPet<T>() where T : MonsterModel
+    {
+        for (int i = 0; i < _pets.Count; i++)
+        {
+            Creature pet = _pets[i];
+            if (pet.Monster is T)
+            {
+                return pet;
+            }
+        }
+        return null;
+    }
 
     private void OnPetDied(Creature pet)
     {
@@ -299,9 +334,13 @@ public sealed class PlayerCombatState
     /// <summary>清理逐回合计数与窄化的“本回合免费”标记。完整 CardEnergyCost 修饰符链仍未移植（偏离 #32）。</summary>
     public void EndOfTurnCleanup()
     {
-        foreach (CardModel card in AllPiles.SelectMany(pile => pile.Cards))
+        for (int p = 0; p < _allPiles.Length; p++)
         {
-            card.EndOfTurnCleanup();
+            List<CardModel> cards = _allPiles[p].CardList;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                cards[i].EndOfTurnCleanup();
+            }
         }
 
         ResetTurnCounters();
@@ -342,7 +381,7 @@ public sealed class PlayerCombatState
         Player clonedPlayer,
         IDictionary<CardModel, CardModel> cardMap)
     {
-        var clone = new PlayerCombatState(clonedPlayer)
+        var clone = new PlayerCombatState(clonedPlayer, OrbQueue.CloneForCombat(clonedPlayer))
         {
             Energy = Energy,
             Stars = Stars,
@@ -370,18 +409,13 @@ public sealed class PlayerCombatState
             FirstWahPlayOrdinalThisTurn = FirstWahPlayOrdinalThisTurn,
             FirstChoPlayOrdinalThisTurn = FirstChoPlayOrdinalThisTurn,
             FirstKiPlayOrdinalThisTurn = FirstKiPlayOrdinalThisTurn,
-            OrbQueue = OrbQueue.CloneForCombat(clonedPlayer),
         };
 
-        foreach ((CardPile source, CardPile target) in AllPiles.Zip(clone.AllPiles))
-        {
-            foreach (CardModel card in source.Cards)
-            {
-                CardModel clonedCard = card.CloneForCombat(clonedPlayer);
-                target.AddInternal(clonedCard);
-                cardMap.Add(card, clonedCard);
-            }
-        }
+        clone.Hand.CloneCardsFrom(Hand, clonedPlayer, cardMap);
+        clone.DrawPile.CloneCardsFrom(DrawPile, clonedPlayer, cardMap);
+        clone.DiscardPile.CloneCardsFrom(DiscardPile, clonedPlayer, cardMap);
+        clone.ExhaustPile.CloneCardsFrom(ExhaustPile, clonedPlayer, cardMap);
+        clone.PlayPile.CloneCardsFrom(PlayPile, clonedPlayer, cardMap);
 
         // 复制完所有战斗牌堆后再精准覆盖箭槽，防止非 Fool 角色克隆 Shoot 牌时重复追加或丢失状态。
         clone.ReplaceClonedArrows(_arrows);

@@ -1,4 +1,4 @@
-using System.Linq;
+using System.Runtime.CompilerServices;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Random;
 
@@ -20,41 +20,43 @@ public sealed class StandardActMap : ActMap
     private readonly int _mapLength;
     private readonly Rng _rng;
 
-    private static readonly Dictionary<MapPointType, int> LowestRowByPointType = new()
-    {
-        [MapPointType.RestSite] = 5,
-        [MapPointType.Elite] = 6,
-    };
+    // 对应 MegaCrit.Sts2.Core.Map.StandardActMap 的五张静态规则表，按枚举下标 / 位集合无分配存储。
+    private static readonly int[] LowestRowByPointType = CreateLowestRowByPointType();
 
-    private static readonly HashSet<MapPointType> UpperMapPointRestrictions = new()
-    {
-        MapPointType.RestSite,
-    };
+    private const uint UpperMapPointRestrictions =
+        1u << (int)MapPointType.RestSite;
 
-    private static readonly HashSet<MapPointType> ParentMapPointRestrictions = new()
-    {
-        MapPointType.Elite,
-        MapPointType.RestSite,
-        MapPointType.Treasure,
-        MapPointType.Shop,
-    };
+    private const uint ParentMapPointRestrictions =
+        (1u << (int)MapPointType.Elite)
+        | (1u << (int)MapPointType.RestSite)
+        | (1u << (int)MapPointType.Treasure)
+        | (1u << (int)MapPointType.Shop);
 
-    private static readonly HashSet<MapPointType> ChildMapPointRestrictions = new()
-    {
-        MapPointType.Elite,
-        MapPointType.RestSite,
-        MapPointType.Treasure,
-        MapPointType.Shop,
-    };
+    private const uint ChildMapPointRestrictions =
+        (1u << (int)MapPointType.Elite)
+        | (1u << (int)MapPointType.RestSite)
+        | (1u << (int)MapPointType.Treasure)
+        | (1u << (int)MapPointType.Shop);
 
-    private static readonly HashSet<MapPointType> SiblingPointTypeRestrictions = new()
+    private const uint SiblingPointTypeRestrictions =
+        (1u << (int)MapPointType.RestSite)
+        | (1u << (int)MapPointType.Monster)
+        | (1u << (int)MapPointType.Unknown)
+        | (1u << (int)MapPointType.Elite)
+        | (1u << (int)MapPointType.Shop);
+
+    private static int[] CreateLowestRowByPointType()
     {
-        MapPointType.RestSite,
-        MapPointType.Monster,
-        MapPointType.Unknown,
-        MapPointType.Elite,
-        MapPointType.Shop,
-    };
+        var rows = new int[(int)MapPointType.Ancient + 1];
+        Array.Fill(rows, int.MinValue);
+        rows[(int)MapPointType.RestSite] = 5;
+        rows[(int)MapPointType.Elite] = 6;
+        return rows;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasRestriction(uint mask, MapPointType pointType) =>
+        (uint)pointType < 32 && (mask & (1u << (int)pointType)) != 0;
 
     public override MapPoint BossMapPoint { get; }
 
@@ -260,18 +262,24 @@ public sealed class StandardActMap : ActMap
             p.CanBeModified = false;
         });
 
-        var toAssign = new List<MapPointType>();
-        toAssign.AddRange(Enumerable.Repeat(MapPointType.RestSite, _pointTypeCounts.NumOfRests));
-        toAssign.AddRange(Enumerable.Repeat(MapPointType.Shop, _pointTypeCounts.NumOfShops));
-        toAssign.AddRange(Enumerable.Repeat(MapPointType.Elite, _pointTypeCounts.NumOfElites));
-        toAssign.AddRange(Enumerable.Repeat(MapPointType.Unknown, _pointTypeCounts.NumOfUnknowns));
+        int totalToAssign = _pointTypeCounts.NumOfRests
+            + _pointTypeCounts.NumOfShops
+            + _pointTypeCounts.NumOfElites
+            + _pointTypeCounts.NumOfUnknowns;
+        var toAssign = new Queue<MapPointType>(totalToAssign);
+        for (int i = 0; i < _pointTypeCounts.NumOfRests; i++) toAssign.Enqueue(MapPointType.RestSite);
+        for (int i = 0; i < _pointTypeCounts.NumOfShops; i++) toAssign.Enqueue(MapPointType.Shop);
+        for (int i = 0; i < _pointTypeCounts.NumOfElites; i++) toAssign.Enqueue(MapPointType.Elite);
+        for (int i = 0; i < _pointTypeCounts.NumOfUnknowns; i++) toAssign.Enqueue(MapPointType.Unknown);
 
-        var queue = new Queue<MapPointType>(toAssign);
-        AssignRemainingTypesToRandomPoints(queue);
+        AssignRemainingTypesToRandomPoints(toAssign);
 
-        foreach (MapPoint point in GetAllMapPoints().Where(p => p.PointType == MapPointType.Unassigned))
+        foreach (MapPoint point in GetAllMapPoints())
         {
-            point.PointType = MapPointType.Monster;
+            if (point.PointType == MapPointType.Unassigned)
+            {
+                point.PointType = MapPointType.Monster;
+            }
         }
 
         BossMapPoint.PointType = MapPointType.Boss;
@@ -292,16 +300,21 @@ public sealed class StandardActMap : ActMap
                 break;
             }
 
-            List<MapPoint> unassigned = GetAllMapPoints().Where(p => p.PointType == MapPointType.Unassigned).ToList();
+            List<MapPoint> unassigned = new();
+            foreach (MapPoint p in GetAllMapPoints())
+            {
+                if (p.PointType == MapPointType.Unassigned) unassigned.Add(p);
+            }
             unassigned.StableShuffle(_rng);
 
-            foreach (MapPoint point in unassigned)
+            for (int u = 0; u < unassigned.Count; u++)
             {
                 if (pointTypesToBeAssigned.Count == 0)
                 {
                     break;
                 }
 
+                MapPoint point = unassigned[u];
                 point.PointType = GetNextValidPointType(pointTypesToBeAssigned, point);
             }
         }
@@ -312,21 +325,24 @@ public sealed class StandardActMap : ActMap
     /// （该点这一轮保持未分配，留给下一轮或"补 Monster"兜底）。</summary>
     private MapPointType GetNextValidPointType(Queue<MapPointType> pointTypesQueue, MapPoint mapPoint)
     {
-        MapPointType[] candidates = pointTypesQueue.ToArray();
-        for (int i = 0; i < candidates.Length; i++)
+        int count = pointTypesQueue.Count;
+        MapPointType chosen = MapPointType.Unassigned;
+        bool taken = false;
+        for (int i = 0; i < count; i++)
         {
-            MapPointType candidate = candidates[i];
-            if (!_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(candidate) && !IsValidPointType(candidate, mapPoint))
+            MapPointType candidate = pointTypesQueue.Dequeue();
+            if (!taken && (_pointTypeCounts.ShouldIgnoreMapPointRulesForMapPointType(candidate) || IsValidPointType(candidate, mapPoint)))
             {
-                continue;
+                chosen = candidate;
+                taken = true;
             }
-            pointTypesQueue.Clear();
-            for (int j = 0; j < candidates.Length; j++)
-                if (j != i) pointTypesQueue.Enqueue(candidates[j]);
-            return candidate;
+            else
+            {
+                pointTypesQueue.Enqueue(candidate);
+            }
         }
 
-        return MapPointType.Unassigned;
+        return chosen;
     }
 
     public bool IsValidPointType(MapPointType pointType, MapPoint mapPoint)
@@ -341,50 +357,68 @@ public sealed class StandardActMap : ActMap
     /// <summary>这些类型不能出现在地图下半部分（越靠近开局的行）。</summary>
     private static bool IsValidForLower(MapPointType pointType, MapPoint mapPoint)
     {
-        return !LowestRowByPointType.TryGetValue(pointType, out int row) || mapPoint.coord.row >= row;
+        uint index = (uint)pointType;
+        return index >= (uint)LowestRowByPointType.Length || mapPoint.coord.row >= LowestRowByPointType[index];
     }
 
     /// <summary>这些类型不能出现在地图上半部分（越靠近 Boss 的行）。</summary>
     private bool IsValidForUpper(MapPointType pointType, MapPoint mapPoint)
     {
-        return mapPoint.coord.row < _mapLength - 3 || !UpperMapPointRestrictions.Contains(pointType);
+        return mapPoint.coord.row < _mapLength - 3 || !HasRestriction(UpperMapPointRestrictions, pointType);
     }
 
     /// <summary>不能与父节点连续出现相同类型（含子节点方向，因为父子是同一条限制集合）。</summary>
     private static bool IsValidWithParents(MapPointType pointType, MapPoint mapPoint)
     {
-        if (!ParentMapPointRestrictions.Contains(pointType))
+        if (!HasRestriction(ParentMapPointRestrictions, pointType))
         {
             return true;
         }
 
-        return !mapPoint.parents.Concat(mapPoint.Children).Any(p => p.PointType == pointType);
+        foreach (MapPoint parent in mapPoint.parents)
+        {
+            if (parent.PointType == pointType) return false;
+        }
+        foreach (MapPoint child in mapPoint.Children)
+        {
+            if (child.PointType == pointType) return false;
+        }
+        return true;
     }
 
     /// <summary>不能与任意子节点连续出现相同类型。</summary>
     private static bool IsValidWithChildren(MapPointType pointType, MapPoint mapPoint)
     {
-        if (!ChildMapPointRestrictions.Contains(pointType))
+        if (!HasRestriction(ChildMapPointRestrictions, pointType))
         {
             return true;
         }
 
-        return !mapPoint.Children.Any(p => p.PointType == pointType);
+        foreach (MapPoint child in mapPoint.Children)
+        {
+            if (child.PointType == pointType) return false;
+        }
+        return true;
     }
 
     /// <summary>这些类型互相之间不能是"兄弟"（共享同一父节点的不同节点）。</summary>
     private static bool IsValidWithSiblings(MapPointType pointType, MapPoint mapPoint)
     {
-        if (!SiblingPointTypeRestrictions.Contains(pointType))
+        if (!HasRestriction(SiblingPointTypeRestrictions, pointType))
         {
             return true;
         }
 
-        return !GetSiblings(mapPoint).Any(p => p.PointType == pointType);
-    }
-
-    private static IEnumerable<MapPoint> GetSiblings(MapPoint mapPoint)
-    {
-        return mapPoint.parents.SelectMany(p => p.Children).Where(sibling => !ReferenceEquals(sibling, mapPoint));
+        foreach (MapPoint parent in mapPoint.parents)
+        {
+            foreach (MapPoint sibling in parent.Children)
+            {
+                if (!ReferenceEquals(sibling, mapPoint) && sibling.PointType == pointType)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

@@ -23,7 +23,8 @@ public sealed class RelicGrabBag
         RelicRarity.Common, RelicRarity.Uncommon, RelicRarity.Rare, RelicRarity.Shop,
     };
 
-    private readonly Dictionary<RelicRarity, List<RelicModel>> _buckets = new();
+    private Dictionary<RelicRarity, List<RelicModel>> _buckets = new();
+    private bool _sharedBuckets;
 
     /// <summary>原生 <c>_refreshAllowed</c>：玩家袋恒 false；读档（Transplant 导入）恒 false。</summary>
     private readonly bool _refreshAllowed;
@@ -34,11 +35,13 @@ public sealed class RelicGrabBag
     private RelicGrabBag(
         Dictionary<RelicRarity, List<RelicModel>> buckets,
         bool refreshAllowed,
-        IReadOnlyList<RelicModel>? originalRelics)
+        IReadOnlyList<RelicModel>? originalRelics,
+        bool sharedBuckets = false)
     {
         _buckets = buckets;
         _refreshAllowed = refreshAllowed;
         _originalRelics = originalRelics;
+        _sharedBuckets = sharedBuckets;
     }
 
     public RelicGrabBag(
@@ -122,7 +125,17 @@ public sealed class RelicGrabBag
     }
 
     /// <summary>严格单桶计数的测试/诊断入口；生产路径用 <see cref="HasAvailableRelics(IRunState)"/>。</summary>
-    public bool HasAvailableRelics() => _bucketedRarities.Any(HasAvailableRelics);
+    public bool HasAvailableRelics()
+    {
+        for (int i = 0; i < _bucketedRarities.Length; i++)
+        {
+            if (HasAvailableRelics(_bucketedRarities[i]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /// <summary>严格单桶计数的测试/诊断入口。</summary>
     public bool HasAvailableRelics(RelicRarity rarity) =>
@@ -132,16 +145,44 @@ public sealed class RelicGrabBag
     public void Remove(RelicModel relic)
     {
         ArgumentNullException.ThrowIfNull(relic);
+        EnsureWritable();
         foreach (List<RelicModel> bucket in _buckets.Values)
             bucket.RemoveAll(candidate => candidate.Id == relic.Id);
     }
 
+    private void EnsureWritable()
+    {
+        if (!_sharedBuckets)
+        {
+            return;
+        }
+
+        _buckets = CopyBuckets(_buckets);
+        _sharedBuckets = false;
+    }
+
+    private static Dictionary<RelicRarity, List<RelicModel>> CopyBuckets(
+        Dictionary<RelicRarity, List<RelicModel>> source)
+    {
+        var copy = new Dictionary<RelicRarity, List<RelicModel>>(source.Count);
+        foreach ((RelicRarity rarity, List<RelicModel> bucket) in source)
+        {
+            copy.Add(rarity, new List<RelicModel>(bucket));
+        }
+        return copy;
+    }
+
     internal RelicGrabBag Clone() => new(
-        _buckets.ToDictionary(
-            pair => pair.Key,
-            pair => pair.Value.ToList()),
+        CopyBuckets(_buckets),
         _refreshAllowed,
         _originalRelics);
+
+    /// <summary>Combat-projection copy-on-write clone: shares buckets until either side mutates.</summary>
+    internal RelicGrabBag CloneSharedForCombat()
+    {
+        _sharedBuckets = true;
+        return new RelicGrabBag(_buckets, _refreshAllowed, _originalRelics, sharedBuckets: true);
+    }
 
     internal RelicGrabBag CloneReshuffled(Rng rng)
     {
@@ -203,6 +244,8 @@ public sealed class RelicGrabBag
     {
         if (!_buckets.TryGetValue(rarity, out List<RelicModel>? bucket) || bucket.Count == 0)
             return null;
+        EnsureWritable();
+        bucket = _buckets[rarity];
         int index = fromFront ? 0 : bucket.Count - 1;
         RelicModel relic = bucket[index];
         bucket.RemoveAt(index);
@@ -212,6 +255,7 @@ public sealed class RelicGrabBag
     /// <summary>原生 <c>GetAvailableDeque</c> 逐字移植。</summary>
     private List<RelicModel>? GetAvailableDeque(RelicRarity rarity, IRunState runState, Predicate<RelicModel> filter)
     {
+        EnsureWritable();
         RemoveDisallowedRelicsFromDeques(runState);
         List<RelicModel>? deque = GetDeque(rarity);
         if (deque.Count == 0 && _refreshAllowed)

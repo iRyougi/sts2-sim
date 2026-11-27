@@ -60,22 +60,27 @@ public sealed class Hive : ActDefinition
 
     public override IReadOnlyList<Type> EventPool => Act2EventPool.All;
 
-    public override IReadOnlyList<Type> AncientPool { get; } =
+    private static readonly IReadOnlyList<Type> StaticAncientPool =
         [typeof(Orobas), typeof(Pael), typeof(Tezcatara)];
+    private static readonly IReadOnlyList<EncounterDefinition> StaticMonsterEncounters =
+        AllEncounters.Where(encounter =>
+            !EliteNames.Contains(encounter.Name) && !BossNames.Contains(encounter.Name)).ToArray();
+    private static readonly IReadOnlyList<EncounterDefinition> StaticEliteEncounters =
+        AllEncounters.Where(encounter => EliteNames.Contains(encounter.Name)).ToArray();
+    private static readonly IReadOnlyList<EncounterDefinition> StaticBossEncounters =
+        AllEncounters.Where(encounter => BossNames.Contains(encounter.Name)).ToArray();
+
+    public override IReadOnlyList<Type> AncientPool => StaticAncientPool;
 
     public override int BaseNumberOfRooms => 14;
 
     public override int NumberOfWeakEncounters => 2;
 
-    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters { get; } =
-        AllEncounters.Where(encounter =>
-            !EliteNames.Contains(encounter.Name) && !BossNames.Contains(encounter.Name)).ToArray();
+    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters => StaticMonsterEncounters;
 
-    protected override IReadOnlyList<EncounterDefinition> EliteEncounters { get; } =
-        AllEncounters.Where(encounter => EliteNames.Contains(encounter.Name)).ToArray();
+    protected override IReadOnlyList<EncounterDefinition> EliteEncounters => StaticEliteEncounters;
 
-    protected override IReadOnlyList<EncounterDefinition> BossEncounters { get; } =
-        AllEncounters.Where(encounter => BossNames.Contains(encounter.Name)).ToArray();
+    protected override IReadOnlyList<EncounterDefinition> BossEncounters => StaticBossEncounters;
 
     public override MapPointTypeCounts GetMapPointTypes(Rng mapRng, AscensionManager ascension)
     {

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models.Cards;
 
@@ -50,10 +51,11 @@ public sealed class RegentCardPool : CardPoolModel
         typeof(Tutor), typeof(Tyranny), typeof(Venerate), typeof(VoidForm), typeof(WroughtInWar),
     };
 
-    public override IReadOnlyList<CardModel> AllCards => OfficialCardTypes
-        .Where(ModelDb.Contains)
-        .Select(type => (CardModel)ModelDb.Get(type))
-        .ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<CardModel>? _poolCache;
+
+    public override IReadOnlyList<CardModel> AllCards =>
+        ModelDb.ResolveRegisteredPool(OfficialCardTypes, ref _poolGeneration, ref _poolCache);
 
     protected override IEnumerable<CardModel> FilterThroughEpochs(
         PlayerUnlockState unlockState,

@@ -19,6 +19,16 @@ public class PlayerRngSet
 
     public bool UsesSemanticKeys => _usesSemanticKeys;
 
+    internal bool HasOpenSemanticScope => _semanticScope is not null;
+
+    internal void RegisterNamedStreams(PlayerRngSet target, Action<Rng, Rng> register)
+    {
+        foreach ((PlayerRngType key, Rng sourceRng) in _rngs)
+        {
+            register(sourceRng, target._rngs[key]);
+        }
+    }
+
     public Rng Rewards => GetRng(PlayerRngType.Rewards);
 
     public Rng Shops => GetRng(PlayerRngType.Shops);
@@ -73,10 +83,10 @@ public class PlayerRngSet
     /// </summary>
     public PlayerRngSet CloneExact()
     {
-        var rngs = new Dictionary<PlayerRngType, Rng>();
+        var rngs = new Dictionary<PlayerRngType, Rng>(_rngs.Count);
         foreach (var (key, rng) in _rngs)
         {
-            rngs[key] = rng.CloneExact();
+            rngs.Add(key, rng.CloneExact());
         }
         return new PlayerRngSet(Seed, rngs, _usesSemanticKeys, _keyedTrace?.CloneExact());
     }
@@ -108,7 +118,7 @@ public class PlayerRngSet
                 nameof(streamsToReseed));
         }
 
-        var rngs = new Dictionary<PlayerRngType, Rng>();
+        var rngs = new Dictionary<PlayerRngType, Rng>(_rngs.Count);
         foreach (PlayerRngType stream in streamsToReseed)
         {
             if (!_rngs.ContainsKey(stream))

@@ -43,8 +43,39 @@ public static class CardPileCmd
     /// New cards still enter through EnterCombat; persistent cards use AddToDeck.</summary>
     public static async Task<CardPileAddResult> AddAsync(
         ICombatState combatState, CardModel card, PileType pileType,
-        CardPilePosition position = CardPilePosition.Bottom) =>
-        (await AddAsync(combatState, new[] { card }, pileType, position))[0];
+        CardPilePosition position = CardPilePosition.Bottom)
+    {
+        ArgumentNullException.ThrowIfNull(combatState);
+        ArgumentNullException.ThrowIfNull(card);
+        if (pileType is not (PileType.Draw or PileType.Hand or PileType.Discard or PileType.Exhaust or PileType.Play))
+            throw new ArgumentOutOfRangeException(nameof(pileType), "Use AddToDeck for persistent cards.");
+        if (combatState.IsEnding())
+            return new CardPileAddResult(card, null, PileType.None, false);
+
+        Player cardOwner = card.Owner ?? throw new InvalidOperationException("Card has no owner.");
+        CardPile? oldPile = card.Pile;
+        bool success = oldPile is not null && oldPile.Type is not (PileType.None or PileType.Deck) &&
+            !cardOwner.Creature.IsDead && cardOwner.Creature.CombatState is not null;
+        var result = new CardPileAddResult(card, oldPile, pileType, success);
+        if (success && (!ReferenceEquals(cardOwner.Creature.CombatState, combatState) ||
+            !combatState.ContainsCreature(cardOwner.Creature)))
+            throw new InvalidOperationException("Moved cards must belong to the supplied combat.");
+
+        if (!combatState.IsLiveCombat() || !success)
+            return result;
+
+        CardPile destination = Get(pileType, cardOwner)
+            ?? throw new InvalidOperationException($"Player has no {pileType} pile.");
+        if (destination.Type == PileType.Hand && destination.Cards.Count >= CardPile.MaxCardsInHand)
+            destination = Get(PileType.Discard, cardOwner)!;
+        oldPile?.RemoveInternal(card);
+        destination.AddInternal(card, GetInsertionIndex(card, destination, position));
+
+        if (oldPile is null || oldPile.Type != card.Pile?.Type)
+            await Hook.AfterCardChangedPiles(cardOwner.RunState, card.CombatState,
+                card, oldPile?.Type ?? PileType.None, null);
+        return result;
+    }
 
     /// <summary>Native Add(IEnumerable): validate first, move the whole batch, then notify in result order.
     /// This entry is limited to existing combat cards: a card with no combat pile has left this surface.</summary>
@@ -167,7 +198,7 @@ public static class CardPileCmd
                 ?? throw new InvalidOperationException("Player has no discard pile.");
         }
 
-        AbstractModel[] listeners = Array.Empty<AbstractModel>();
+        IReadOnlyList<AbstractModel> listeners = Array.Empty<AbstractModel>();
         List<AbstractModel> invokedListeners = new();
         bool beforeEntryApplied = false;
         try

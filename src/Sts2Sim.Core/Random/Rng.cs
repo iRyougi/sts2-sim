@@ -497,4 +497,10 @@ public class Rng
         _random.FillSerializableState(serializableRng);
         return serializableRng;
     }
+
+    internal void AppendStateTo(ref Combat.StateDescription.CombatStateDescriptionBuilder builder)
+    {
+        builder.Append(Counter);
+        _random.AppendStateTo(ref builder);
+    }
 }

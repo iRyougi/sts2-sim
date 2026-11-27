@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Models.Cards;
 
 namespace Sts2Sim.Core.Models.CardPools;
@@ -33,6 +34,9 @@ public sealed class SilentCardPool : CardPoolModel
         typeof(UpMySleeve), typeof(WellLaidPlans), typeof(WraithForm),
     ];
 
-    public override IReadOnlyList<CardModel> AllCards { get; } = OfficialCardTypes
-        .Select(type => (CardModel)ModelDb.Get(type)).ToList().AsReadOnly();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<CardModel>? _poolCache;
+
+    public override IReadOnlyList<CardModel> AllCards =>
+        ModelDb.ResolveStrictPool(OfficialCardTypes, ref _poolGeneration, ref _poolCache);
 }

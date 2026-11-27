@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models.Potions;
 
@@ -27,10 +28,11 @@ public sealed class SharedPotionPool : PotionPoolModel
         typeof(SwiftPotion), typeof(TouchOfInsanity), typeof(VulnerablePotion), typeof(WeakPotion),
     ];
 
-    public override IReadOnlyList<PotionModel> AllPotions => PotionTypes
-        .Where(ModelDb.Contains)
-        .Select(type => (PotionModel)ModelDb.Get(type))
-        .ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<PotionModel>? _poolCache;
+
+    public override IReadOnlyList<PotionModel> AllPotions =>
+        ModelDb.ResolveRegisteredPool(PotionTypes, ref _poolGeneration, ref _poolCache);
 
     public override IEnumerable<PotionModel> GetUnlockedPotions(PlayerUnlockState unlockState)
     {

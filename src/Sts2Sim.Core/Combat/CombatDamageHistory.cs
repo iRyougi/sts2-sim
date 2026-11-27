@@ -7,7 +7,17 @@ namespace Sts2Sim.Core.Combat;
 /// <summary>Minimal combat damage ledger used by history-dependent card formulas.</summary>
 public sealed class CombatDamageHistory
 {
-    private readonly List<CombatDamageHistoryEntry> _entries = new();
+    private readonly List<CombatDamageHistoryEntry> _entries;
+
+    public CombatDamageHistory()
+    {
+        _entries = new List<CombatDamageHistoryEntry>();
+    }
+
+    private CombatDamageHistory(int capacity)
+    {
+        _entries = capacity > 0 ? new List<CombatDamageHistoryEntry>(capacity) : new List<CombatDamageHistoryEntry>();
+    }
 
     internal static CombatDamageHistory Empty { get; } = new();
 
@@ -35,17 +45,29 @@ public sealed class CombatDamageHistory
         IReadOnlyDictionary<Creature, Creature> creatureMap,
         Dictionary<CardModel, CardModel> cardMap)
     {
-        var preexistingSources = new HashSet<CardModel>(
-            cardMap.Keys,
-            ReferenceEqualityComparer.Instance);
-        var clone = new CombatDamageHistory();
-        clone._entries.AddRange(_entries.Select(entry => entry.Clone(creatureMap, cardMap)));
+        int count = _entries.Count;
+        if (count == 0)
+        {
+            return new CombatDamageHistory();
+        }
+
+        var clone = new CombatDamageHistory(count);
+        List<CardModel>? newlyAddedSources = null;
+        for (int i = 0; i < count; i++)
+        {
+            clone._entries.Add(_entries[i].Clone(creatureMap, cardMap, ref newlyAddedSources));
+        }
+
+        if (newlyAddedSources is null)
+        {
+            return clone;
+        }
 
         // History can introduce detached sources after CombatState cloned the ordinary piles.
         // Complete their provenance graph before any new card restores its references.
-        var origins = new Queue<CardModel>(cardMap.Keys.Where(source => !preexistingSources.Contains(source)));
-        while (origins.TryDequeue(out CardModel? card))
+        for (int i = 0; i < newlyAddedSources.Count; i++)
         {
+            CardModel card = newlyAddedSources[i];
             if (card.CloneOf is not { } origin || cardMap.ContainsKey(origin)) continue;
             if (!creatureMap.TryGetValue(origin.Owner.Creature, out Creature? clonedOwner) ||
                 clonedOwner.Player is not { } player)
@@ -53,15 +75,13 @@ public sealed class CombatDamageHistory
                 throw new InvalidOperationException("Detached clone origin owner was not rebound to a player.");
             }
             cardMap.Add(origin, origin.CloneForCombat(player));
-            origins.Enqueue(origin);
+            newlyAddedSources.Add(origin);
         }
 
-        foreach ((CardModel source, CardModel target) in cardMap)
+        for (int i = 0; i < newlyAddedSources.Count; i++)
         {
-            if (!preexistingSources.Contains(source))
-            {
-                target.RestoreCombatCloneReferencesFrom(source, cardMap);
-            }
+            CardModel source = newlyAddedSources[i];
+            cardMap[source].RestoreCombatCloneReferencesFrom(source, cardMap);
         }
 
         return clone;

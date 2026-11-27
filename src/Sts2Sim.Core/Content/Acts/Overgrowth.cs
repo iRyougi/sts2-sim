@@ -15,7 +15,9 @@ public sealed class Overgrowth : ActDefinition
 
     public override IReadOnlyList<Type> EventPool => Act1EventPool.All;
 
-    public override IReadOnlyList<Type> AncientPool { get; } = [typeof(Neow)];
+    private static readonly IReadOnlyList<Type> StaticAncientPool = [typeof(Neow)];
+
+    public override IReadOnlyList<Type> AncientPool => StaticAncientPool;
 
     public override int BaseNumberOfRooms => 15;
 
@@ -23,7 +25,7 @@ public sealed class Overgrowth : ActDefinition
 
     // 下列遭遇的 Name 早于"按原版类名命名"的约定，与原版 ModelId.Entry 不同，IdEntry 显式写出原版 ID。
     // 原版用 Id.Entry 派生怪物生成种子（RoomFactory.CreateEncounterMonsterRng），写错会改变怪物组成。
-    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters { get; } = new List<EncounterDefinition>
+    private static readonly IReadOnlyList<EncounterDefinition> StaticMonsterEncounters = new List<EncounterDefinition>
     {
         new(CreateMonster<CubexConstruct>, tags: null, isWeak: false, name: "CubexConstruct") { IdEntry = "CUBEX_CONSTRUCT_NORMAL" },
         new(CreateFlyconid, [EncounterTag.Mushroom, EncounterTag.Slimes], isWeak: false, name: "FlyconidNormal"),
@@ -51,19 +53,25 @@ public sealed class Overgrowth : ActDefinition
         new(CreateMonster<VineShambler>, tags: null, isWeak: false, name: "VineShambler") { IdEntry = "VINE_SHAMBLER_NORMAL" },
     };
 
-    protected override IReadOnlyList<EncounterDefinition> EliteEncounters { get; } = new List<EncounterDefinition>
+    private static readonly IReadOnlyList<EncounterDefinition> StaticEliteEncounters = new List<EncounterDefinition>
     {
         new(CreateMonster<BygoneEffigy>, tags: null, isWeak: false, name: "BygoneEffigy") { IdEntry = "BYGONE_EFFIGY_ELITE" },
         new(CreateMonster<Byrdonis>, tags: null, isWeak: false, name: "Byrdonis") { IdEntry = "BYRDONIS_ELITE" },
         new(() => [(CreateMonster<PhrogParasite>(), "phrog")], tags: null, isWeak: false, name: "PhrogParasite") { Slots = ["phrog", "wriggler1", "wriggler2", "wriggler3", "wriggler4"], IdEntry = "PHROG_PARASITE_ELITE" },
     };
 
-    protected override IReadOnlyList<EncounterDefinition> BossEncounters { get; } = new List<EncounterDefinition>
+    private static readonly IReadOnlyList<EncounterDefinition> StaticBossEncounters = new List<EncounterDefinition>
     {
         new(CreateMonster<CeremonialBeast>, tags: null, isWeak: false, name: "CeremonialBeast") { IdEntry = "CEREMONIAL_BEAST_BOSS" },
         new(CreateTheKin, tags: null, isWeak: false, name: "TheKin") { Slots = ["slot1", "slot2", "leaderSlot"], IdEntry = "THE_KIN_BOSS" },
         new(CreateMonster<Vantom>, tags: null, isWeak: false, name: "Vantom") { IdEntry = "VANTOM_BOSS" },
     };
+
+    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters => StaticMonsterEncounters;
+
+    protected override IReadOnlyList<EncounterDefinition> EliteEncounters => StaticEliteEncounters;
+
+    protected override IReadOnlyList<EncounterDefinition> BossEncounters => StaticBossEncounters;
 
     public override MapPointTypeCounts GetMapPointTypes(Rng mapRng, AscensionManager ascension)
     {

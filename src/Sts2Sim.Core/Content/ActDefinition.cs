@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Content.Acts;
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Helpers;
@@ -13,6 +15,32 @@ namespace Sts2Sim.Core.Content;
 /// </summary>
 public abstract class ActDefinition
 {
+    private static readonly ConcurrentDictionary<Type, (EncounterDefinition[] Weak, EncounterDefinition[] Regular)> FilteredMonsterPools = new();
+    private static readonly ConcurrentDictionary<Type, ReadOnlyCollection<Type>> EffectiveEventPools = new();
+    private static readonly Func<ActDefinition>[][] ActFactoriesByIndex =
+    [
+        [static () => new Overgrowth(), static () => new Underdocks()],
+        [static () => new Hive()],
+        [static () => new Glory()],
+    ];
+
+    private static bool IsCanonicalStaticAct(Type type) =>
+        type == typeof(Overgrowth) || type == typeof(Underdocks) || type == typeof(Hive) || type == typeof(Glory);
+
+    private (EncounterDefinition[] Weak, EncounterDefinition[] Regular) GetFilteredMonsterPools()
+    {
+        Type type = GetType();
+        if (IsCanonicalStaticAct(type))
+        {
+            return FilteredMonsterPools.GetOrAdd(type, _ => (
+                MonsterEncounters.Where(static e => e.IsWeak).ToArray(),
+                MonsterEncounters.Where(static e => !e.IsWeak).ToArray()));
+        }
+
+        return (
+            MonsterEncounters.Where(static e => e.IsWeak).ToArray(),
+            MonsterEncounters.Where(static e => !e.IsWeak).ToArray());
+    }
     private EncounterBagState? _weakMonsterEncounterState;
     private EncounterBagState? _regularMonsterEncounterState;
     private EncounterBagState? _eliteEncounterState;
@@ -39,10 +67,11 @@ public abstract class ActDefinition
         _eliteEncounterState = null;
         _lastMonsterEncounter = null;
         _monsterEncountersPicked = 0;
+        (EncounterDefinition[] weakPool, EncounterDefinition[] regularPool) = GetFilteredMonsterPools();
         foreach (EncounterDefinition encounter in visitedMonsterEncounters)
         {
             bool weak = _monsterEncountersPicked < NumberOfWeakEncounters;
-            EncounterDefinition[] pool = MonsterEncounters.Where(e => e.IsWeak == weak).ToArray();
+            EncounterDefinition[] pool = weak ? weakPool : regularPool;
             ref EncounterBagState? state = ref (weak
                 ? ref _weakMonsterEncounterState : ref _regularMonsterEncounterState);
             ConsumeObserved(ref state, pool, encounter);
@@ -90,20 +119,31 @@ public abstract class ActDefinition
         ArgumentNullException.ThrowIfNull(rng);
         // Deviation #321: all content is unlocked and discovered; omit UnderdocksEpoch/IsUnlocked
         // and the save-dependent preference for an undiscovered alternate act.
-        IReadOnlyList<ActDefinition>[] actsByIndex =
+        return
         [
-            [new Overgrowth(), new Underdocks()],
-            [new Hive()],
-            [new Glory()],
+            rng.NextItem(ActFactoriesByIndex[0])!(),
+            rng.NextItem(ActFactoriesByIndex[1])!(),
+            rng.NextItem(ActFactoriesByIndex[2])!(),
         ];
-        return actsByIndex.Select(acts => rng.NextItem(acts)!).ToArray();
     }
 
     /// <summary>本幕的事件池。取代 RunState 里写死的 Act1EventPool。</summary>
     public abstract IReadOnlyList<Type> EventPool { get; }
 
     /// <summary>ActModel.AllEvents excludes shared events; concatenate before the single UpFront shuffle.</summary>
-    public IReadOnlyList<Type> EffectiveEventPool => [.. EventPool, .. SharedEventPool.All];
+    public IReadOnlyList<Type> EffectiveEventPool
+    {
+        get
+        {
+            Type type = GetType();
+            if (IsCanonicalStaticAct(type))
+            {
+                return EffectiveEventPools.GetOrAdd(type, _ => Array.AsReadOnly<Type>([.. EventPool, .. SharedEventPool.All]));
+            }
+
+            return [.. EventPool, .. SharedEventPool.All];
+        }
+    }
 
     /// <summary>Ancient event candidates for this act; one is selected from the UpFront RNG at act start.</summary>
     /// <remarks>Deviation #196: unlock/epoch filters are not modeled. RunState allocates shared Ancients
@@ -174,9 +214,8 @@ public abstract class ActDefinition
     private EncounterDefinition PickMonsterEncounter(Rng rng)
     {
         bool useWeakPool = _monsterEncountersPicked < NumberOfWeakEncounters;
-        EncounterDefinition[] encounters = MonsterEncounters
-            .Where(encounter => encounter.IsWeak == useWeakPool)
-            .ToArray();
+        (EncounterDefinition[] weakPool, EncounterDefinition[] regularPool) = GetFilteredMonsterPools();
+        EncounterDefinition[] encounters = useWeakPool ? weakPool : regularPool;
         EnsurePoolNotEmpty(RoomType.Monster, encounters, useWeakPool ? "weak" : "regular");
 
         EncounterDefinition picked;

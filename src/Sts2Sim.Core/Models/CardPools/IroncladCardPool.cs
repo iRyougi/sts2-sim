@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models.Cards;
 
@@ -44,8 +45,11 @@ public sealed class IroncladCardPool : CardPoolModel
     private static readonly Type[] Ironclad7Cards =
         [typeof(BloodWall), typeof(TearAsunder), typeof(Inferno)];
 
-    public override IReadOnlyList<CardModel> AllCards => OfficialCardTypes
-        .Select(type => (CardModel)ModelDb.Get(type)).ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<CardModel>? _poolCache;
+
+    public override IReadOnlyList<CardModel> AllCards =>
+        ModelDb.ResolveStrictPool(OfficialCardTypes, ref _poolGeneration, ref _poolCache);
 
     protected override IEnumerable<CardModel> FilterThroughEpochs(
         PlayerUnlockState unlockState,

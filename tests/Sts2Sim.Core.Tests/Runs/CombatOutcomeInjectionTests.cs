@@ -1,5 +1,4 @@
 using Sts2Sim.Core.Combat;
-using Sts2Sim.Core.Demo;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
@@ -23,7 +22,7 @@ public sealed class CombatOutcomeInjectionTests
     public async Task Injected_outcome_applies_only_in_imagination(string row)
     {
         const string seed = "M2DINJECTION01";
-        RunReplayDemo.EnsureModelsRegistered();
+        ModelDb.EnsureInitialized();
         var original = new RunState(seed, 10);
         original.AddPlayer(Player.CreateForNewRun(ModelDb.Character<Silent>(), original));
         original.AddVisitedMapCoord(original.Map.StartingMapPoint.coord);

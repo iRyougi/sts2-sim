@@ -99,23 +99,94 @@ public static partial class VisibleContentProjection
 
 public static partial class VisibleContentProjection
 {
+    private static readonly ConcurrentDictionary<string, ImmutableArray<string>> CardGapIds = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, ImmutableArray<string>> RelicGapIds = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, ImmutableArray<string>> PotionGapIds = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, ImmutableArray<string>> EnchantmentGapIds = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, ImmutableArray<string>> AfflictionGapIds = new(StringComparer.Ordinal);
+
+    private static string CardTypeName(CardType type) => type switch
+    {
+        CardType.Attack => "Attack",
+        CardType.Skill => "Skill",
+        CardType.Power => "Power",
+        CardType.Status => "Status",
+        CardType.Curse => "Curse",
+        _ => type.ToString(),
+    };
+
+    private static string CardRarityName(CardRarity rarity) => rarity switch
+    {
+        CardRarity.None => "None",
+        CardRarity.Basic => "Basic",
+        CardRarity.Common => "Common",
+        CardRarity.Uncommon => "Uncommon",
+        CardRarity.Rare => "Rare",
+        CardRarity.Ancient => "Ancient",
+        CardRarity.Event => "Event",
+        CardRarity.Token => "Token",
+        CardRarity.Status => "Status",
+        CardRarity.Curse => "Curse",
+        CardRarity.Quest => "Quest",
+        _ => rarity.ToString(),
+    };
+
+    private static string TargetTypeName(TargetType targetType) => targetType switch
+    {
+        TargetType.None => "None",
+        TargetType.Self => "Self",
+        TargetType.AnyEnemy => "AnyEnemy",
+        TargetType.AllEnemies => "AllEnemies",
+        TargetType.RandomEnemy => "RandomEnemy",
+        TargetType.AnyAlly => "AnyAlly",
+        _ => targetType.ToString(),
+    };
+
+    private static string KeywordName(CardKeyword keyword) => keyword switch
+    {
+        CardKeyword.Exhaust => "Exhaust",
+        CardKeyword.Ethereal => "Ethereal",
+        CardKeyword.Innate => "Innate",
+        CardKeyword.Retain => "Retain",
+        CardKeyword.Unplayable => "Unplayable",
+        CardKeyword.Eternal => "Eternal",
+        CardKeyword.Sly => "Sly",
+        _ => keyword.ToString(),
+    };
+
     /// <summary>Current visible card state, independent of whether the card was fixed or randomly offered.</summary>
     public static VisibleContent ForCard(CardModel card)
     {
         ArgumentNullException.ThrowIfNull(card);
-        var values = ImmutableArray.CreateBuilder<VisibleValue>();
+        var values = ImmutableArray.CreateBuilder<VisibleValue>(12);
         values.Add(VisibleValue.Int("UpgradeLevel", card.CurrentUpgradeLevel));
-        values.Add(VisibleValue.Scope("Type", card.Type.ToString()));
-        values.Add(VisibleValue.Scope("Rarity", card.Rarity.ToString()));
-        values.Add(VisibleValue.Scope("TargetType", card.TargetType.ToString()));
+        values.Add(VisibleValue.Scope("Type", CardTypeName(card.Type)));
+        values.Add(VisibleValue.Scope("Rarity", CardRarityName(card.Rarity)));
+        values.Add(VisibleValue.Scope("TargetType", TargetTypeName(card.TargetType)));
         AddCost(values, "EnergyCost", card.EnergyCost, card.CostsXEnergy);
         AddCost(values, "StarCost", card.StarCost, card.CostsXStar, absent: !card.HasStarCost);
-        foreach (CardKeyword keyword in card.Keywords.OrderBy(keyword => keyword))
-            values.Add(VisibleValue.Scope("Keyword", keyword.ToString()));
+        IReadOnlyCollection<CardKeyword> keywords = card.Keywords;
+        if (keywords.Count == 1)
+        {
+            foreach (CardKeyword kw in keywords) values.Add(VisibleValue.Scope("Keyword", KeywordName(kw)));
+        }
+        else if (keywords.Count > 1)
+        {
+            foreach (CardKeyword keyword in keywords.OrderBy(static keyword => keyword))
+                values.Add(VisibleValue.Scope("Keyword", KeywordName(keyword)));
+        }
 
         // Native card hover text adds ReplayDynamic from the enchanted replay count.
-        int replayCount = card.BaseReplayCount + card.Enchantments.Count(enchantment =>
-            enchantment is Spiral || enchantment is Glam { Status: EnchantmentStatus.Normal });
+        int replayCount = card.BaseReplayCount;
+        if (card.EnchantmentList is { Count: > 0 } replayEnchs)
+        {
+            for (int i = 0; i < replayEnchs.Count; i++)
+            {
+                EnchantmentModel enchantment = replayEnchs[i];
+                if (enchantment is Spiral || enchantment is Glam { Status: EnchantmentStatus.Normal })
+                    replayCount++;
+            }
+        }
         if (replayCount > 0) values.Add(VisibleValue.Int("Replay", replayCount));
 
         // 41cef1ea mutation audit: every Core Cards field assignment outside upgrades,
@@ -186,17 +257,19 @@ public static partial class VisibleContentProjection
             values.Add(VisibleValue.Int("GlowGold", glowActive && card.CanPlay(out _) && card.ShouldGlowGold ? 1 : 0));
             values.Add(VisibleValue.Int("GlowRed", glowActive && card.ShouldGlowRed ? 1 : 0));
         }
-        var children = card.Enchantments.Select(ForEnchantment).ToImmutableArray();
+        ImmutableArray<VisibleContent> children = card.EnchantmentList is { Count: > 0 } enchList
+            ? enchList.Select(ForEnchantment).ToImmutableArray()
+            : ImmutableArray<VisibleContent>.Empty;
         if (card.Affliction is { } affliction)
             children = children.Add(new VisibleContent(affliction.Id.Entry,
                 affliction is Entangled or Galvanized or Tainted
                     ? [VisibleValue.Int("Amount", affliction.Amount)] : [], [])
             {
-                CoverageGapIds = [$"G2.Canonical.Affliction:{affliction.Id.Entry}"]
+                CoverageGapIds = AfflictionGapIds.GetOrAdd(affliction.Id.Entry, static entry => [$"G2.Canonical.Affliction:{entry}"])
             });
         return new(card.Id.Entry, values.ToImmutable(), children)
         {
-            CoverageGapIds = [$"G2.Canonical.Card:{card.Id.Entry}"]
+            CoverageGapIds = CardGapIds.GetOrAdd(card.Id.Entry, static entry => [$"G2.Canonical.Card:{entry}"])
         };
     }
 
@@ -268,7 +341,7 @@ public static partial class VisibleContentProjection
             values.Add(VisibleValue.Int("RemainingCombats", mysteryTicket.RemainingCombats));
         return new(relic.Id.Entry, values.ToImmutable(), [])
         {
-            CoverageGapIds = [$"G2.Canonical.Relic:{relic.Id.Entry}"]
+            CoverageGapIds = RelicGapIds.GetOrAdd(relic.Id.Entry, static entry => [$"G2.Canonical.Relic:{entry}"])
         };
     }
 
@@ -280,9 +353,9 @@ public static partial class VisibleContentProjection
         ArgumentNullException.ThrowIfNull(potion);
         return new(potion.Id.Entry,
             [VisibleValue.Scope("Rarity", potion.Rarity.ToString()),
-             VisibleValue.Scope("TargetType", potion.TargetType.ToString())], [])
+             VisibleValue.Scope("TargetType", TargetTypeName(potion.TargetType))], [])
         {
-            CoverageGapIds = [$"G2.Canonical.Potion:{potion.Id.Entry}"]
+            CoverageGapIds = PotionGapIds.GetOrAdd(potion.Id.Entry, static entry => [$"G2.Canonical.Potion:{entry}"])
         };
     }
 
@@ -309,7 +382,7 @@ public static partial class VisibleContentProjection
             values.Add(VisibleValue.Int("BlockAdditive", checked((int)Amount(enchantment) - 1)));
         return new(enchantment.Id.Entry, values.ToImmutable(), [])
         {
-            CoverageGapIds = [$"G2.Canonical.Enchantment:{enchantment.Id.Entry}"]
+            CoverageGapIds = EnchantmentGapIds.GetOrAdd(enchantment.Id.Entry, static entry => [$"G2.Canonical.Enchantment:{entry}"])
         };
     }
 }

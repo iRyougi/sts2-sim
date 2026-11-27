@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Models.Cards;
 
 namespace Sts2Sim.Core.Models.CardPools;
@@ -22,6 +23,9 @@ public sealed class StatusCardPool : CardPoolModel
         typeof(Cards.Void),
         typeof(Wound),
     ];
-    public override IReadOnlyList<CardModel> AllCards => CardTypes.Where(ModelDb.Contains)
-        .Select(type => (CardModel)ModelDb.Get(type)).ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<CardModel>? _poolCache;
+
+    public override IReadOnlyList<CardModel> AllCards =>
+        ModelDb.ResolveRegisteredPool(CardTypes, ref _poolGeneration, ref _poolCache);
 }

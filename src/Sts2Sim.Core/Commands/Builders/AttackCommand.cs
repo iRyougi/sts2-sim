@@ -222,6 +222,8 @@ public sealed class AttackCommand
 
         await Hook.BeforeAttack(combatState, this);
         int attackCount = Hook.ModifyAttackHitCount(combatState, this, _hitCount);
+        Creature[]? singleTargetArray = null;
+        List<Creature>? validTargets = null;
         for (int i = 0; i < attackCount; i++)
         {
             if (Attacker.IsDead)
@@ -229,14 +231,46 @@ public sealed class AttackCommand
                 break;
             }
 
-            List<Creature> validTargets = GetPossibleTargets().Where(c => c.IsAlive).ToList();
-            if (validTargets.Count == 0)
+            IEnumerable<Creature> hitTargets;
+            if (IsSingleTargeted)
             {
-                break;
+                Creature target = _singleTarget!;
+                if (!target.IsAlive)
+                {
+                    break;
+                }
+                singleTargetArray ??= new Creature[1];
+                singleTargetArray[0] = target;
+                hitTargets = singleTargetArray;
+            }
+            else
+            {
+                IReadOnlyList<Creature> possible = GetPossibleTargets();
+                if (validTargets is null) validTargets = new List<Creature>(possible.Count);
+                else validTargets.Clear();
+                for (int p = 0; p < possible.Count; p++)
+                {
+                    Creature candidate = possible[p];
+                    if (candidate.IsAlive) validTargets.Add(candidate);
+                }
+                if (validTargets.Count == 0)
+                {
+                    break;
+                }
+
+                Creature? singleTarget = GetSingleTarget(validTargets, combatState);
+                if (singleTarget != null)
+                {
+                    singleTargetArray ??= new Creature[1];
+                    singleTargetArray[0] = singleTarget;
+                    hitTargets = singleTargetArray;
+                }
+                else
+                {
+                    hitTargets = validTargets;
+                }
             }
 
-            Creature? singleTarget = GetSingleTarget(validTargets, combatState);
-            IEnumerable<Creature> hitTargets = singleTarget != null ? new[] { singleTarget } : validTargets;
             IReadOnlyList<DamageResult> hitResults = await Commands.CreatureCmd.Damage(
                 combatState,
                 hitTargets,
@@ -245,7 +279,7 @@ public sealed class AttackCommand
                 Attacker,
                 ModelSource as CardModel,
                 CardPlay);
-            _results.Add(hitResults.ToList());
+            _results.Add(hitResults is List<DamageResult> ownedList ? new List<DamageResult>(ownedList) : hitResults.ToList());
         }
 
         // 原版在 AfterAttack 之前记录 CreatureAttackedEntry；玩法上只有 Osty 的攻击被读取。

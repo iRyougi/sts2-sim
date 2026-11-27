@@ -43,4 +43,11 @@ public class PlayerOddsSet
         CardRarity.OverrideCurrentValue(save.CardRarityOddsValue);
         PotionReward.OverrideCurrentValue(save.PotionRewardOddsValue);
     }
+
+    internal PlayerOddsSet Clone(PlayerRngSet rng, AscensionManager ascension, IOddsHooks hooks) =>
+        new()
+        {
+            CardRarity = new CardRarityOdds(CardRarity.CurrentValue, rng.Rewards, ascension),
+            PotionReward = new PotionRewardOdds(PotionReward.CurrentValue, rng.Rewards, hooks),
+        };
 }

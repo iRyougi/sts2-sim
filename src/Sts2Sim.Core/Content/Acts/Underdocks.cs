@@ -16,21 +16,24 @@ public sealed class Underdocks : ActDefinition
 
     public override IReadOnlyList<Type> EventPool => UnderdocksEventPool.All;
 
-    public override IReadOnlyList<Type> AncientPool { get; } = [typeof(Neow)];
+    private static readonly IReadOnlyList<Type> StaticAncientPool = [typeof(Neow)];
+    private static readonly IReadOnlyList<EncounterDefinition> StaticMonsterEncounters =
+        [.. UnderdocksEncounters.BatchA, .. UnderdocksEncounters.BatchB];
+
+    public override IReadOnlyList<Type> AncientPool => StaticAncientPool;
 
     public override int BaseNumberOfRooms => 15;
 
     public override int NumberOfWeakEncounters => 3;
 
-    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters { get; } =
-        [.. UnderdocksEncounters.BatchA, .. UnderdocksEncounters.BatchB];
+    protected override IReadOnlyList<EncounterDefinition> MonsterEncounters => StaticMonsterEncounters;
 
-    protected override IReadOnlyList<EncounterDefinition> EliteEncounters { get; } =
+    protected override IReadOnlyList<EncounterDefinition> EliteEncounters =>
         UnderdocksEncounters.Elites;
 
     // Deviation #300: omit ApplyActDiscoveryOrderModifications and its first-run encounter ordering.
     // The normal randomized bags and boss selection also apply to independent initial episodes.
-    protected override IReadOnlyList<EncounterDefinition> BossEncounters { get; } =
+    protected override IReadOnlyList<EncounterDefinition> BossEncounters =>
         UnderdocksEncounters.Bosses;
 
     public override MapPointTypeCounts GetMapPointTypes(Rng mapRng, AscensionManager ascension)

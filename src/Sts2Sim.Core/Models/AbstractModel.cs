@@ -64,7 +64,7 @@ public abstract class AbstractModel : IComparable<AbstractModel>
             throw new DuplicateModelException(type);
         }
         Id = ModelDb.GetId(type);
-        HookSkipBits = Hooks.HookOverrideIndex.SkipBitsOf(type);
+        (HookSkipBits, HookSkipBitsHi) = Hooks.HookOverrideIndex.SkipBitsOf(type);
         HookListenerKind = Hooks.HookOverrideIndex.KindOf(type);
         if (GlobalKeywordsRequireHexed && type != typeof(Powers.HexPower) &&
             type != typeof(Powers.PhantomBladesPower) &&
@@ -115,10 +115,16 @@ public abstract class AbstractModel : IComparable<AbstractModel>
 
     public AbstractModel MutableClone()
     {
-        AbstractModel abstractModel = (AbstractModel)MemberwiseClone();
-        abstractModel.IsMutable = true;
+        AbstractModel abstractModel = ShallowMutableClone();
         abstractModel.DeepCloneFields();
         abstractModel.AfterCloned();
+        return abstractModel;
+    }
+
+    private protected AbstractModel ShallowMutableClone()
+    {
+        AbstractModel abstractModel = (AbstractModel)MemberwiseClone();
+        abstractModel.IsMutable = true;
         return abstractModel;
     }
 
@@ -136,9 +142,11 @@ public abstract class AbstractModel : IComparable<AbstractModel>
 
     /// <summary>
     /// Plan 09-O: per runtime type, fixed at construction (pure functions of the type; clones copy them with every other
-    /// field). <see cref="Hooks.HookOverrideIndex.Skips"/> reads the first, Hook's eligibility switch the second.
+    /// field). <see cref="Hooks.HookOverrideIndex.Skips"/> reads the two 64-bit masks, Hook's eligibility switch the kind.
     /// </summary>
     internal ulong HookSkipBits { get; }
+
+    internal ulong HookSkipBitsHi { get; }
 
     internal Hooks.HookOverrideIndex.ListenerKind HookListenerKind { get; }
 

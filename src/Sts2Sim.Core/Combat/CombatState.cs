@@ -413,7 +413,32 @@ public sealed partial class CombatState : ICombatState
     /// instead of copying); otherwise a new list is built and kept. A handed-out list is never written to again, so a
     /// dispatch that is still iterating an older one is unaffected, and a list a caller changed simply stops matching.
     /// </summary>
-    internal List<AbstractModel> HookListenerList()
+    internal static bool IsConcreteRunOrSnapshot(IRunState runState) =>
+        runState is Runs.RunState or CombatRunStateSnapshot;
+
+    internal readonly struct ListenerListWithMask(
+        List<AbstractModel> list,
+        ulong activeLo,
+        ulong activeHi,
+        bool anyExecutionFinished)
+    {
+        public readonly List<AbstractModel> List = list;
+        public readonly ulong ActiveLo = activeLo;
+        public readonly ulong ActiveHi = activeHi;
+        public readonly bool AnyExecutionFinished = anyExecutionFinished;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public bool HasActive(Hooks.HookOverrideIndex.HookSlot slot) =>
+            Hooks.HookOverrideIndex.HasActive(ActiveLo, ActiveHi, slot);
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public bool HasActiveOrExecFinished(Hooks.HookOverrideIndex.HookSlot slot) =>
+            AnyExecutionFinished || Hooks.HookOverrideIndex.HasActive(ActiveLo, ActiveHi, slot);
+    }
+
+    internal List<AbstractModel> HookListenerList() => HookListenerListWithMask().List;
+
+    internal ListenerListWithMask HookListenerListWithMask()
     {
         HookListenerLists lists = _hookListenerLists ??= new HookListenerLists();
         List<AbstractModel>? kept = lists.Combat;
@@ -421,7 +446,14 @@ public sealed partial class CombatState : ICombatState
         {
             var match = new MatchSink(kept);
             WalkHookListeners(ref match);
-            if (match.Matches) return kept;
+            if (match.Matches)
+            {
+                return new ListenerListWithMask(
+                    kept,
+                    lists.CombatActiveLo,
+                    lists.CombatActiveHi,
+                    match.AnyExecutionFinished);
+            }
         }
 
         // Build the whole dispatch snapshot before any hook runs. Intermediate copies of
@@ -431,7 +463,13 @@ public sealed partial class CombatState : ICombatState
         var build = new ListSink(new List<AbstractModel>(Math.Max(EstimateHookListenerCount(), kept?.Count ?? 0)));
         WalkHookListeners(ref build);
         lists.Combat = build.List;
-        return build.List;
+        lists.CombatActiveLo = build.ActiveLo;
+        lists.CombatActiveHi = build.ActiveHi;
+        return new ListenerListWithMask(
+            build.List,
+            build.ActiveLo,
+            build.ActiveHi,
+            build.AnyExecutionFinished);
     }
 
     /// <summary>
@@ -439,7 +477,10 @@ public sealed partial class CombatState : ICombatState
     /// player active for hooks, every deck card followed by its enchantments. Kept and compared exactly like
     /// <see cref="HookListenerList"/>; the deck rarely changes during combat, so the comparison is the usual cost.
     /// </summary>
-    internal List<AbstractModel> DeckHookListenerList(IReadOnlyList<Player> players)
+    internal List<AbstractModel> DeckHookListenerList(IReadOnlyList<Player> players) =>
+        DeckHookListenerListWithMask(players).List;
+
+    internal ListenerListWithMask DeckHookListenerListWithMask(IReadOnlyList<Player> players)
     {
         HookListenerLists lists = _hookListenerLists ??= new HookListenerLists();
         List<AbstractModel>? kept = lists.Deck;
@@ -447,13 +488,26 @@ public sealed partial class CombatState : ICombatState
         {
             var match = new MatchSink(kept);
             WalkDeckHookListeners(ref match, players);
-            if (match.Matches) return kept;
+            if (match.Matches)
+            {
+                return new ListenerListWithMask(
+                    kept,
+                    lists.DeckActiveLo,
+                    lists.DeckActiveHi,
+                    match.AnyExecutionFinished);
+            }
         }
 
         var build = new ListSink(new List<AbstractModel>(kept?.Count ?? 0));
         WalkDeckHookListeners(ref build, players);
         lists.Deck = build.List;
-        return build.List;
+        lists.DeckActiveLo = build.ActiveLo;
+        lists.DeckActiveHi = build.ActiveHi;
+        return new ListenerListWithMask(
+            build.List,
+            build.ActiveLo,
+            build.ActiveHi,
+            build.AnyExecutionFinished);
     }
 
     /// <summary>The game's run-level deck part, built fresh (out of combat, or for a combat this run does not own).</summary>
@@ -470,6 +524,8 @@ public sealed partial class CombatState : ICombatState
     private sealed class HookListenerLists
     {
         public List<AbstractModel>? Combat, Deck;
+        public ulong CombatActiveLo, CombatActiveHi;
+        public ulong DeckActiveLo, DeckActiveHi;
     }
 
     private interface IHookListenerSink
@@ -477,20 +533,41 @@ public sealed partial class CombatState : ICombatState
         void Put(AbstractModel model);
     }
 
-    private readonly struct ListSink(List<AbstractModel> list) : IHookListenerSink
+    private struct ListSink(List<AbstractModel> list) : IHookListenerSink
     {
         public readonly List<AbstractModel> List = list;
-        public void Put(AbstractModel model) => List.Add(model);
+        public ulong ActiveLo;
+        public ulong ActiveHi;
+        public bool AnyExecutionFinished;
+
+        public void Put(AbstractModel model)
+        {
+            List.Add(model);
+            if (model is null)
+            {
+                ActiveLo = ~0UL;
+                ActiveHi = ~0UL;
+                return;
+            }
+            ActiveLo |= ~model.HookSkipBits;
+            ActiveHi |= ~model.HookSkipBitsHi;
+            if (model.HasExecutionFinishedSubscribers)
+            {
+                AnyExecutionFinished = true;
+            }
+        }
     }
 
     private struct MatchSink(List<AbstractModel> expected) : IHookListenerSink
     {
         private int _position;
         private bool _differs;
+        public bool AnyExecutionFinished;
 
         public void Put(AbstractModel model)
         {
             if (!_differs && (_position >= expected.Count || !ReferenceEquals(expected[_position], model))) _differs = true;
+            if (model is not null && model.HasExecutionFinishedSubscribers) AnyExecutionFinished = true;
             _position++;
         }
 
@@ -612,7 +689,10 @@ public sealed partial class CombatState : ICombatState
                 sink.Put(card.Affliction);
             }
 
-            WalkAll(ref sink, card.EnchantmentList);
+            if (card.EnchantmentList is { } enchantments)
+            {
+                WalkAll(ref sink, enchantments);
+            }
         }
     }
 
@@ -632,7 +712,10 @@ public sealed partial class CombatState : ICombatState
             foreach (CardModel card in System.Runtime.InteropServices.CollectionsMarshal.AsSpan(player.Deck.CardList))
             {
                 sink.Put(card);
-                WalkAll(ref sink, card.EnchantmentList);
+                if (card.EnchantmentList is { } enchantments)
+                {
+                    WalkAll(ref sink, enchantments);
+                }
             }
         }
     }

@@ -24,6 +24,16 @@ public class RunRngSet
 
     public bool UsesSemanticKeys => _usesSemanticKeys;
 
+    internal bool HasOpenSemanticScope => _semanticScope is not null;
+
+    internal void RegisterNamedStreams(RunRngSet target, Action<Rng, Rng> register)
+    {
+        foreach ((RunRngType key, Rng sourceRng) in _rngs)
+        {
+            register(sourceRng, target._rngs[key]);
+        }
+    }
+
     /// <summary>
     /// We generate a string for the seed that gets hashed to a ulong for the actual thing
     /// passed to the RNGs. This is the original string that was input, for display purposes.
@@ -114,10 +124,10 @@ public class RunRngSet
     /// </summary>
     public RunRngSet CloneExact()
     {
-        var rngs = new Dictionary<RunRngType, Rng>();
+        var rngs = new Dictionary<RunRngType, Rng>(_rngs.Count);
         foreach (var (key, rng) in _rngs)
         {
-            rngs[key] = rng.CloneExact();
+            rngs.Add(key, rng.CloneExact());
         }
         return new RunRngSet(
             StringSeed,
@@ -154,7 +164,7 @@ public class RunRngSet
                 nameof(streamsToReseed));
         }
 
-        var rngs = new Dictionary<RunRngType, Rng>();
+        var rngs = new Dictionary<RunRngType, Rng>(_rngs.Count);
         foreach (RunRngType stream in streamsToReseed)
         {
             if (!_rngs.ContainsKey(stream))

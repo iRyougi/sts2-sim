@@ -8,11 +8,13 @@ using Sts2Sim.Core.Models.Afflictions;
 namespace Sts2Sim.Core.Hooks;
 
 /// <summary>
-/// Immutable type capabilities for the three neutral cost slots and two completed-Task
-/// pile slots. No instance, eligibility, notification or Hook result is cached.
+/// Immutable type capabilities for the three neutral cost slots, two completed-Task pile slots,
+/// and 104 single-overload Hook dispatch slots. No instance, eligibility, notification or Hook result is cached.
 /// </summary>
 internal static class HookOverrideIndex
 {
+    internal readonly record struct HookSkipMask(ulong Lo, ulong Hi);
+
     [Flags]
     internal enum CostSlot : byte { Energy = 1, EnergyLate = 2, Star = 4, All = 7 }
     [Flags]
@@ -56,6 +58,25 @@ internal static class HookOverrideIndex
         BeforeSideTurnEndVeryEarly, BeforeSideTurnEndEarly, BeforeSideTurnEnd, AfterSideTurnEnd, AfterSideTurnEndLate,
         BeforeFlush, BeforeFlushLate, ShouldTakeExtraTurnEarly, ShouldTakeExtraTurn,
         ShouldClearBlock, AfterBlockCleared,
+        ShouldPlay, BeforeCardPlayed, AfterCardPlayed, AfterCardPlayedLate,
+        ModifyCardPlayCount, AfterModifyingCardPlayCount,
+        ModifyCardPlayResultLocation, AfterModifyingCardPlayResultLocation,
+        AfterEnergySpent, AfterStarsSpent, AfterStarsGained, ShouldGainStars,
+        BeforeBlockGained, AfterBlockGained, AfterBlockBroken, AfterModifyingBlockAmount,
+        BeforeHandDraw, ModifyHandDraw, AfterModifyingHandDraw, ShouldDraw,
+        AfterCardDrawnEarly, AfterCardDrawn,
+        AfterCardDiscarded, AfterCardExhausted, AfterShuffle, AfterHandEmptied,
+        AfterCardGeneratedForCombat, AfterCardEnteredCombat,
+        ShouldEtherealTrigger, ShouldFlush, AfterFlush,
+        ModifyMaxEnergy, ModifyXValue, ShouldPlayerResetEnergy, AfterEnergyReset, AfterEnergyResetLate,
+        BeforeSideTurnStart, AfterPlayerTurnStartEarly, AfterPlayerTurnStart, AfterPlayerTurnStartLate,
+        AfterAutoPrePlayPhaseEnteredEarly, AfterAutoPrePlayPhaseEntered, AfterAutoPrePlayPhaseEnteredLate, AfterAutoPostPlayPhaseEntered,
+        ShouldDie, ShouldDieLate, BeforeDeath,
+        ShouldCreatureBeRemovedFromCombatAfterDeath, ShouldPowerBeRemovedOnDeath, ShouldStopCombatFromEnding,
+        TryModifyKeywordsInCombat,
+        AfterOrbChanneled, AfterOrbEvoked, ModifyOrbPassiveTriggerCounts, ModifyOrbValue,
+        ModifySummonAmount, AfterSummon, AfterOstyRevived, AfterForge,
+        AfterArrowShot, AfterArrowImpaled, AfterArrowDislodged, AfterDiedToDoom,
         Count,
     }
 
@@ -63,6 +84,10 @@ internal static class HookOverrideIndex
 
     private static MethodInfo[] ResolveHookSlots()
     {
+        if ((int)HookSlot.Count > 128)
+        {
+            throw new InvalidOperationException($"HookSlot.Count ({(int)HookSlot.Count}) exceeds 128-bit mask capacity.");
+        }
         var slots = new MethodInfo[(int)HookSlot.Count];
         for (int i = 0; i < slots.Length; i++)
         {
@@ -79,10 +104,29 @@ internal static class HookOverrideIndex
     /// <summary>
     /// True when <paramref name="model"/> is a known hook-listener kind (so <c>Hook.IsEligibleHookListener</c> is a pure read
     /// for it) and its runtime type inherits <see cref="AbstractModel"/>'s implementation of <paramref name="slot"/>, which
-    /// does nothing. A type whose metadata cannot be read is never skipped.
+    /// does nothing. Null or unknown listener kinds return false so dispatch reaches the fail-closed eligibility guard.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool Skips(AbstractModel model, HookSlot slot) => (model.HookSkipBits & (1UL << (int)slot)) != 0;
+    internal static bool Skips(AbstractModel? model, HookSlot slot)
+    {
+        if (model is null)
+        {
+            return false;
+        }
+        int s = (int)slot;
+        return s < 64
+            ? (model.HookSkipBits & (1UL << s)) != 0
+            : (model.HookSkipBitsHi & (1UL << (s - 64))) != 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool HasActive(ulong activeLo, ulong activeHi, HookSlot slot)
+    {
+        int s = (int)slot;
+        return s < 64
+            ? (activeLo & (1UL << s)) != 0
+            : (activeHi & (1UL << (s - 64))) != 0;
+    }
 
     /// <summary>The hook-listener kind of a model type, in <c>Hook.IsEligibleHookListener</c>'s order (the kinds are
     /// disjoint direct subclasses of <see cref="AbstractModel"/>).</summary>
@@ -98,18 +142,18 @@ internal static class HookOverrideIndex
         : ListenerKind.Unknown;
 
     // Read-mostly table keyed by runtime type (reference identity), replaced whole under a lock when a new type appears.
-    private sealed class SkipTable(Type?[] keys, ulong[] bits, int count)
+    private sealed class SkipTable(Type?[] keys, HookSkipMask[] bits, int count)
     {
         public readonly Type?[] Keys = keys;
-        public readonly ulong[] Bits = bits;
+        public readonly HookSkipMask[] Bits = bits;
         public readonly int Count = count;
     }
 
-    private static volatile SkipTable _skips = new(new Type?[256], new ulong[256], 0);
+    private static volatile SkipTable _skips = new(new Type?[256], new HookSkipMask[256], 0);
     private static readonly object SkipGate = new();
 
     /// <summary>The per-type bits behind <see cref="Skips"/>, read once per model type by <see cref="AbstractModel"/>.</summary>
-    internal static ulong SkipBitsOf(Type type)
+    internal static HookSkipMask SkipBitsOf(Type type)
     {
         SkipTable table = _skips;
         int mask = table.Keys.Length - 1;
@@ -121,7 +165,7 @@ internal static class HookOverrideIndex
         }
     }
 
-    private static ulong AddSkipBits(Type type)
+    private static HookSkipMask AddSkipBits(Type type)
     {
         lock (SkipGate)
         {
@@ -129,10 +173,10 @@ internal static class HookOverrideIndex
             int length = table.Keys.Length;
             if ((table.Count + 1) * 2 > length) length *= 2;
             var keys = new Type?[length];
-            var bits = new ulong[length];
-            ulong added = 0;
+            var bits = new HookSkipMask[length];
+            HookSkipMask added = default;
             bool present = false;
-            void Insert(Type key, ulong value)
+            void Insert(Type key, HookSkipMask value)
             {
                 for (int i = RuntimeHelpers.GetHashCode(key) & (length - 1); ; i = (i + 1) & (length - 1))
                 {
@@ -154,18 +198,30 @@ internal static class HookOverrideIndex
         }
     }
 
-    private static ulong ResolveSkipBits(Type type)
+    internal const ulong UnknownOrNullSentinelHiBit = 1UL << 63;
+
+    private static HookSkipMask ResolveSkipBits(Type type)
     {
         if (KindOf(type) == ListenerKind.Unknown)
-            return 0;  // unknown kinds keep IsEligibleHookListener's fail-closed throw at the actual dispatch
+            return default; // unknown kinds keep all skip bits 0 (including bit 127) so dispatch reaches fail-closed guard
         // ResolveCoverage sets a bit for every slot the type may override (or cannot be resolved); the rest are skipped.
-        ulong covered = 0;
-        for (int start = 0; start < HookSlots.Length; start += 8)
+        ulong coveredLo = 0;
+        for (int start = 0; start < 64; start += 8)
         {
-            MethodInfo[] group = HookSlots[start..Math.Min(start + 8, HookSlots.Length)];
-            covered |= (ulong)ResolveCoverage(type, group, (byte)((1 << group.Length) - 1)) << start;
+            MethodInfo[] group = HookSlots[start..(start + 8)];
+            coveredLo |= (ulong)ResolveCoverage(type, group, 0xFF) << start;
         }
-        return ~covered & ((1UL << HookSlots.Length) - 1);
+
+        ulong coveredHi = 0;
+        int hiCount = HookSlots.Length - 64;
+        for (int start = 0; start < hiCount; start += 8)
+        {
+            MethodInfo[] group = HookSlots[(64 + start)..Math.Min(64 + start + 8, HookSlots.Length)];
+            coveredHi |= (ulong)ResolveCoverage(type, group, (byte)((1 << group.Length) - 1)) << start;
+        }
+
+        // Unused high bits (including bit 63 = UnknownOrNullSentinelHiBit) stay 1 in skipHi (0 in ~skipHi) for known types.
+        return new HookSkipMask(~coveredLo, ~coveredHi);
     }
 
     internal static bool MayOverride(AbstractModel model, CostSlot slot) =>

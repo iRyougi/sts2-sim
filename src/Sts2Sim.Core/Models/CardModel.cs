@@ -50,10 +50,28 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     /// <summary>逐字移植 <c>CardModel.ShouldGlowGold</c>（v0.113.1）：牌自身条件，否则看附魔。手牌里实际显示还要满足
     /// <c>NHandCardHolder</c> 的门（可打出且处于出牌阶段），见 <c>VisibleContentProjection.ForCard</c>。</summary>
-    public bool ShouldGlowGold => ShouldGlowGoldInternal || _enchantments.Any(enchantment => enchantment.ShouldGlowGold);
+    public bool ShouldGlowGold => ShouldGlowGoldInternal || (_enchantments is { } list && HasGoldGlow(list));
 
     /// <summary>逐字移植 <c>CardModel.ShouldGlowRed</c>（v0.113.1）。</summary>
-    public bool ShouldGlowRed => ShouldGlowRedInternal || _enchantments.Any(enchantment => enchantment.ShouldGlowRed);
+    public bool ShouldGlowRed => ShouldGlowRedInternal || (_enchantments is { } list && HasRedGlow(list));
+
+    private static bool HasGoldGlow(List<EnchantmentModel> enchantments)
+    {
+        for (int i = 0; i < enchantments.Count; i++)
+        {
+            if (enchantments[i].ShouldGlowGold) return true;
+        }
+        return false;
+    }
+
+    private static bool HasRedGlow(List<EnchantmentModel> enchantments)
+    {
+        for (int i = 0; i < enchantments.Count; i++)
+        {
+            if (enchantments[i].ShouldGlowRed) return true;
+        }
+        return false;
+    }
 
     /// <summary>逐字移植 <c>CardModel.ShouldGlowGoldInternal</c>：子类覆写，只许读玩家可见的状态。</summary>
     protected virtual bool ShouldGlowGoldInternal => false;
@@ -68,7 +86,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     private int _energyCostUpgradeDelta;
     private int _energyCostThisCombatDelta;
     private int _energyCostThisTurnDelta;
-    private List<LocalEnergyModifier> _localEnergyModifiers = [];
+    private List<LocalEnergyModifier>? _localEnergyModifiers;
 
     /// <summary>原版 <c>CardEnergyCost.CapturedXValue</c>：X 费卡在 <c>SpendEnergy</c> 或
     /// <c>CardCmd.AutoPlay(skipXCapture: false)</c> 时写入，之后不清零，克隆时随实例复制。
@@ -144,13 +162,36 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         if (IsXEnergyCost)
             return CanonicalEnergyCost;
         int cost = Math.Max(0, CanonicalEnergyCost - _energyCostUpgradeDelta);
-        foreach (LocalEnergyModifier modifier in _localEnergyModifiers)
+        if (_localEnergyModifiers is { } modifiers)
         {
-            cost = modifier.IsAbsolute
-                ? (modifier.ReduceOnly ? Math.Min(cost, modifier.Amount) : modifier.Amount)
-                : cost + modifier.Amount;
+            for (int i = 0; i < modifiers.Count; i++)
+            {
+                LocalEnergyModifier modifier = modifiers[i];
+                cost = modifier.IsAbsolute
+                    ? (modifier.ReduceOnly ? Math.Min(cost, modifier.Amount) : modifier.Amount)
+                    : cost + modifier.Amount;
+            }
         }
         return Math.Max(0, cost);
+    }
+
+    private void AddLocalEnergyModifier(LocalEnergyModifier modifier)
+    {
+        (_localEnergyModifiers ??= new List<LocalEnergyModifier>(2)).Add(modifier);
+    }
+
+    private void RemoveLocalEnergyModifiers(Predicate<LocalEnergyModifier> match)
+    {
+        if (_localEnergyModifiers is null)
+        {
+            return;
+        }
+
+        _localEnergyModifiers.RemoveAll(match);
+        if (_localEnergyModifiers.Count == 0)
+        {
+            _localEnergyModifiers = null;
+        }
     }
 
     public virtual int StarCost => ResolveStarCost();
@@ -260,7 +301,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     }
 
     /// <summary>原版单附魔槽 <c>Enchantment?.Id</c>；模拟器的列表最多一项（<see cref="AttachEnchantment"/>）。</summary>
-    private ModelId? EnchantmentIdForComparison => _enchantments.Count > 0 ? _enchantments[0].Id : null;
+    private ModelId? EnchantmentIdForComparison => _enchantments is { Count: > 0 } ? _enchantments[0].Id : null;
 
     /// <summary>原版 <c>CardEnergyCost.GetResolved()</c>：X 费返回捕获值；否则
     /// <c>Math.Max(0, GetWithModifiers(All))</c>，其中不可打出（基础费 &lt; 0）的卡不经修饰直接得 0。</summary>
@@ -344,7 +385,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
         if (!energyIgnored)
         {
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisTurn, 0));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.FreeThisTurn, 0));
         }
     }
 
@@ -352,7 +393,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         TemporaryFreeThisTurn = false;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind == LocalEnergyModifierKind.FreeThisTurn);
+        RemoveLocalEnergyModifiers(static modifier => modifier.Kind == LocalEnergyModifierKind.FreeThisTurn);
     }
 
     /// <summary>Remains free across turn boundaries until the card is actually played.</summary>
@@ -369,7 +410,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
         if (!energyIgnored)
         {
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeUntilPlayed, 0));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.FreeUntilPlayed, 0));
         }
     }
 
@@ -386,7 +427,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         }
         if (!energyIgnored)
         {
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.FreeThisCombat, 0));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.FreeThisCombat, 0));
         }
     }
 
@@ -402,14 +443,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             return;
         }
         TemporaryCostOverrideThisTurn = cost;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisTurn, cost));
+        AddLocalEnergyModifier(new(LocalEnergyModifierKind.SetThisTurn, cost));
     }
 
     internal void ClearTemporaryCostOverrideThisTurn()
     {
         AssertMutable();
         TemporaryCostOverrideThisTurn = null;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind == LocalEnergyModifierKind.SetThisTurn);
+        RemoveLocalEnergyModifiers(static modifier => modifier.Kind == LocalEnergyModifierKind.SetThisTurn);
     }
 
     /// <summary>A fixed energy-cost override until the turn ends or this card is first played.</summary>
@@ -449,14 +490,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             return;
         }
         TemporaryCostOverrideThisTurnOrUntilPlayed = cost;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisTurnOrUntilPlayed, cost, reduceOnly));
+        AddLocalEnergyModifier(new(LocalEnergyModifierKind.SetThisTurnOrUntilPlayed, cost, reduceOnly));
     }
 
     internal void ClearTemporaryCostOverrideThisTurnOrUntilPlayed()
     {
         AssertMutable();
         TemporaryCostOverrideThisTurnOrUntilPlayed = null;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind is
+        RemoveLocalEnergyModifiers(static modifier => modifier.Kind is
             LocalEnergyModifierKind.SetThisTurnOrUntilPlayed or
             LocalEnergyModifierKind.AddThisTurnOrUntilPlayed);
     }
@@ -488,7 +529,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             return;
         }
         TemporaryCostOverrideThisCombat = cost;
-        _localEnergyModifiers.Add(new(LocalEnergyModifierKind.SetThisCombat, cost, reduceOnly));
+        AddLocalEnergyModifier(new(LocalEnergyModifierKind.SetThisCombat, cost, reduceOnly));
     }
 
     /// <summary>Adds a local modifier after the currently resolved local cost for this combat.</summary>
@@ -497,7 +538,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         AssertMutable();
         _energyCostThisCombatDelta = checked(_energyCostThisCombatDelta + amount);
         if (amount != 0)
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddThisCombat, amount));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.AddThisCombat, amount));
     }
 
     /// <summary>Adds a relative local energy modifier lasting until the turn ends (including replays).</summary>
@@ -506,7 +547,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         AssertMutable();
         _energyCostThisTurnDelta = checked(_energyCostThisTurnDelta + amount);
         if (amount != 0)
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddThisTurn, amount));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.AddThisTurn, amount));
     }
 
     /// <summary>Adds a relative local cost modifier that survives turns until the first play.</summary>
@@ -514,7 +555,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         if (amount != 0)
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddUntilPlayed, amount));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.AddUntilPlayed, amount));
     }
 
     /// <summary>Adds a relative local cost modifier that clears after first play or turn end.</summary>
@@ -522,14 +563,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         AssertMutable();
         if (amount != 0)
-            _localEnergyModifiers.Add(new(LocalEnergyModifierKind.AddThisTurnOrUntilPlayed, amount));
+            AddLocalEnergyModifier(new(LocalEnergyModifierKind.AddThisTurnOrUntilPlayed, amount));
     }
 
     internal void ClearEnergyCostThisTurn()
     {
         AssertMutable();
         _energyCostThisTurnDelta = 0;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.Kind == LocalEnergyModifierKind.AddThisTurn);
+        RemoveLocalEnergyModifiers(static modifier => modifier.Kind == LocalEnergyModifierKind.AddThisTurn);
     }
 
     /// <summary>
@@ -543,14 +584,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     /// <summary>原版 v0.113.1 <c>_keywordsAddedFromOutside/_keywordsRemovedFromOutside</c>：非升级来源的关键字增删，
     /// 降级时在 canonical 关键字上重放（#922）。</summary>
-    private HashSet<CardKeyword> _keywordsAddedFromOutside = new();
+    private HashSet<CardKeyword>? _keywordsAddedFromOutside;
 
-    private HashSet<CardKeyword> _keywordsRemovedFromOutside = new();
+    private HashSet<CardKeyword>? _keywordsRemovedFromOutside;
 
     /// <summary>原版 <c>_isUpgrading</c>：OnUpgrade 期间为真，升级自身的关键字改动不记为外部来源。</summary>
     private bool _isUpgrading;
 
-    private List<EnchantmentModel> _enchantments = new();
+    private List<EnchantmentModel>? _enchantments;
 
     private AfflictionModel? _affliction;
 
@@ -611,10 +652,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     public IReadOnlyCollection<CardTag> Tags => CanonicalTags;
 
-    public IReadOnlyList<EnchantmentModel> Enchantments => _enchantments;
+    public IReadOnlyList<EnchantmentModel> Enchantments =>
+        (IReadOnlyList<EnchantmentModel>?)_enchantments ?? Array.Empty<EnchantmentModel>();
 
-    /// <summary>The same list as <see cref="Enchantments"/>, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
-    internal List<EnchantmentModel> EnchantmentList => _enchantments;
+    /// <summary>The underlying enchantment list when present, for allocation- and interface-free reads in hook dispatch (Plan 09-O).</summary>
+    internal List<EnchantmentModel>? EnchantmentList => _enchantments;
 
     public AfflictionModel? Affliction => _affliction;
 
@@ -737,8 +779,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         // 原版 v0.113.1 DowngradeInternal：canonical 本地关键字 ∪ 外部增加 − 外部移除（#922）。
         // 数值仍用升级差值法（偏离登记 Thrash 条目），运行时增长不回退。
         var restoredKeywords = new HashSet<CardKeyword>(lowerLevel.LocalKeywords);
-        restoredKeywords.UnionWith(_keywordsAddedFromOutside);
-        restoredKeywords.ExceptWith(_keywordsRemovedFromOutside);
+        if (_keywordsAddedFromOutside is not null)
+        {
+            restoredKeywords.UnionWith(_keywordsAddedFromOutside);
+        }
+        if (_keywordsRemovedFromOutside is not null)
+        {
+            restoredKeywords.ExceptWith(_keywordsRemovedFromOutside);
+        }
         foreach ((FieldInfo field, object currentCanonicalValue) in currentNumeric)
         {
             object lowerCanonicalValue = lowerNumeric[field];
@@ -847,8 +895,13 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         _keywordOverride = new HashSet<CardKeyword>(LocalKeywords) { keyword };
         if (!_isUpgrading)
         {
-            _keywordsAddedFromOutside.Add(keyword);
-            _keywordsRemovedFromOutside.Remove(keyword);
+            (_keywordsAddedFromOutside ??= new HashSet<CardKeyword>()).Add(keyword);
+            if (_keywordsRemovedFromOutside is not null &&
+                _keywordsRemovedFromOutside.Remove(keyword) &&
+                _keywordsRemovedFromOutside.Count == 0)
+            {
+                _keywordsRemovedFromOutside = null;
+            }
         }
     }
 
@@ -862,8 +915,13 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         _keywordOverride = updated;
         if (!_isUpgrading)
         {
-            _keywordsRemovedFromOutside.Add(keyword);
-            _keywordsAddedFromOutside.Remove(keyword);
+            (_keywordsRemovedFromOutside ??= new HashSet<CardKeyword>()).Add(keyword);
+            if (_keywordsAddedFromOutside is not null &&
+                _keywordsAddedFromOutside.Remove(keyword) &&
+                _keywordsAddedFromOutside.Count == 0)
+            {
+                _keywordsAddedFromOutside = null;
+            }
         }
     }
 
@@ -898,13 +956,13 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     {
         ArgumentNullException.ThrowIfNull(enchantment);
         AssertMutable();
-        if (_enchantments.Count > 0)
+        if (_enchantments is { Count: > 0 })
         {
             throw new InvalidOperationException($"{Id} is already enchanted.");
         }
 
         enchantment.AssignOwnerCard(this);
-        _enchantments.Add(enchantment);
+        (_enchantments ??= new List<EnchantmentModel>(1)).Add(enchantment);
     }
 
     internal void AttachAffliction(AfflictionModel affliction, decimal amount)
@@ -1229,9 +1287,12 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         await Hook.AfterModifyingCardPlayResultLocation(this, resultLocation, resultLocationModifiers);
 
         int enchantedPlayCount = BaseReplayCount + 1;
-        foreach (EnchantmentModel enchantment in _enchantments)
+        if (_enchantments is { } enchantmentsForCount)
         {
-            enchantedPlayCount = enchantment.EnchantPlayCount(enchantedPlayCount);
+            for (int i = 0; i < enchantmentsForCount.Count; i++)
+            {
+                enchantedPlayCount = enchantmentsForCount[i].EnchantPlayCount(enchantedPlayCount);
+            }
         }
 
         int playCount = Hook.ModifyCardPlayCount(
@@ -1283,15 +1344,18 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
                     return firstPlay;
                 }
 
-                foreach (EnchantmentModel enchantment in _enchantments.ToArray())
+                if (_enchantments is { Count: > 0 })
                 {
-                    await enchantment.OnPlay(this, cardPlay);
-                    if (Owner.Creature.IsDead)
+                    foreach (EnchantmentModel enchantment in _enchantments.ToArray())
                     {
-                        return firstPlay;
-                    }
+                        await enchantment.OnPlay(this, cardPlay);
+                        if (Owner.Creature.IsDead)
+                        {
+                            return firstPlay;
+                        }
 
-                    enchantment.InvokeExecutionFinished();
+                        enchantment.InvokeExecutionFinished();
+                    }
                 }
                 if (_affliction is not null)
                 {
@@ -1373,7 +1437,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
             TemporaryFreeUntilPlayed = false;
         }
         TemporaryCostOverrideThisTurnOrUntilPlayed = null;
-        _localEnergyModifiers.RemoveAll(modifier => modifier.ClearsAfterPlay);
+        RemoveLocalEnergyModifiers(static modifier => modifier.ClearsAfterPlay);
         ClearTemporaryStarCostOverrideThisTurn();
 
         return firstPlay;
@@ -1397,21 +1461,36 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     protected override void DeepCloneFields()
     {
         base.DeepCloneFields();
-        _localEnergyModifiers = _localEnergyModifiers.ToList();
+        _localEnergyModifiers = _localEnergyModifiers is { Count: > 0 }
+            ? new List<LocalEnergyModifier>(_localEnergyModifiers)
+            : null;
         _keywordOverride = _keywordOverride is null ? null : new HashSet<CardKeyword>(_keywordOverride);
-        _keywordsAddedFromOutside = new HashSet<CardKeyword>(_keywordsAddedFromOutside);
-        _keywordsRemovedFromOutside = new HashSet<CardKeyword>(_keywordsRemovedFromOutside);
-        _enchantments = _enchantments
-            .Select(enchantment => (EnchantmentModel)enchantment.MutableClone())
-            .ToList();
-        foreach (EnchantmentModel enchantment in _enchantments)
+        _keywordsAddedFromOutside = _keywordsAddedFromOutside is { Count: > 0 }
+            ? new HashSet<CardKeyword>(_keywordsAddedFromOutside)
+            : null;
+        _keywordsRemovedFromOutside = _keywordsRemovedFromOutside is { Count: > 0 }
+            ? new HashSet<CardKeyword>(_keywordsRemovedFromOutside)
+            : null;
+        if (_enchantments is { Count: > 0 } sourceEnchantments)
         {
-            enchantment.AssignOwnerCard(this);
+            var clonedEnchantments = new List<EnchantmentModel>(sourceEnchantments.Count);
+            for (int i = 0; i < sourceEnchantments.Count; i++)
+            {
+                var clonedEnchantment = (EnchantmentModel)sourceEnchantments[i].MutableClone();
+                clonedEnchantment.AssignOwnerCard(this);
+                clonedEnchantments.Add(clonedEnchantment);
+            }
+            _enchantments = clonedEnchantments;
         }
+        else
+        {
+            _enchantments = null;
+        }
+
         if (_affliction is not null)
         {
             int amount = _affliction.Amount;
-            AfflictionModel clone = (AfflictionModel)_affliction.MutableClone();
+            var clone = (AfflictionModel)_affliction.MutableClone();
             _affliction = null;
             AttachAffliction(clone, amount);
         }
@@ -1432,7 +1511,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         TemporaryStarCostOverrideThisTurn = null;
         ExhaustOnNextPlay = false;
         _energyCostThisTurnDelta = 0;
-        _localEnergyModifiers.RemoveAll(modifier =>
+        RemoveLocalEnergyModifiers(static modifier =>
             modifier.Kind != LocalEnergyModifierKind.AddThisCombat);
         _deckVersion = null;
         _cloneOf = null;
@@ -1453,13 +1532,20 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
 
     internal CardModel CloneForCombat(Player? owner)
     {
-        var clone = (CardModel)MutableClone();
-        clone.AssignOwnerInternal(owner);
+        var clone = (CardModel)ShallowMutableClone();
+        clone._localEnergyModifiers = null;
+        clone.DeepCloneFields();
+        clone.AfterCloned();
+        clone.Owner = owner!;
         clone._deckVersion = _deckVersion;
         clone._cloneOf = _cloneOf;
-        foreach ((EnchantmentModel source, EnchantmentModel target) in _enchantments.Zip(clone._enchantments))
+        if (_enchantments is { Count: > 0 } sourceEnchantments)
         {
-            target.RestoreCombatCloneStateFrom(source);
+            List<EnchantmentModel> targetEnchantments = clone._enchantments!;
+            for (int i = 0; i < sourceEnchantments.Count; i++)
+            {
+                targetEnchantments[i].RestoreCombatCloneStateFrom(sourceEnchantments[i]);
+            }
         }
 
         clone.TemporaryFreeThisTurn = TemporaryFreeThisTurn;
@@ -1471,9 +1557,11 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         clone.TemporaryCostOverrideThisTurnOrUntilPlayed = TemporaryCostOverrideThisTurnOrUntilPlayed;
         clone.TemporaryCostOverrideThisCombat = TemporaryCostOverrideThisCombat;
         clone.TemporaryStarCostOverrideThisTurn = TemporaryStarCostOverrideThisTurn;
-        clone.ExhaustOnNextPlay = ExhaustOnNextPlay;
+        clone._exhaustOnNextPlay = _exhaustOnNextPlay;
         clone._energyCostThisTurnDelta = _energyCostThisTurnDelta;
-        clone._localEnergyModifiers = _localEnergyModifiers.ToList();
+        clone._localEnergyModifiers = _localEnergyModifiers is { Count: > 0 }
+            ? new List<LocalEnergyModifier>(_localEnergyModifiers)
+            : null;
         return clone;
     }
 
@@ -1531,12 +1619,20 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         builder.Append(_energyCostUpgradeDelta);
         builder.Append(_energyCostThisCombatDelta);
         builder.Append(_energyCostThisTurnDelta);
-        builder.Append(_localEnergyModifiers.Count);
-        foreach (LocalEnergyModifier modifier in _localEnergyModifiers)
+        if (_localEnergyModifiers is { } modifiers)
         {
-            builder.Append((int)modifier.Kind);
-            builder.Append(modifier.Amount);
-            builder.Append(modifier.ReduceOnly);
+            builder.Append(modifiers.Count);
+            for (int i = 0; i < modifiers.Count; i++)
+            {
+                LocalEnergyModifier modifier = modifiers[i];
+                builder.Append((int)modifier.Kind);
+                builder.Append(modifier.Amount);
+                builder.Append(modifier.ReduceOnly);
+            }
+        }
+        else
+        {
+            builder.Append(0);
         }
         builder.Append(TemporaryStarCostOverrideThisTurn ?? int.MinValue);
         AppendDowngradeKeywords(ref builder);
@@ -1553,7 +1649,7 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     /// 每次增删只把 D 加/减同一关键字，所以 D 完整决定后续行为。描述只写 D 与 canonical 是否不同及其内容。</summary>
     private void AppendDowngradeKeywords(ref CombatStateDescriptionBuilder builder)
     {
-        if (_keywordsAddedFromOutside.Count == 0 && _keywordsRemovedFromOutside.Count == 0)
+        if (_keywordsAddedFromOutside is null && _keywordsRemovedFromOutside is null)
         {
             builder.Append(false);
             return;
@@ -1562,8 +1658,14 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         // 现有卡牌的 CanonicalKeywords 都是常量（不依赖升级等级），等于 0 级 canonical 的本地关键字。
         IReadOnlyCollection<CardKeyword> canonical = CanonicalKeywords;
         var downgradeKeywords = new HashSet<CardKeyword>(canonical);
-        downgradeKeywords.UnionWith(_keywordsAddedFromOutside);
-        downgradeKeywords.ExceptWith(_keywordsRemovedFromOutside);
+        if (_keywordsAddedFromOutside is not null)
+        {
+            downgradeKeywords.UnionWith(_keywordsAddedFromOutside);
+        }
+        if (_keywordsRemovedFromOutside is not null)
+        {
+            downgradeKeywords.ExceptWith(_keywordsRemovedFromOutside);
+        }
         if (downgradeKeywords.SetEquals(canonical))
         {
             builder.Append(false);

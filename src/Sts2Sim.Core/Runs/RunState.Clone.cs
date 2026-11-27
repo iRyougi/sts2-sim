@@ -12,8 +12,10 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Events;
 using Sts2Sim.Core.Rewards;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Collections;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -65,35 +67,60 @@ public sealed partial class RunState
         SharedRelicGrabBag = imagination
             ? source.SharedRelicGrabBag?.CloneReshuffled(newRngForBag("shared"))
             : source.SharedRelicGrabBag?.Clone();
-        var cardMap = new Dictionary<CardModel, CardModel>(ReferenceEqualityComparer.Instance);
-        var playerMap = new Dictionary<Player, Player>(ReferenceEqualityComparer.Instance);
-        foreach (Player player in source._players)
+        int estimatedCards = 0;
+        for (int i = 0; i < source._players.Count; i++)
         {
+            Player p = source._players[i];
+            estimatedCards += p.Deck.CardList.Count;
+            if (p.PlayerCombatState is { } pcs)
+            {
+                estimatedCards += pcs.Hand.CardList.Count + pcs.DrawPile.CardList.Count
+                    + pcs.DiscardPile.CardList.Count + pcs.ExhaustPile.CardList.Count + pcs.PlayPile.CardList.Count;
+            }
+        }
+        var cardMap = new Dictionary<CardModel, CardModel>(estimatedCards + 8, ReferenceEqualityComparer.Instance);
+        var playerMap = new Dictionary<Player, Player>(source._players.Count, ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < source._players.Count; i++)
+        {
+            Player player = source._players[i];
             Player copied = imagination ? player.CloneReseededForRun(this, cardMap)
                 : player.CloneForRun(this, cardMap);
             _players.Add(copied);
             playerMap.Add(player, copied);
         }
-        var modelMap = new Dictionary<AbstractModel, AbstractModel>(ReferenceEqualityComparer.Instance);
+        var modelMap = new Dictionary<AbstractModel, AbstractModel>(cardMap.Count + 16, ReferenceEqualityComparer.Instance);
         foreach ((CardModel original, CardModel copied) in cardMap) modelMap.Add(original, copied);
         foreach ((Player original, Player copied) in playerMap)
         {
-            foreach (var pair in original.Relics.Zip(copied.Relics)) modelMap.TryAdd(pair.First, pair.Second);
-            foreach (var pair in original.PotionSlots.Zip(copied.PotionSlots))
-                if (pair.First is not null) modelMap.TryAdd(pair.First, pair.Second!);
+            List<RelicModel> srcRelics = original.RelicList;
+            List<RelicModel> dstRelics = copied.RelicList;
+            for (int i = 0; i < srcRelics.Count; i++) modelMap.TryAdd(srcRelics[i], dstRelics[i]);
+            List<PotionModel?> srcPotions = original.PotionSlotList;
+            List<PotionModel?> dstPotions = copied.PotionSlotList;
+            for (int i = 0; i < srcPotions.Count; i++)
+                if (srcPotions[i] is { } pSrc) modelMap.TryAdd(pSrc, dstPotions[i]!);
         }
-        IEnumerable<AbstractModel> mapQuests = source.Map.GetAllMapPoints()
-            .Append(source.Map.StartingMapPoint).Append(source.Map.BossMapPoint)
-            .SelectMany(point => point.Quests);
-        // MapPoint needs only quest roots here. Their references are copied by the shared run
-        // graph, after combat roots have published their single clone identities.
-        foreach (AbstractModel original in mapQuests.Distinct<AbstractModel>(ReferenceEqualityComparer.Instance))
+        CopyMapPointQuests(source.Map.StartingMapPoint, playerMap, cardMap, modelMap);
+        CopyMapPointQuests(source.Map.BossMapPoint, playerMap, cardMap, modelMap);
+        foreach (MapPoint point in source.Map.GetAllMapPoints())
+            CopyMapPointQuests(point, playerMap, cardMap, modelMap);
+
+        static void CopyMapPointQuests(
+            MapPoint point,
+            Dictionary<Player, Player> pMap,
+            Dictionary<CardModel, CardModel> cMap,
+            Dictionary<AbstractModel, AbstractModel> mMap)
         {
-            if (original.IsCanonical || modelMap.ContainsKey(original)) continue;
-            AbstractModel copied = original is CardModel card && card.HasOwner
-                ? card.CloneForCombat(playerMap[card.Owner]) : original.MutableClone();
-            modelMap.Add(original, copied);
-            if (original is CardModel sourceCard) cardMap.TryAdd(sourceCard, (CardModel)copied);
+            IReadOnlyCollection<AbstractModel> quests = point.Quests;
+            if (quests.Count == 0) return;
+            foreach (AbstractModel original in quests)
+            {
+                if (original.IsCanonical || mMap.ContainsKey(original)) continue;
+                AbstractModel copied = original is CardModel card && card.HasOwner
+                    ? card.CloneForCombat(pMap[card.Owner]) : original.MutableClone();
+                mMap.Add(original, copied);
+                if (original is CardModel sourceCard) cMap.TryAdd(sourceCard, (CardModel)copied);
+            }
         }
         Map = source.Map.CloneForRun(modelMap, imagination
             ? new Rng(rng.Seed, source.Map is SpoilsActMap or ActEntryMapState { Kind: nameof(SpoilsActMap) }
@@ -210,14 +237,18 @@ public sealed partial class RunState
         if (_nextEncounterForTransplant is not null)
             throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingTransplant,
                 "A transplant encounter is waiting to be entered.");
-        if (typeof(RunRngSet).GetField("_semanticScope",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(Rng) is not null ||
-            _players.Any(player => typeof(PlayerRngSet).GetField("_semanticScope",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(player.PlayerRng) is not null))
+        if (Rng.HasOpenSemanticScope)
             throw new RunCloneNotSupportedException(RunCloneRejectionReason.OpenSemanticScope,
                 "A semantic RNG scope has not been closed.");
-        foreach (AbstractRoom room in _currentRooms)
+        for (int i = 0; i < _players.Count; i++)
         {
+            if (_players[i].PlayerRng.HasOpenSemanticScope)
+                throw new RunCloneNotSupportedException(RunCloneRejectionReason.OpenSemanticScope,
+                    "A semantic RNG scope has not been closed.");
+        }
+        for (int i = 0; i < _currentRooms.Count; i++)
+        {
+            AbstractRoom room = _currentRooms[i];
             if (room is CombatRoom combat) combat.AssertRunCloneBoundary();
             if (room is EventRoom @event) @event.Event.AssertRunCloneBoundary();
         }
@@ -405,20 +436,28 @@ public sealed partial class RunState
             _pending.Enqueue((source, target));
         }
 
+        private static readonly ConcurrentDictionary<Type, Action<object, object, Func<object?, object?>, Func<object, object?>>> CompiledModelFieldCopiers = new();
+
         internal void Complete()
         {
+            Func<object?, object?> mapVal = MapValue;
             while (_pending.TryDequeue(out var pair))
             {
-                foreach (FieldInfo field in RunCloneOwnedRootDiscovery.InstanceFields(pair.Source.GetType()))
+                Type runtimeType = pair.Source.GetType();
+                if (!runtimeType.IsValueType)
+                {
+                    var copier = CompiledModelFieldCopiers.GetOrAdd(runtimeType, BuildCompiledModelFieldCopier);
+                    copier(pair.Source, pair.Target, mapVal, _mapTypedRoot);
+                    continue;
+                }
+
+                foreach (FieldInfo field in RunCloneOwnedRootDiscovery.InstanceFields(runtimeType))
                 {
                     if (RunCloneOwnedRootDiscovery.IsRuntimeSubscription(field)) continue;
-                    // Typed Event/room owners restore these runtime controls after validating the boundary.
                     if (RunCloneOwnedRootDiscovery.IsRuntimeBoundary(field)) continue;
                     if (field.DeclaringType == typeof(EventModel)) continue;
                     if (RunCloneOwnedRootDiscovery.IsCombatScopedCreatureReference(field))
                     {
-                        // #974：战斗内映射到已发布的克隆生物；战斗外残留的已离场生物不属于任何世界根，
-                        // 映射为 null（与战斗克隆 RestoreCombatCloneReferencesFrom 对称，偏离 #160 条目）。
                         object? creature = field.GetValue(pair.Source);
                         field.SetValue(pair.Target, creature is null ? null : _mapTypedRoot(creature));
                         continue;
@@ -426,6 +465,115 @@ public sealed partial class RunState
                     field.SetValue(pair.Target, MapValue(field.GetValue(pair.Source)));
                 }
             }
+        }
+
+        private static bool IsImmutableScalarValueType(Type fieldType)
+        {
+            if (fieldType.IsPrimitive || fieldType.IsEnum
+                || fieldType == typeof(decimal) || fieldType == typeof(Guid)
+                || fieldType == typeof(DateTime) || fieldType == typeof(DateTimeOffset)
+                || fieldType == typeof(TimeSpan))
+            {
+                return true;
+            }
+
+            if (Nullable.GetUnderlyingType(fieldType) is { } underlying)
+            {
+                return underlying.IsPrimitive || underlying.IsEnum
+                    || underlying == typeof(decimal) || underlying == typeof(Guid)
+                    || underlying == typeof(DateTime) || underlying == typeof(DateTimeOffset)
+                    || underlying == typeof(TimeSpan);
+            }
+
+            return false;
+        }
+
+        private static Action<object, object, Func<object?, object?>, Func<object, object?>> BuildCompiledModelFieldCopier(Type runtimeType)
+        {
+            ParameterExpression srcObj = Expression.Parameter(typeof(object), "srcObj");
+            ParameterExpression dstObj = Expression.Parameter(typeof(object), "dstObj");
+            ParameterExpression mapValParam = Expression.Parameter(typeof(Func<object?, object?>), "mapVal");
+            ParameterExpression mapTypedParam = Expression.Parameter(typeof(Func<object, object?>), "mapTyped");
+
+            ParameterExpression srcTyped = Expression.Variable(runtimeType, "src");
+            ParameterExpression dstTyped = Expression.Variable(runtimeType, "dst");
+            var body = new List<Expression>
+            {
+                Expression.Assign(srcTyped, Expression.Convert(srcObj, runtimeType)),
+                Expression.Assign(dstTyped, Expression.Convert(dstObj, runtimeType)),
+            };
+
+            MethodInfo invokeMapVal = typeof(Func<object?, object?>).GetMethod("Invoke")!;
+            MethodInfo invokeMapTyped = typeof(Func<object, object?>).GetMethod("Invoke")!;
+
+            foreach (FieldInfo field in RunCloneOwnedRootDiscovery.InstanceFields(runtimeType))
+            {
+                if (RunCloneOwnedRootDiscovery.IsRuntimeSubscription(field)) continue;
+                if (RunCloneOwnedRootDiscovery.IsRuntimeBoundary(field)) continue;
+                if (field.DeclaringType == typeof(EventModel)) continue;
+
+                // Readonly fields cannot be assigned via Expression.Assign without reflection fallback;
+                // immutable scalar readonly fields are already copied identically by MemberwiseClone!
+                Type ft = field.FieldType;
+                bool isDirectScalar = IsImmutableScalarValueType(ft)
+                    || ft == typeof(string) || ft == typeof(ModelId) || ft == typeof(Type);
+
+                if (field.IsInitOnly)
+                {
+                    if (isDirectScalar) continue;
+                    // Non-scalar readonly reference/struct field (e.g., private readonly List<T>): use reflection helper
+                    ConstantExpression fConst = Expression.Constant(field);
+                    if (RunCloneOwnedRootDiscovery.IsCombatScopedCreatureReference(field))
+                    {
+                        body.Add(Expression.Call(
+                            typeof(RunCloneOwnedModelGraph).GetMethod(nameof(CopyReadonlyCombatCreatureField), BindingFlags.Static | BindingFlags.NonPublic)!,
+                            fConst, srcObj, dstObj, mapTypedParam));
+                    }
+                    else
+                    {
+                        body.Add(Expression.Call(
+                            typeof(RunCloneOwnedModelGraph).GetMethod(nameof(CopyReadonlyField), BindingFlags.Static | BindingFlags.NonPublic)!,
+                            fConst, srcObj, dstObj, mapValParam));
+                    }
+                    continue;
+                }
+
+                MemberExpression srcField = Expression.Field(srcTyped, field);
+                MemberExpression dstField = Expression.Field(dstTyped, field);
+
+                if (RunCloneOwnedRootDiscovery.IsCombatScopedCreatureReference(field))
+                {
+                    Expression mappedCreature = Expression.Condition(
+                        Expression.ReferenceEqual(srcField, Expression.Constant(null, ft)),
+                        Expression.Constant(null, ft),
+                        Expression.Convert(Expression.Call(mapTypedParam, invokeMapTyped, Expression.Convert(srcField, typeof(object))), ft));
+                    body.Add(Expression.Assign(dstField, mappedCreature));
+                }
+                else if (isDirectScalar)
+                {
+                    body.Add(Expression.Assign(dstField, srcField));
+                }
+                else
+                {
+                    Expression mapped = Expression.Convert(
+                        Expression.Call(mapValParam, invokeMapVal, Expression.Convert(srcField, typeof(object))),
+                        ft);
+                    body.Add(Expression.Assign(dstField, mapped));
+                }
+            }
+
+            return Expression.Lambda<Action<object, object, Func<object?, object?>, Func<object, object?>>>(
+                Expression.Block([srcTyped, dstTyped], body),
+                srcObj, dstObj, mapValParam, mapTypedParam).Compile();
+        }
+
+        private static void CopyReadonlyField(FieldInfo field, object source, object target, Func<object?, object?> mapVal) =>
+            field.SetValue(target, mapVal(field.GetValue(source)));
+
+        private static void CopyReadonlyCombatCreatureField(FieldInfo field, object source, object target, Func<object, object?> mapTyped)
+        {
+            object? creature = field.GetValue(source);
+            field.SetValue(target, creature is null ? null : mapTyped(creature));
         }
 
         private object? MapValue(object? source)
@@ -541,14 +689,104 @@ public sealed partial class RunState
 {
     private static class RunCloneOwnedRootDiscovery
     {
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, FieldInfo[]> Fields = new();
+        private static readonly ConcurrentDictionary<Type, FieldInfo[]> Fields = new();
+        private static readonly ConcurrentDictionary<Type, Action<object, Queue<object>>?> CompiledChildEnqueuers = new();
+        private static readonly ConcurrentDictionary<Type, FieldInfo[]> PrivateRngFields = new();
+
+        internal static FieldInfo[] RngFields(Type type) => PrivateRngFields.GetOrAdd(type, static t =>
+            InstanceFields(t).Where(static f => f.FieldType == typeof(Rng)).ToArray());
+
+        private static bool CannotContainModelRoots(Type fieldType)
+        {
+            if (fieldType.IsPrimitive || fieldType.IsEnum
+                || fieldType == typeof(string) || fieldType == typeof(decimal)
+                || fieldType == typeof(ModelId) || fieldType == typeof(Type)
+                || fieldType == typeof(MemberInfo) || fieldType == typeof(Rng)
+                || fieldType == typeof(Guid) || fieldType == typeof(DateTime)
+                || fieldType == typeof(DateTimeOffset) || fieldType == typeof(TimeSpan))
+            {
+                return true;
+            }
+
+            if (Nullable.GetUnderlyingType(fieldType) is { } underlying)
+            {
+                return CannotContainModelRoots(underlying);
+            }
+
+            return false;
+        }
+
+        private static Action<object, Queue<object>>? BuildChildEnqueuer(Type runtimeType)
+        {
+            if (runtimeType.IsValueType)
+            {
+                FieldInfo[] traversable = InstanceFields(runtimeType)
+                    .Where(static f => !IsRuntimeSubscription(f) && !IsRuntimeBoundary(f)
+                        && !IsCombatScopedCreatureReference(f) && !CannotContainModelRoots(f.FieldType))
+                    .ToArray();
+                if (traversable.Length == 0) return null;
+                return (obj, q) =>
+                {
+                    for (int i = 0; i < traversable.Length; i++)
+                    {
+                        if (traversable[i].GetValue(obj) is { } val) q.Enqueue(val);
+                    }
+                };
+            }
+
+            ParameterExpression objParam = Expression.Parameter(typeof(object), "obj");
+            ParameterExpression queueParam = Expression.Parameter(typeof(Queue<object>), "queue");
+            ParameterExpression typedVar = Expression.Variable(runtimeType, "typed");
+            MethodInfo enqueueMethod = typeof(Queue<object>).GetMethod("Enqueue", [typeof(object)])!;
+
+            var statements = new List<Expression>
+            {
+                Expression.Assign(typedVar, Expression.Convert(objParam, runtimeType)),
+            };
+            int count = 0;
+            foreach (FieldInfo field in InstanceFields(runtimeType))
+            {
+                if (IsRuntimeSubscription(field) || IsRuntimeBoundary(field)
+                    || IsCombatScopedCreatureReference(field) || CannotContainModelRoots(field.FieldType))
+                {
+                    continue;
+                }
+                count++;
+                MemberExpression fieldExpr = Expression.Field(typedVar, field);
+                if (!field.FieldType.IsValueType)
+                {
+                    ParameterExpression valVar = Expression.Variable(typeof(object), "v");
+                    statements.Add(Expression.Block(
+                        [valVar],
+                        Expression.Assign(valVar, Expression.Convert(fieldExpr, typeof(object))),
+                        Expression.IfThen(
+                            Expression.ReferenceNotEqual(valVar, Expression.Constant(null, typeof(object))),
+                            Expression.Call(queueParam, enqueueMethod, valVar))));
+                }
+                else
+                {
+                    ParameterExpression boxedVar = Expression.Variable(typeof(object), "b");
+                    statements.Add(Expression.Block(
+                        [boxedVar],
+                        Expression.Assign(boxedVar, Expression.Convert(fieldExpr, typeof(object))),
+                        Expression.IfThen(
+                            Expression.ReferenceNotEqual(boxedVar, Expression.Constant(null, typeof(object))),
+                            Expression.Call(queueParam, enqueueMethod, boxedVar))));
+                }
+            }
+
+            if (count == 0) return null;
+            return Expression.Lambda<Action<object, Queue<object>>>(
+                Expression.Block([typedVar], statements),
+                objParam, queueParam).Compile();
+        }
 
         internal static IReadOnlyList<AbstractModel> Collect(IEnumerable<object> roots,
             Func<object, bool>? skipRoot = null)
         {
-            var models = new List<AbstractModel>();
-            var seen = new HashSet<object>(ReferenceEqualityComparer.Instance);
-            var pending = new Queue<object>();
+            var models = new List<AbstractModel>(64);
+            var seen = new HashSet<object>(128, ReferenceEqualityComparer.Instance);
+            var pending = new Queue<object>(64);
             foreach (object root in roots) pending.Enqueue(root);
             while (pending.TryDequeue(out object? current))
             {
@@ -584,16 +822,8 @@ public sealed partial class RunState
                 }
                 if (type.Assembly != typeof(RunState).Assembly && !type.IsValueType
                     && !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false)) continue;
-                foreach (FieldInfo field in InstanceFields(type))
-                {
-                    if (IsRuntimeSubscription(field)) continue;
-                    // Locks, selectors, observers and ambient scopes are validated/rebuilt by
-                    // the owning typed clone component, not descended into as logical roots.
-                    if (IsRuntimeBoundary(field)) continue;
-                    // 战斗外可能指向已离场的生物；不把旧战斗当作逻辑根下钻（#974）。
-                    if (IsCombatScopedCreatureReference(field)) continue;
-                    if (field.GetValue(current) is { } value) pending.Enqueue(value);
-                }
+                Action<object, Queue<object>>? enqueuer = CompiledChildEnqueuers.GetOrAdd(type, BuildChildEnqueuer);
+                enqueuer?.Invoke(current, pending);
             }
             return models;
         }
@@ -643,21 +873,33 @@ public sealed partial class RunState
             Register(source.PlayerRng, target.PlayerRng);
             Register(source.Odds, target.Odds);
             Register(source.RelicGrabBag, target.RelicGrabBag);
-            RegisterRngStreams(source.PlayerRng, target.PlayerRng);
-            foreach (var pair in source.Piles.Zip(target.Piles)) Register(pair.First, pair.Second);
-            foreach (var pair in source.Relics.Zip(target.Relics)) RegisterModel(pair.First, pair.Second);
-            foreach (var pair in source.PotionSlots.Zip(target.PotionSlots))
+            source.PlayerRng.RegisterNamedStreams(target.PlayerRng, Register);
+            Register(source.Deck, target.Deck);
+            if (source.PlayerCombatState is { } srcPcs && target.PlayerCombatState is { } dstPcs)
             {
-                if (pair.First is not null && pair.Second is not null) RegisterModel(pair.First, pair.Second);
-                else if ((pair.First is null) != (pair.Second is null))
+                IReadOnlyList<CardPile> srcPiles = srcPcs.AllPiles;
+                IReadOnlyList<CardPile> dstPiles = dstPcs.AllPiles;
+                for (int i = 0; i < srcPiles.Count; i++) Register(srcPiles[i], dstPiles[i]);
+            }
+            List<RelicModel> srcRelics = source.RelicList;
+            List<RelicModel> dstRelics = target.RelicList;
+            for (int i = 0; i < srcRelics.Count; i++) RegisterModel(srcRelics[i], dstRelics[i]);
+            List<PotionModel?> srcPotions = source.PotionSlotList;
+            List<PotionModel?> dstPotions = target.PotionSlotList;
+            for (int i = 0; i < srcPotions.Count; i++)
+            {
+                PotionModel? pFirst = srcPotions[i];
+                PotionModel? pSecond = dstPotions[i];
+                if (pFirst is not null && pSecond is not null) RegisterModel(pFirst, pSecond);
+                else if ((pFirst is null) != (pSecond is null))
                     throw new InvalidOperationException("Potion-slot shape changed during player cloning.");
             }
         }
         // Include private held cards, provenance ancestors and closure-only cards before
         // CombatState builds its shared context. No new per-state private-card map is made.
-        foreach (CardModel source in ownedModels.OfType<CardModel>())
+        foreach (AbstractModel ownedModel in ownedModels)
         {
-            if (source.IsCanonical) continue;
+            if (ownedModel is not CardModel source || source.IsCanonical) continue;
             if (!cards.TryGetValue(source, out CardModel? target))
             {
                 target = source.HasOwner
@@ -682,12 +924,6 @@ public sealed partial class RunState
         {
             Register(source, target);
             models.QueueExistingModelFields(source, target);
-        }
-
-        void RegisterRngStreams(object source, object target)
-        {
-            foreach (PropertyInfo stream in source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
-                if (stream.PropertyType == typeof(Rng)) Register(stream.GetValue(source)!, stream.GetValue(target)!);
         }
     }
 }
@@ -915,11 +1151,27 @@ public sealed partial class RunState
 
 public sealed partial class RunState
 {
+    private static readonly FieldInfo EventPreparedCombatRoomField = typeof(EventRoom).GetField(
+        "_preparedCombatRoom", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo EventOwnerField = typeof(EventModel).GetField(
+        "_owner", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo EventRngField = typeof(EventModel).GetField(
+        "_rng", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo EventStateLockField = typeof(EventModel).GetField(
+        "_stateLock", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo EventActiveChoiceTaskField = typeof(EventModel).GetField(
+        "_activeChoiceTask", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo SphereOwnerField = typeof(CrystalSphereMinigame).GetField(
+        "_owner", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly FieldInfo SphereRngField = typeof(CrystalSphereMinigame).GetField(
+        "_rng", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly ConcurrentDictionary<Type, FieldInfo[]> RuntimeBoundaryModelFields = new();
+
     private void CopyOwnedRunGraphFrom(RunState source, Dictionary<Player, Player> players,
         Dictionary<CardModel, CardModel> cards,
         IReadOnlyDictionary<AbstractModel, AbstractModel> initialModels, bool imagination)
     {
-        var identities = new Dictionary<object, object>(ReferenceEqualityComparer.Instance)
+        var identities = new Dictionary<object, object>(cards.Count + 128, ReferenceEqualityComparer.Instance)
         {
             [source] = this,
             [source.Rng] = Rng,
@@ -931,7 +1183,7 @@ public sealed partial class RunState
             [source._currentRooms] = _currentRooms,
             [source._activeRewardOffers] = _activeRewardOffers,
         };
-        RegisterNamedRngs(source.Rng, Rng);
+        source.Rng.RegisterNamedStreams(Rng, (srcRng, dstRng) => identities.Add(srcRng, dstRng));
         if (source.SharedRelicGrabBag is not null && SharedRelicGrabBag is not null)
             identities.Add(source.SharedRelicGrabBag, SharedRelicGrabBag);
         for (int index = 0; index < _acts.Length; index++) identities.Add(source._acts[index], _acts[index]);
@@ -939,18 +1191,21 @@ public sealed partial class RunState
 
         var hiddenPreparedStates = new HashSet<CombatState>(ReferenceEqualityComparer.Instance);
         if (imagination)
-            foreach (EventRoom room in source._currentRooms.OfType<EventRoom>())
-                if (PreparedRoom(room) is { } prepared)
+            for (int i = 0; i < source._currentRooms.Count; i++)
+                if (source._currentRooms[i] is EventRoom room && PreparedRoom(room) is { } prepared)
                     foreach (CombatState state in prepared.EnumerateRunCloneStates())
                         hiddenPreparedStates.Add(state);
         IReadOnlyList<AbstractModel> owned = RunCloneOwnedRootDiscovery.Collect(Roots(),
-            root => root is CombatState state && hiddenPreparedStates.Contains(state));
+            hiddenPreparedStates.Count == 0 ? null : root => root is CombatState state && hiddenPreparedStates.Contains(state));
         var privateRngs = new Dictionary<Rng, string>(ReferenceEqualityComparer.Instance);
-        foreach (AbstractModel model in owned)
+        for (int m = 0; m < owned.Count; m++)
         {
-            foreach (FieldInfo field in RunCloneOwnedRootDiscovery.InstanceFields(model.GetType()))
+            AbstractModel model = owned[m];
+            FieldInfo[] rngFields = RunCloneOwnedRootDiscovery.RngFields(model.GetType());
+            for (int f = 0; f < rngFields.Length; f++)
             {
-                if (field.FieldType != typeof(Rng) || field.GetValue(model) is not Rng stream) continue;
+                FieldInfo field = rngFields[f];
+                if (field.GetValue(model) is not Rng stream) continue;
                 string key = $"run-clone/model={model.Id}/field={field.DeclaringType!.FullName}.{field.Name}";
                 privateRngs.TryAdd(stream, key);
             }
@@ -1002,8 +1257,7 @@ public sealed partial class RunState
         }
 
         static CombatRoom? PreparedRoom(EventRoom room) =>
-            (CombatRoom?)typeof(EventRoom).GetField("_preparedCombatRoom",
-                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room);
+            (CombatRoom?)EventPreparedCombatRoomField.GetValue(room);
 
         IEnumerable<object> Roots()
         {
@@ -1059,18 +1313,14 @@ public sealed partial class RunState
         {
             EventModel target = (EventModel)models.MapOwnedRoot(original)!;
             if (!restoredEvents.Add(original)) return target;
-            FieldInfo ownerField = typeof(EventModel).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            Player? owner = (Player?)ownerField.GetValue(original);
-            FieldInfo rngField = typeof(EventModel).GetField("_rng", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            Rng? originalRng = (Rng?)rngField.GetValue(original);
+            Player? owner = (Player?)EventOwnerField.GetValue(original);
+            Rng? originalRng = (Rng?)EventRngField.GetValue(original);
             Rng eventRng = originalRng is null ? new Rng(Rng.Seed, $"run-clone/event={original.Id}")
                 : (Rng)MapLogicalValue(originalRng)!;
             target.RestoreRunCloneStateFrom(original, owner is null ? null! : players[owner], this,
                 eventRng, MapOffer, callbacks.Rebind);
-            FieldInfo stateLock = typeof(EventModel).GetField("_stateLock", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            identities.TryAdd(stateLock.GetValue(original)!, stateLock.GetValue(target)!);
-            FieldInfo choiceTask = typeof(EventModel).GetField("_activeChoiceTask", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            if (choiceTask.GetValue(original) is Task done)
+            identities.TryAdd(EventStateLockField.GetValue(original)!, EventStateLockField.GetValue(target)!);
+            if (EventActiveChoiceTaskField.GetValue(original) is Task done)
             {
                 if (!done.IsCompletedSuccessfully)
                     throw new RunCloneNotSupportedException(RunCloneRejectionReason.PendingCallback,
@@ -1081,7 +1331,7 @@ public sealed partial class RunState
                     completion.SetResult();
                     identities.Add(done, independentCompletion = completion.Task);
                 }
-                choiceTask.SetValue(target, independentCompletion);
+                EventActiveChoiceTaskField.SetValue(target, independentCompletion);
             }
             // Route logical containers through the memo too: the same queue/option can be
             // reached through a world field and a callback capture.
@@ -1101,16 +1351,15 @@ public sealed partial class RunState
 
         CrystalSphereMinigame MapSphere(CrystalSphereMinigame original)
         {
-            FieldInfo ownerField = typeof(CrystalSphereMinigame).GetField("_owner", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            FieldInfo rngField = typeof(CrystalSphereMinigame).GetField("_rng", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            Player owner = players[(Player)ownerField.GetValue(original)!];
-            Rng originalRng = (Rng)rngField.GetValue(original)!;
+            Player srcOwner = (Player)SphereOwnerField.GetValue(original)!;
+            Player owner = players[srcOwner];
+            Rng originalRng = (Rng)SphereRngField.GetValue(original)!;
             Rng rng;
             if (identities.TryGetValue(originalRng, out object? existingRng)) rng = (Rng)existingRng;
             else
             {
                 rng = imagination
-                    ? new Rng(Rng.Seed, $"run-clone/sphere/player={source._players.IndexOf((Player)ownerField.GetValue(original)!)}")
+                    ? new Rng(Rng.Seed, $"run-clone/sphere/player={source._players.IndexOf(srcOwner)}")
                     : CopyPrivateRng(originalRng);
                 identities.Add(originalRng, rng);
             }
@@ -1134,12 +1383,18 @@ public sealed partial class RunState
 
         void RebuildModelControls()
         {
-            foreach (AbstractModel original in owned)
+            for (int m = 0; m < owned.Count; m++)
             {
+                AbstractModel original = owned[m];
+                FieldInfo[] boundaryFields = RuntimeBoundaryModelFields.GetOrAdd(original.GetType(), static t =>
+                    RunCloneOwnedRootDiscovery.InstanceFields(t)
+                        .Where(static f => RunCloneOwnedRootDiscovery.IsRuntimeBoundary(f) && f.DeclaringType != typeof(EventModel))
+                        .ToArray());
+                if (boundaryFields.Length == 0) continue;
                 AbstractModel target = (AbstractModel)identities[original];
-                foreach (FieldInfo field in RunCloneOwnedRootDiscovery.InstanceFields(original.GetType()))
+                for (int f = 0; f < boundaryFields.Length; f++)
                 {
-                    if (!RunCloneOwnedRootDiscovery.IsRuntimeBoundary(field) || field.DeclaringType == typeof(EventModel)) continue;
+                    FieldInfo field = boundaryFields[f];
                     if (field.GetValue(original) is SemaphoreSlim gate)
                     {
                         if (gate.CurrentCount != 1)
@@ -1161,12 +1416,18 @@ public sealed partial class RunState
 
         void PublishMapGraph(Sts2Sim.Core.Map.ActMap original, Sts2Sim.Core.Map.ActMap target)
         {
-            var pending = new Queue<(Sts2Sim.Core.Map.MapPoint Source, Sts2Sim.Core.Map.MapPoint Target)>();
+            var pending = new Queue<(Sts2Sim.Core.Map.MapPoint Source, Sts2Sim.Core.Map.MapPoint Target)>(64);
             pending.Enqueue((original.StartingMapPoint, target.StartingMapPoint));
             pending.Enqueue((original.BossMapPoint, target.BossMapPoint));
             if (original.SecondBossMapPoint is { } second) pending.Enqueue((second, target.SecondBossMapPoint!));
-            foreach (var pair in original.GetAllMapPoints().Zip(target.GetAllMapPoints()))
-                pending.Enqueue((pair.First, pair.Second));
+            using (IEnumerator<Sts2Sim.Core.Map.MapPoint> srcEnum = original.GetAllMapPoints().GetEnumerator())
+            using (IEnumerator<Sts2Sim.Core.Map.MapPoint> dstEnum = target.GetAllMapPoints().GetEnumerator())
+            {
+                while (srcEnum.MoveNext() && dstEnum.MoveNext())
+                {
+                    pending.Enqueue((srcEnum.Current, dstEnum.Current));
+                }
+            }
             while (pending.TryDequeue(out var pair))
             {
                 if (identities.TryGetValue(pair.Source, out object? existing))
@@ -1176,17 +1437,17 @@ public sealed partial class RunState
                     continue;
                 }
                 identities.Add(pair.Source, pair.Target);
-                foreach (var edge in pair.Source.Children.Zip(pair.Target.Children))
-                    pending.Enqueue((edge.First, edge.Second));
-                foreach (var edge in pair.Source.parents.Zip(pair.Target.parents))
-                    pending.Enqueue((edge.First, edge.Second));
+                using (IEnumerator<Sts2Sim.Core.Map.MapPoint> srcC = pair.Source.Children.GetEnumerator())
+                using (IEnumerator<Sts2Sim.Core.Map.MapPoint> dstC = pair.Target.Children.GetEnumerator())
+                {
+                    while (srcC.MoveNext() && dstC.MoveNext()) pending.Enqueue((srcC.Current, dstC.Current));
+                }
+                using (IEnumerator<Sts2Sim.Core.Map.MapPoint> srcP = pair.Source.parents.GetEnumerator())
+                using (IEnumerator<Sts2Sim.Core.Map.MapPoint> dstP = pair.Target.parents.GetEnumerator())
+                {
+                    while (srcP.MoveNext() && dstP.MoveNext()) pending.Enqueue((srcP.Current, dstP.Current));
+                }
             }
-        }
-
-        void RegisterNamedRngs(object original, object target)
-        {
-            foreach (PropertyInfo property in original.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
-                if (property.PropertyType == typeof(Rng)) identities.Add(property.GetValue(original)!, property.GetValue(target)!);
         }
     }
 }

@@ -19,6 +19,11 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
         ref CombatStateDescriptionBuilder builder,
         IEnumerable<CardModel?> cards)
     {
+        if (cards is ICollection<CardModel?> { Count: 0 } or IReadOnlyCollection<CardModel?> { Count: 0 })
+        {
+            builder.Append(0);
+            return;
+        }
         CombatStateDescriptionContext context = this;
         string[] locations = cards
             .Where(card => card is not null)
@@ -36,6 +41,11 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
         ref CombatStateDescriptionBuilder builder,
         IEnumerable<KeyValuePair<CardModel, int>> values)
     {
+        if (values is ICollection<KeyValuePair<CardModel, int>> { Count: 0 } or IReadOnlyCollection<KeyValuePair<CardModel, int>> { Count: 0 })
+        {
+            builder.Append(0);
+            return;
+        }
         CombatStateDescriptionContext context = this;
         var ordered = values
             .Select(entry => (Location: context.FindCardLocation(entry.Key), entry.Value))
@@ -53,6 +63,11 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
         ref CombatStateDescriptionBuilder builder,
         IEnumerable<Entities.Creatures.Creature> creatures)
     {
+        if (creatures is ICollection<Entities.Creatures.Creature> { Count: 0 } or IReadOnlyCollection<Entities.Creatures.Creature> { Count: 0 })
+        {
+            builder.Append(0);
+            return;
+        }
         CombatStateDescriptionContext context = this;
         string[] locations = creatures
             .Select(context.FindCreatureLocation)
@@ -69,6 +84,11 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
         ref CombatStateDescriptionBuilder builder,
         IEnumerable<KeyValuePair<Entities.Creatures.Creature, decimal>> values)
     {
+        if (values is ICollection<KeyValuePair<Entities.Creatures.Creature, decimal>> { Count: 0 } or IReadOnlyCollection<KeyValuePair<Entities.Creatures.Creature, decimal>> { Count: 0 })
+        {
+            builder.Append(0);
+            return;
+        }
         CombatStateDescriptionContext context = this;
         var ordered = values
             .Select(entry => (Location: context.FindCreatureLocation(entry.Key), entry.Value))
@@ -93,11 +113,12 @@ internal readonly record struct CombatStateDescriptionContext(CombatState State,
         if (origin.Pile is null)
         {
             // A removed source has no ordinary pile entry, but its mutable state remains reachable.
-            builder.Append(State.Players.ToList().IndexOf(origin.Owner));
+            builder.Append(CombatStateDescription.IndexOfReference(State.Players, origin.Owner));
             builder.Append(origin.DeckVersion is not null);
             if (origin.DeckVersion is { } deckVersion)
             {
-                AppendCardReferences(ref builder, new[] { deckVersion });
+                builder.Append(1);
+                builder.Append(FindCardLocation(deckVersion));
             }
             AppendDetachedCard(ref builder, origin);
         }

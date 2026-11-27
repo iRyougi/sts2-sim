@@ -146,31 +146,26 @@ public sealed class CombatSemanticHistory
     internal CombatSemanticHistory Clone()
     {
         var clone = new CombatSemanticHistory();
-        clone._exhausts.AddRange(_exhausts.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
-        clone._cardBlockGains.AddRange(_cardBlockGains.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
-        clone._orbChannels.AddRange(_orbChannels.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
-        clone._energySpent.AddRange(_energySpent.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
-        clone._cardDrawn.AddRange(_cardDrawn.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
-        clone._actorEvents.AddRange(_actorEvents.Select(entry => entry with
-        {
-            Turn = entry.Turn.Copy(),
-        }));
+        CopyEntries(_exhausts, clone._exhausts, static e => e with { Turn = e.Turn.Copy() });
+        CopyEntries(_cardBlockGains, clone._cardBlockGains, static e => e with { Turn = e.Turn.Copy() });
+        CopyEntries(_orbChannels, clone._orbChannels, static e => e with { Turn = e.Turn.Copy() });
+        CopyEntries(_energySpent, clone._energySpent, static e => e with { Turn = e.Turn.Copy() });
+        CopyEntries(_cardDrawn, clone._cardDrawn, static e => e with { Turn = e.Turn.Copy() });
+        CopyEntries(_actorEvents, clone._actorEvents, static e => e with { Turn = e.Turn.Copy() });
         return clone;
+    }
+
+    private static void CopyEntries<TEntry>(List<TEntry> source, List<TEntry> target, Func<TEntry, TEntry> copy)
+    {
+        if (source.Count == 0)
+        {
+            return;
+        }
+        target.EnsureCapacity(source.Count);
+        for (int i = 0; i < source.Count; i++)
+        {
+            target.Add(copy(source[i]));
+        }
     }
 
     internal void AppendStateDescription(ref CombatStateDescriptionBuilder builder)
@@ -232,10 +227,25 @@ public sealed class CombatSemanticHistory
         throw new InvalidOperationException("Combat history actor is not in this combat.");
     }
 
-    private static TurnKey CaptureTurnKey(CombatState state) => new(
-        state.RoundNumber,
-        state.CurrentSide,
-        state.Players.Select(player => player.PlayerCombatState?.TurnNumber).ToArray());
+    private static TurnKey CaptureTurnKey(CombatState state)
+    {
+        int count = state.Players.Count;
+        if (count == 0)
+        {
+            return new TurnKey(state.RoundNumber, state.CurrentSide, 0, null, null);
+        }
+        int? p0 = state.Players[0].PlayerCombatState?.TurnNumber;
+        if (count == 1)
+        {
+            return new TurnKey(state.RoundNumber, state.CurrentSide, 1, p0, null);
+        }
+        var extra = new int?[count - 1];
+        for (int i = 1; i < count; i++)
+        {
+            extra[i - 1] = state.Players[i].PlayerCombatState?.TurnNumber;
+        }
+        return new TurnKey(state.RoundNumber, state.CurrentSide, count, p0, extra);
+    }
 
     private readonly record struct ExhaustEntry(TurnKey Turn, int ActorIndex);
 
@@ -251,37 +261,48 @@ public sealed class CombatSemanticHistory
     private readonly record struct ActorEventEntry(ActorEvent Kind, TurnKey Turn, int ActorIndex);
 
     private readonly record struct TurnKey(
-        int RoundNumber, CombatSide Side, int?[] PlayerTurnNumbers)
+        int RoundNumber, CombatSide Side, int PlayerCount, int? Player0TurnNumber, int?[]? ExtraPlayerTurnNumbers)
     {
         public bool HappenedThisTurn(CombatState state)
         {
             if (RoundNumber != state.RoundNumber || Side != state.CurrentSide ||
-                PlayerTurnNumbers.Length != state.Players.Count)
+                PlayerCount != state.Players.Count)
                 return false;
-            for (int i = 0; i < PlayerTurnNumbers.Length; i++)
+            if (PlayerCount == 0)
+                return true;
+            if (state.Players[0].PlayerCombatState?.TurnNumber is not int turn0 ||
+                Player0TurnNumber != turn0)
+                return false;
+            for (int i = 1; i < PlayerCount; i++)
             {
                 if (state.Players[i].PlayerCombatState?.TurnNumber is not int turnNumber ||
-                    PlayerTurnNumbers[i] != turnNumber)
+                    ExtraPlayerTurnNumbers![i - 1] != turnNumber)
                     return false;
             }
             return true;
         }
 
-        public TurnKey Copy() => this with
-        {
-            PlayerTurnNumbers = PlayerTurnNumbers.ToArray(),
-        };
+        public TurnKey Copy() => ExtraPlayerTurnNumbers is null
+            ? this
+            : this with { ExtraPlayerTurnNumbers = ExtraPlayerTurnNumbers.ToArray() };
 
         public void Append(ref CombatStateDescriptionBuilder builder)
         {
             builder.Append(RoundNumber);
             builder.Append((int)Side);
-            builder.Append(PlayerTurnNumbers.Length);
-            foreach (int? turnNumber in PlayerTurnNumbers)
+            builder.Append(PlayerCount);
+            if (PlayerCount > 0)
             {
-                builder.Append(turnNumber.HasValue);
-                if (turnNumber is int value)
-                    builder.Append(value);
+                builder.Append(Player0TurnNumber.HasValue);
+                if (Player0TurnNumber is int v0)
+                    builder.Append(v0);
+                for (int i = 1; i < PlayerCount; i++)
+                {
+                    int? turnNumber = ExtraPlayerTurnNumbers![i - 1];
+                    builder.Append(turnNumber.HasValue);
+                    if (turnNumber is int value)
+                        builder.Append(value);
+                }
             }
         }
     }

@@ -75,8 +75,14 @@ public sealed class OrbQueue(Player owner)
     internal OrbQueue CloneForCombat(Player clonedOwner)
     {
         var clone = new OrbQueue(clonedOwner) { Capacity = Capacity };
-        foreach (OrbModel orb in _orbs)
-            clone._orbs.Add(orb.CloneForCombat(clonedOwner));
+        if (_orbs.Count > 0)
+        {
+            clone._orbs.EnsureCapacity(_orbs.Count);
+            for (int i = 0; i < _orbs.Count; i++)
+            {
+                clone._orbs.Add(_orbs[i].CloneForCombat(clonedOwner));
+            }
+        }
         return clone;
     }
 }

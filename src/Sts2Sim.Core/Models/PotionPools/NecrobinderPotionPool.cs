@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models.Potions;
 
@@ -11,8 +12,11 @@ public sealed class NecrobinderPotionPool : PotionPoolModel
     private static readonly Type[] PotionTypes =
         [typeof(PotionOfDoom), typeof(PotOfGhouls), typeof(BoneBrew)];
 
-    public override IReadOnlyList<PotionModel> AllPotions => PotionTypes
-        .Select(type => (PotionModel)ModelDb.Get(type)).ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<PotionModel>? _poolCache;
+
+    public override IReadOnlyList<PotionModel> AllPotions =>
+        ModelDb.ResolveStrictPool(PotionTypes, ref _poolGeneration, ref _poolCache);
 
     public override IEnumerable<PotionModel> GetUnlockedPotions(PlayerUnlockState unlockState) =>
         unlockState.IsEpochRevealed(Necrobinder4EpochId) ? AllPotions : [];

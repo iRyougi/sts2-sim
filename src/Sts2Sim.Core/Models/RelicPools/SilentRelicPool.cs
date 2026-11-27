@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Sts2Sim.Core.Models.Relics;
 
 namespace Sts2Sim.Core.Models.RelicPools;
@@ -11,8 +12,9 @@ public sealed class SilentRelicPool : RelicPoolModel
         typeof(SneckoSkull), typeof(Tingsha), typeof(ToughBandages), typeof(TwistedFunnel),
     };
 
-    public override IReadOnlyList<RelicModel> AllRelics => OfficialRelicTypes
-        .Where(ModelDb.Contains)
-        .Select(type => (RelicModel)ModelDb.Get(type))
-        .ToArray();
+    private static int _poolGeneration;
+    private static ReadOnlyCollection<RelicModel>? _poolCache;
+
+    public override IReadOnlyList<RelicModel> AllRelics =>
+        ModelDb.ResolveRegisteredPool(OfficialRelicTypes, ref _poolGeneration, ref _poolCache);
 }

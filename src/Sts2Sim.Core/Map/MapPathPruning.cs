@@ -110,9 +110,10 @@ public static class MapPathPruning
 
     public static List<List<MapPoint[]>> FindMatchingSegments(MapPoint startingMapPoint)
     {
-        var buckets = new Dictionary<ulong, List<SegmentGroup>>();
-        var numbers = new NumberText();
-        var path = new List<MapPoint>();
+        var fastGroups = new Dictionary<CompactSegmentSig, SegmentGroup>();
+        Dictionary<ulong, List<SegmentGroup>>? fallbackBuckets = null;
+        NumberText? fallbackNumbers = null;
+        var path = new List<MapPoint>(24);
 
         // Preserve FindAllPaths' child order and stop at the first Boss. Only the
         // shared DFS stack is retained; completed paths need no separate lists.
@@ -121,7 +122,7 @@ public static class MapPathPruning
             path.Add(point);
             if (point.PointType == MapPointType.Boss)
             {
-                AddSegments(path, buckets, numbers);
+                AddSegments(path, fastGroups, ref fallbackBuckets, ref fallbackNumbers);
             }
             else
             {
@@ -135,19 +136,40 @@ public static class MapPathPruning
 
         Visit(startingMapPoint);
         var duplicates = new List<SegmentGroup>();
-        foreach (List<SegmentGroup> bucket in buckets.Values)
+        foreach (SegmentGroup group in fastGroups.Values)
         {
-            foreach (SegmentGroup group in bucket)
+            if (group.Segments.Count > 1)
             {
-                if (group.Segments.Count > 1)
+                group.EnsureKey();
+                duplicates.Add(group);
+            }
+        }
+        if (fallbackBuckets is not null)
+        {
+            foreach (List<SegmentGroup> bucket in fallbackBuckets.Values)
+            {
+                foreach (SegmentGroup group in bucket)
                 {
-                    duplicates.Add(group);
+                    if (group.Segments.Count > 1)
+                    {
+                        group.EnsureKey();
+                        duplicates.Add(group);
+                    }
                 }
             }
         }
+        if (duplicates.Count == 0)
+        {
+            return new List<List<MapPoint[]>>();
+        }
         // Numeric coordinate order differs from the original ordinal key order.
-        duplicates.Sort((a, b) => StringComparer.Ordinal.Compare(a.Key, b.Key));
-        return duplicates.Select(group => group.Segments).ToList();
+        duplicates.Sort(static (a, b) => StringComparer.Ordinal.Compare(a.Key, b.Key));
+        var result = new List<List<MapPoint[]>>(duplicates.Count);
+        for (int i = 0; i < duplicates.Count; i++)
+        {
+            result.Add(duplicates[i].Segments);
+        }
+        return result;
     }
 
     public static List<List<MapPoint>> FindAllPaths(MapPoint current)
@@ -172,40 +194,95 @@ public static class MapPathPruning
         return result;
     }
 
+    private readonly record struct CompactSegmentSig(ulong Header, ulong TypesLo, ulong TypesHi);
+
     private static void AddSegments(
         List<MapPoint> path,
-        Dictionary<ulong, List<SegmentGroup>> buckets,
-        NumberText numbers)
+        Dictionary<CompactSegmentSig, SegmentGroup> fastGroups,
+        ref Dictionary<ulong, List<SegmentGroup>>? fallbackBuckets,
+        ref NumberText? fallbackNumbers)
     {
-        for (int i = 0; i < path.Count - 1; i++)
+        int pathCount = path.Count;
+        for (int i = 0; i < pathCount - 1; i++)
         {
-            if (!IsValidSegmentStartMapPoint(path[i]))
+            MapPoint startPoint = path[i];
+            if (!IsValidSegmentStartMapPoint(startPoint))
             {
                 continue;
             }
 
-            for (int j = 2; j < path.Count - i; j++)
+            MapCoord firstCoord = startPoint.coord;
+            int t0 = (int)startPoint.PointType;
+            int t1 = (int)path[i + 1].PointType;
+            bool canPack = firstCoord.col is >= 0 and < 256 && firstCoord.row is >= 0 and < 256
+                && (uint)t0 < 16 && (uint)t1 < 16;
+            ulong typesLo = canPack ? (((ulong)(uint)t0) | ((ulong)(uint)t1 << 4)) : 0;
+            ulong typesHi = 0;
+
+            for (int j = 2; j < pathCount - i; j++)
             {
                 MapPoint end = path[i + j];
+                int length = j + 1;
+                int tj = (int)end.PointType;
+                if (canPack && length <= 32 && (uint)tj < 16)
+                {
+                    int bitPos = j * 4;
+                    if (bitPos < 64) typesLo |= (ulong)(uint)tj << bitPos;
+                    else typesHi |= (ulong)(uint)tj << (bitPos - 64);
+                }
+                else
+                {
+                    canPack = false;
+                }
+
                 if (!IsValidSegmentEndMapPoint(end))
                 {
                     continue;
                 }
 
-                int length = j + 1;
-                var key = new SegmentKeyChars(path, i, length, numbers);
+                MapCoord lastCoord = end.coord;
+                if (canPack && lastCoord.col is >= 0 and < 256 && lastCoord.row is >= 0 and < 256)
+                {
+                    ulong header = (firstCoord.row == 0 ? (1UL << 40) : ((ulong)(uint)firstCoord.col << 24))
+                        | ((ulong)(uint)firstCoord.row << 16)
+                        | ((ulong)(uint)lastCoord.col << 8)
+                        | (uint)lastCoord.row
+                        | ((ulong)(uint)length << 32);
+                    var sig = new CompactSegmentSig(header, typesLo, typesHi);
+                    if (fastGroups.TryGetValue(sig, out SegmentGroup? existingGroup))
+                    {
+                        if (HasOverlap(existingGroup.Segments, path, i, length))
+                        {
+                            continue;
+                        }
+                        var extraSeg = new MapPoint[length];
+                        path.CopyTo(i, extraSeg, 0, length);
+                        existingGroup.Segments.Add(extraSeg);
+                        continue;
+                    }
+
+                    var firstSeg = new MapPoint[length];
+                    path.CopyTo(i, firstSeg, 0, length);
+                    var created = new SegmentGroup(null);
+                    created.Segments.Add(firstSeg);
+                    fastGroups.Add(sig, created);
+                    continue;
+                }
+
+                fallbackBuckets ??= new Dictionary<ulong, List<SegmentGroup>>();
+                fallbackNumbers ??= new NumberText();
+                var key = new SegmentKeyChars(path, i, length, fallbackNumbers);
                 ulong hash = HashKey(key);
-                if (!buckets.TryGetValue(hash, out List<SegmentGroup>? bucket))
+                if (!fallbackBuckets.TryGetValue(hash, out List<SegmentGroup>? bucket))
                 {
                     bucket = new List<SegmentGroup>();
-                    buckets.Add(hash, bucket);
+                    fallbackBuckets.Add(hash, bucket);
                 }
                 SegmentGroup? group = null;
                 foreach (SegmentGroup candidate in bucket)
                 {
-                    // Hashes never establish equality: compare every original
-                    // key character, including culture-specific integer text.
-                    if (KeyEquals(key, candidate.Key))
+                    candidate.EnsureKey();
+                    if (KeyEquals(key, candidate.Key!))
                     {
                         group = candidate;
                         break;
@@ -289,10 +366,11 @@ public static class MapPathPruning
         return index == text.Length;
     }
 
-    private sealed class SegmentGroup(string key)
+    private sealed class SegmentGroup(string? key)
     {
-        public string Key { get; } = key;
-        public List<MapPoint[]> Segments { get; } = new();
+        public string? Key { get; private set; } = key;
+        public List<MapPoint[]> Segments { get; } = new(2);
+        public void EnsureKey() => Key ??= GenerateSegmentKey(Segments[0]);
     }
 
     private sealed class NumberText
@@ -436,8 +514,17 @@ public static class MapPathPruning
                 continue;
             }
 
-            MapPoint[] tail = segment.Skip(i).ToArray();
-            if (tail.Any(n => n.Children.Count > 1 && n.parents.Count == 1))
+            bool tailHasBranchingSingleParent = false;
+            for (int k = i; k < segment.Length; k++)
+            {
+                MapPoint n = segment[k];
+                if (n.Children.Count > 1 && n.parents.Count == 1)
+                {
+                    tailHasBranchingSingleParent = true;
+                    break;
+                }
+            }
+            if (tailHasBranchingSingleParent)
             {
                 continue;
             }
@@ -447,7 +534,16 @@ public static class MapPathPruning
                 return false;
             }
 
-            if (!point.Children.Where(c => !segment.Contains(c)).Any(c => c.parents.Count == 1))
+            bool hasStrandedOutsideChild = false;
+            foreach (MapPoint c in point.Children)
+            {
+                if (c.parents.Count == 1 && Array.IndexOf(segment, c) < 0)
+                {
+                    hasStrandedOutsideChild = true;
+                    break;
+                }
+            }
+            if (!hasStrandedOutsideChild)
             {
                 RemovePoint(grid, startMapPoints, point);
                 result = true;

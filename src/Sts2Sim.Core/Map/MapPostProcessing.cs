@@ -152,14 +152,15 @@ public static class MapPostProcessing
             do
             {
                 changed = false;
-                foreach (MapPoint point in rowPoints)
+                for (int idx = 0; idx < rowPoints.Count; idx++)
                 {
+                    MapPoint point = rowPoints[idx];
                     int col = point.coord.col;
-                    HashSet<int> allowed = GetAllowedPositions(point, columns);
+                    (int minAllowed, int maxAllowed) = GetAllowedColumnRange(point, columns);
                     int bestCol = col;
                     int bestGap = ComputeGap(col, rowPoints, point);
 
-                    foreach (int candidate in allowed)
+                    for (int candidate = minAllowed; candidate <= maxAllowed; candidate++)
                     {
                         if (candidate == col || (grid[candidate, row] != null && grid[candidate, row] != point))
                         {
@@ -203,35 +204,25 @@ public static class MapPostProcessing
         return true;
     }
 
-    private static HashSet<int> GetNeighborAllowedPositions(int column, int totalColumns)
+    private static (int Min, int Max) GetAllowedColumnRange(MapPoint node, int totalColumns)
     {
-        var result = new HashSet<int>(3);
-        for (int offset = -1; offset <= 1; offset++)
-        {
-            int candidate = column + offset;
-            if (candidate >= 0 && candidate < totalColumns)
-            {
-                result.Add(candidate);
-            }
-        }
-
-        return result;
-    }
-
-    private static HashSet<int> GetAllowedPositions(MapPoint node, int totalColumns)
-    {
-        var allowed = new HashSet<int>(Enumerable.Range(0, totalColumns));
+        int min = 0;
+        int max = totalColumns - 1;
         foreach (MapPoint parent in node.parents)
         {
-            allowed.IntersectWith(GetNeighborAllowedPositions(parent.coord.col, totalColumns));
+            int c = parent.coord.col;
+            if (c - 1 > min) min = c - 1;
+            if (c + 1 < max) max = c + 1;
         }
 
         foreach (MapPoint child in node.Children)
         {
-            allowed.IntersectWith(GetNeighborAllowedPositions(child.coord.col, totalColumns));
+            int c = child.coord.col;
+            if (c - 1 > min) min = c - 1;
+            if (c + 1 < max) max = c + 1;
         }
 
-        return allowed;
+        return (min, max);
     }
 
     private static int ComputeGap(int candidateCol, List<MapPoint> rowPoints, MapPoint current)

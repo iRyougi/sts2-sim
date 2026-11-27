@@ -66,8 +66,18 @@ public sealed class Creature
     public bool IsHittable =>
         IsAlive && CombatState is { } combatState && Hook.ShouldAllowHitting(combatState, this);
 
-    public bool IsSecondaryEnemy =>
-        Side == CombatSide.Enemy && Powers.Any(power => power.OwnerIsSecondaryEnemy);
+    public bool IsSecondaryEnemy
+    {
+        get
+        {
+            if (Side != CombatSide.Enemy) return false;
+            for (int i = 0; i < _powers.Count; i++)
+            {
+                if (_powers[i].OwnerIsSecondaryEnemy) return true;
+            }
+            return false;
+        }
+    }
 
     public bool IsPrimaryEnemy => Side == CombatSide.Enemy && !IsSecondaryEnemy;
 
@@ -300,7 +310,17 @@ public sealed class Creature
         }
     }
 
-    public T? GetPower<T>() where T : PowerModel => _powers.OfType<T>().FirstOrDefault();
+    public T? GetPower<T>() where T : PowerModel
+    {
+        for (int i = 0; i < _powers.Count; i++)
+        {
+            if (_powers[i] is T typed)
+            {
+                return typed;
+            }
+        }
+        return null;
+    }
 
     public bool HasPower<T>() where T : PowerModel => GetPower<T>() != null;
 }

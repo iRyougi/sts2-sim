@@ -45,16 +45,37 @@ public sealed partial class CombatState
     public CombatState Clone(out CombatCloneMap map)
     {
         var runState = new CombatRunStateSnapshot(RunState, RunState.Rng.CloneExact());
-        var cardMap = new Dictionary<CardModel, CardModel>(ReferenceEqualityComparer.Instance);
-        var playerMap = new Dictionary<Player, Player>(ReferenceEqualityComparer.Instance);
-        foreach (Player player in Players)
+        int estimatedCards = EstimatePlayerCardsCount(Players);
+        var cardMap = new Dictionary<CardModel, CardModel>(estimatedCards + 4, ReferenceEqualityComparer.Instance);
+        var playerMap = new Dictionary<Player, Player>(Players.Count, ReferenceEqualityComparer.Instance);
+        for (int i = 0; i < Players.Count; i++)
         {
+            Player player = Players[i];
             Player clonedPlayer = player.CloneForCombat(runState, cardMap);
             playerMap.Add(player, clonedPlayer);
             runState.AddPlayer(clonedPlayer);
         }
 
         return CloneProjection(runState, playerMap, cardMap, out map);
+    }
+
+    private static int EstimatePlayerCardsCount(IReadOnlyList<Player> players)
+    {
+        int total = 0;
+        for (int i = 0; i < players.Count; i++)
+        {
+            Player p = players[i];
+            total += p.Deck.CardList.Count;
+            if (p.PlayerCombatState is { } pcs)
+            {
+                total += pcs.Hand.CardList.Count
+                    + pcs.DrawPile.CardList.Count
+                    + pcs.DiscardPile.CardList.Count
+                    + pcs.ExhaustPile.CardList.Count
+                    + pcs.PlayPile.CardList.Count;
+            }
+        }
+        return total;
     }
 
     /// <summary>
@@ -135,7 +156,8 @@ public sealed partial class CombatState
     {
         CombatState clone = NewCloneState(runState, projection: true);
         var states = new CloneStates(this, clone);
-        var creatures = new Dictionary<Creature, Creature>(ReferenceEqualityComparer.Instance);
+        int estimatedCreatures = _allies.Count + _enemies.Count + _escapedCreatures.Count + _removedCreatures.Count;
+        var creatures = new Dictionary<Creature, Creature>(estimatedCreatures + 2, ReferenceEqualityComparer.Instance);
         CloneGraph(runState, playerMap, cardMap, states, creatures, powerMap: null, projection: true);
         map = new CombatCloneMap(cardMap, playerMap, creatures);
         return clone;
@@ -211,6 +233,27 @@ public sealed partial class CombatState
         IsProjection = projection || IsProjection,
     };
 
+    private static void ClonePowerCardsFromList(
+        List<Creature> creatures,
+        IReadOnlyDictionary<Player, Player> playerMap,
+        Dictionary<CardModel, CardModel> cardMap)
+    {
+        for (int i = 0; i < creatures.Count; i++)
+        {
+            List<PowerModel> powers = creatures[i].PowerList;
+            for (int p = 0; p < powers.Count; p++)
+            {
+                foreach (CardModel card in powers[p].EnumerateCombatCloneCards())
+                {
+                    if (!cardMap.ContainsKey(card))
+                    {
+                        cardMap.Add(card, card.CloneForCombat(playerMap[card.Owner]));
+                    }
+                }
+            }
+        }
+    }
+
     private static void CloneGraph(IRunState runState,
         IReadOnlyDictionary<Player, Player> playerMap,
         Dictionary<CardModel, CardModel> cardMap,
@@ -220,25 +263,38 @@ public sealed partial class CombatState
     {
         foreach ((CombatState sourceState, _) in states)
         {
-            foreach (Creature creature in sourceState.EnumerateCloneCreatures())
+            ClonePowerCardsFromList(sourceState._allies, playerMap, cardMap);
+            ClonePowerCardsFromList(sourceState._enemies, playerMap, cardMap);
+            ClonePowerCardsFromList(sourceState._escapedCreatures, playerMap, cardMap);
+            ClonePowerCardsFromList(sourceState._removedCreatures, playerMap, cardMap);
+        }
+
+        Queue<CardModel>? origins = null;
+        foreach (CardModel card in cardMap.Keys)
+        {
+            if (card.CloneOf is { } origin && !cardMap.ContainsKey(origin))
             {
-                foreach (CardModel card in creature.Powers.SelectMany(power => power.EnumerateCombatCloneCards()))
-                    if (!cardMap.ContainsKey(card))
-                        cardMap.Add(card, card.CloneForCombat(playerMap[card.Owner]));
+                (origins ??= new Queue<CardModel>()).Enqueue(card);
             }
         }
-        var origins = new Queue<CardModel>(cardMap.Keys);
-        while (origins.TryDequeue(out CardModel? card))
+        if (origins is not null)
         {
-            if (card.CloneOf is not { } origin || cardMap.ContainsKey(origin)) continue;
-            cardMap.Add(origin, origin.CloneForCombat(playerMap[origin.Owner]));
-            origins.Enqueue(origin);
+            while (origins.TryDequeue(out CardModel? card))
+            {
+                if (card.CloneOf is not { } origin || cardMap.ContainsKey(origin)) continue;
+                cardMap.Add(origin, origin.CloneForCombat(playerMap[origin.Owner]));
+                origins.Enqueue(origin);
+            }
         }
         foreach ((CardModel source, CardModel target) in cardMap)
             target.RestoreCombatCloneReferencesFrom(source, cardMap);
         foreach ((Player source, Player target) in playerMap)
-            foreach ((RelicModel sourceRelic, RelicModel targetRelic) in source.Relics.Zip(target.Relics))
-                targetRelic.RestoreCombatCloneReferencesFrom(sourceRelic, cardMap);
+        {
+            List<RelicModel> srcRelics = source.RelicList;
+            List<RelicModel> dstRelics = target.RelicList;
+            for (int i = 0; i < srcRelics.Count; i++)
+                dstRelics[i].RestoreCombatCloneReferencesFrom(srcRelics[i], cardMap);
+        }
 
         foreach ((CombatState source, CombatState target) in states)
         {
@@ -246,7 +302,14 @@ public sealed partial class CombatState
             CopyCreatures(source._enemies, target._enemies, target, false, false);
             CopyCreatures(source._escapedCreatures, target._escapedCreatures, target, true, false);
             CopyCreatures(source._removedCreatures, target._removedCreatures, target, false, true);
-            target._spawnedEnemies.AddRange(source._spawnedEnemies.Select(creature => creatureMap[creature]));
+            if (source._spawnedEnemies.Count > 0)
+            {
+                target._spawnedEnemies.EnsureCapacity(source._spawnedEnemies.Count);
+                for (int i = 0; i < source._spawnedEnemies.Count; i++)
+                {
+                    target._spawnedEnemies.Add(creatureMap[source._spawnedEnemies[i]]);
+                }
+            }
         }
         foreach ((Creature source, Creature target) in creatureMap)
         {
@@ -257,8 +320,10 @@ public sealed partial class CombatState
                 if (sourceOwner.PlayerCombatState?.Pets.Contains(source) == true)
                     clonedOwner.PlayerCombatState!.AddPetInternal(target);
             }
-            foreach (PowerModel sourcePower in source.Powers)
+            List<PowerModel> srcPowers = source.PowerList;
+            for (int i = 0; i < srcPowers.Count; i++)
             {
+                PowerModel sourcePower = srcPowers[i];
                 if (powerMap?.ContainsKey(sourcePower) == true) continue;
                 var clonedPower = (PowerModel)sourcePower.MutableClone();
                 clonedPower.ApplyInternal(target, sourcePower.Amount);

@@ -30,10 +30,12 @@ public struct CombatStateDescriptionBuilder
 
     public void Append(decimal value)
     {
-        foreach (int part in decimal.GetBits(value))
-        {
-            Append(part);
-        }
+        Span<int> bits = stackalloc int[4];
+        decimal.GetBits(value, bits);
+        Append(bits[0]);
+        Append(bits[1]);
+        Append(bits[2]);
+        Append(bits[3]);
     }
 
     public void Append(ModelId value)

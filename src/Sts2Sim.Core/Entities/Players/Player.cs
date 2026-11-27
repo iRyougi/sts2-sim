@@ -131,7 +131,8 @@ public sealed class Player
         int maxHp,
         int maxEnergy,
         int gold,
-        PlayerUnlockState unlockState)
+        PlayerUnlockState unlockState,
+        int initialPotionSlots = InitialMaxPotionSlotCount)
     {
         Character = character;
         UnlockState = unlockState;
@@ -140,9 +141,13 @@ public sealed class Player
         BaseOrbSlotCount = character.BaseOrbSlotCount;
         Gold = gold;
         IsActiveForHooks = Creature.IsAlive;
-        for (int i = 0; i < InitialMaxPotionSlotCount; i++)
+        if (initialPotionSlots > 0)
         {
-            _potionSlots.Add(null);
+            _potionSlots.EnsureCapacity(initialPotionSlots);
+            for (int i = 0; i < initialPotionSlots; i++)
+            {
+                _potionSlots.Add(null);
+            }
         }
     }
 
@@ -279,15 +284,28 @@ public sealed class Player
     /// （克隆体的 CombatState 关联由 <c>CombatState.AddPlayerCreature</c> 统一设置,见 Task 13）。</summary>
     public void PopulateCombatState(Rng shuffleRng)
     {
-        foreach (CardModel deckCard in Deck.Cards)
+        List<CardModel> deckCards = Deck.CardList;
+        CardPile drawPile = PlayerCombatState!.DrawPile;
+        bool anyEnchantment = false;
+        for (int i = 0; i < deckCards.Count; i++)
         {
+            CardModel deckCard = deckCards[i];
             var combatCopy = (CardModel)deckCard.MutableClone();
             combatCopy.AssignOwner(this);
             combatCopy.AssignDeckVersionInternal(deckCard);
-            PlayerCombatState!.DrawPile.AddInternal(combatCopy);
+            drawPile.AddInternal(combatCopy);
+            if (combatCopy.EnchantmentList is { Count: > 0 })
+            {
+                anyEnchantment = true;
+            }
         }
-        PlayerCombatState!.DrawPile.RandomizeOrderInternal(shuffleRng);
-        List<CardModel> initialOrder = PlayerCombatState.DrawPile.Cards.ToList();
+        drawPile.RandomizeOrderInternal(shuffleRng);
+        if (!anyEnchantment)
+        {
+            return;
+        }
+
+        List<CardModel> initialOrder = drawPile.Cards.ToList();
         foreach (EnchantmentModel enchantment in initialOrder
                      .SelectMany(card => card.Enchantments)
                      .ToList())
@@ -296,7 +314,7 @@ public sealed class Player
         }
         foreach (CardModel card in initialOrder)
         {
-            PlayerCombatState.DrawPile.MoveToBottomInternal(card);
+            drawPile.MoveToBottomInternal(card);
         }
     }
 
@@ -464,7 +482,7 @@ public sealed class Player
     internal Player CloneForCombat(
         IRunState runState,
         IDictionary<CardModel, CardModel> cardMap) =>
-        CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.Clone());
+        CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.CloneSharedForCombat());
 
     /// <summary>公开世界克隆（<c>CombatState.CloneForPublicWorld</c>）：玩家 RNG 由 <paramref name="playerSeed"/>
     /// 全新播种，遗物袋内容不变、用 <paramref name="relicBagShuffle"/> 重洗。与 <see cref="CloneForCombat"/>
@@ -482,7 +500,7 @@ public sealed class Player
         PlayerRngSet clonedRng, RelicGrabBag clonedRelicBag)
     {
         // Character is a canonical ModelDb instance and therefore deliberately shared.
-        var clone = new Player(Character, Creature.CurrentHp, Creature.MaxHp, MaxEnergy, Gold, UnlockState)
+        var clone = new Player(Character, Creature.CurrentHp, Creature.MaxHp, MaxEnergy, Gold, UnlockState, initialPotionSlots: 0)
         {
             RunState = runState,
             IsActiveForHooks = IsActiveForHooks,
@@ -491,47 +509,49 @@ public sealed class Player
             BaseOrbSlotCount = BaseOrbSlotCount,
             PlayerRng = clonedRng,
         };
-        clone.Odds = PlayerOddsSet.FromSerializable(
-            Odds.ToSerializable(),
+        clone.Odds = Odds.Clone(
             clone.PlayerRng,
             runState.Ascension,
             new HookOddsAdapter(runState));
         clone.RelicGrabBag = clonedRelicBag;
 
-        clone._potionSlots.Clear();
-        foreach (PotionModel? potion in _potionSlots)
+        if (_potionSlots.Count > 0)
         {
-            if (potion is null)
+            clone._potionSlots.EnsureCapacity(_potionSlots.Count);
+            for (int i = 0; i < _potionSlots.Count; i++)
             {
-                clone._potionSlots.Add(null);
-                continue;
+                PotionModel? potion = _potionSlots[i];
+                if (potion is null)
+                {
+                    clone._potionSlots.Add(null);
+                    continue;
+                }
+
+                var clonedPotion = (PotionModel)potion.MutableClone();
+                clonedPotion.AssignOwner(clone);
+                clone._potionSlots.Add(clonedPotion);
             }
-
-            var clonedPotion = (PotionModel)potion.MutableClone();
-            clonedPotion.AssignOwner(clone);
-            clone._potionSlots.Add(clonedPotion);
         }
 
-        foreach (RelicModel relic in _relics)
+        if (_relics.Count > 0)
         {
-            var clonedRelic = (RelicModel)relic.MutableClone();
-            clonedRelic.AssignOwner(clone);
-            clone._relics.Add(clonedRelic);
+            clone._relics.EnsureCapacity(_relics.Count);
+            for (int i = 0; i < _relics.Count; i++)
+            {
+                var clonedRelic = (RelicModel)_relics[i].MutableClone();
+                clonedRelic.AssignOwner(clone);
+                clone._relics.Add(clonedRelic);
+            }
         }
 
-        foreach (CardModel card in Deck.Cards)
-        {
-            CardModel clonedCard = card.CloneForCombat(clone);
-            clone.Deck.AddInternal(clonedCard);
-            cardMap.Add(card, clonedCard);
-        }
+        clone.Deck.CloneCardsFrom(Deck, clone, cardMap);
 
         clone.PlayerCombatState = PlayerCombatState?.CloneForCombat(clone, cardMap);
         return clone;
     }
     internal Player CloneForRun(RunState runState, IDictionary<CardModel, CardModel> cardMap)
     {
-        Player clone = CloneForCombat(runState, cardMap);
+        Player clone = CloneOwnedState(runState, cardMap, PlayerRng.CloneExact(), RelicGrabBag.Clone());
         clone.Creature.RestoreCumulativeHpLostFrom(Creature);
         clone.Creature.CombatId = Creature.CombatId;
         return clone;

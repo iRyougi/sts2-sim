@@ -76,9 +76,25 @@ public sealed class CardPile(PileType type)
     public void RandomizeOrderInternal(Rng rng)
     {
         // 原版 v0.113.1：_cards.UnstableShuffle(rng)。
-        List<CardModel> list = _cards.ToList();
-        list.UnstableShuffle(rng);
-        _cards.Clear();
-        _cards.AddRange(list);
+        _cards.UnstableShuffle(rng);
+    }
+
+    internal void CloneCardsFrom(CardPile source, Players.Player clonedOwner, IDictionary<CardModel, CardModel> cardMap)
+    {
+        List<CardModel> src = source._cards;
+        if (src.Count == 0)
+        {
+            return;
+        }
+
+        _cards.EnsureCapacity(src.Count);
+        for (int i = 0; i < src.Count; i++)
+        {
+            CardModel sourceCard = src[i];
+            CardModel clonedCard = sourceCard.CloneForCombat(clonedOwner);
+            _cards.Add(clonedCard);
+            clonedCard.AssignPileInternal(this);
+            cardMap.Add(sourceCard, clonedCard);
+        }
     }
 }

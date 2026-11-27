@@ -161,6 +161,14 @@ public sealed class MegaRandom
         rng.state3 = _s3;
     }
 
+    internal void AppendStateTo(ref Combat.StateDescription.CombatStateDescriptionBuilder builder)
+    {
+        builder.Append(_s0);
+        builder.Append(_s1);
+        builder.Append(_s2);
+        builder.Append(_s3);
+    }
+
     /// <summary>
     /// Deviation #21: exact, independent snapshot of the generator's internal state.
     /// Not present in the game; used for O(1) parallel environment resets.

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Sts2Sim.Core.ValueProps;
 
 /// <summary>
@@ -17,10 +19,12 @@ public enum ValueProp
 public static class ValuePropExtensions
 {
     /// <summary>Whether this is attack damage from a powered card or monster move.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPoweredAttack(this ValueProp props) =>
-        props.HasFlag(ValueProp.Move) && !props.HasFlag(ValueProp.Unpowered);
+        (props & (ValueProp.Move | ValueProp.Unpowered)) == ValueProp.Move;
 
     /// <summary>Whether this is block from a powered card or monster move.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPoweredCardOrMonsterMoveBlock(this ValueProp props) =>
-        props.HasFlag(ValueProp.Move) && !props.HasFlag(ValueProp.Unpowered);
+        (props & (ValueProp.Move | ValueProp.Unpowered)) == ValueProp.Move;
 }
