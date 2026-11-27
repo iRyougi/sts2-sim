@@ -1048,7 +1048,8 @@ public sealed partial class RunState
 
         Rng CopyPrivateRng(Rng stream)
         {
-            if (!imagination) return stream.CloneExact();
+            if (!imagination)
+                return stream.CloneExact(observer => (Action<int, string, string>)callbacks.Rebind(observer));
             if (!privateRngs.TryGetValue(stream, out string? key))
                 throw new InvalidOperationException("Private RNG has no logical owner field in this run graph.");
             return new Rng(Rng.Seed, key);
@@ -1110,7 +1111,7 @@ public sealed partial class RunState
             {
                 rng = imagination
                     ? new Rng(Rng.Seed, $"run-clone/sphere/player={source._players.IndexOf((Player)ownerField.GetValue(original)!)}")
-                    : originalRng.CloneExact();
+                    : CopyPrivateRng(originalRng);
                 identities.Add(originalRng, rng);
             }
             CrystalSphereItem MapItem(CrystalSphereItem item) => (CrystalSphereItem)MapLogicalValue(item)!;

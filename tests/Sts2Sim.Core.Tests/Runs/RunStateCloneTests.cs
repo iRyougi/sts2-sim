@@ -550,6 +550,151 @@ public sealed partial class RunStateCloneTests
         if (scenario == "event") await AssertCallbackOwnedCardForkIsolationAsync();
     }
 
+    [Fact]
+    public async Task CloneExact_KeyedRewardOverrideAndRunRngObserversBindToCloneSet()
+    {
+        RunState source = RunState.CreateKeyedForLabels("BR2YTPQX15HD", [new Overgrowth(), new Hive(), new Glory()], 10);
+        Player sourcePlayer = Player.CreateForNewRun(ModelDb.Character<Defect>(), source);
+        source.AddPlayer(sourcePlayer);
+        sourcePlayer.Creature.SetMaxHpInternal(10_000);
+        sourcePlayer.Creature.HealInternal(10_000);
+        source.Map.StartingMapPoint.PointType = MapPointType.Monster;
+        await new RunDriver(source, new FirstChoiceDecisionSource()).RunAsync(0);
+
+        var driftwood = (Sts2Sim.Core.Models.Relics.Driftwood)
+            ModelDb.Relic<Sts2Sim.Core.Models.Relics.Driftwood>().MutableClone();
+        driftwood.AssignOwner(sourcePlayer);
+        sourcePlayer.AddRelicInternal(driftwood);
+
+        MapPoint next = source.Map.StartingMapPoint.Children.OrderBy(p => p.coord.col).First();
+        next.PointType = MapPointType.Monster;
+
+        bool captured = false;
+        var captureSource = new KeyedRewardCaptureDecisionSource(async rewards =>
+        {
+            if (captured || rewards.Card.IsResolved || rewards.Card.Options.Count == 0)
+            {
+                return;
+            }
+            captured = true;
+
+            KeyedRngDraw[] sourceDrawsBefore = sourcePlayer.PlayerRng.GetKeyedDraws().ToArray();
+            string sourceSnapshotBefore = RunCloneGraphSnapshot.Capture(source);
+            RunState clone = source.CloneExact();
+            string cloneBeforeSnapshot = RunCloneGraphSnapshot.Capture(clone);
+            RewardsSet cloneRewards = clone.ActiveRewardOffers[^1];
+            var cloneOptions = (CardCreationOptions?)typeof(CardReward)
+                .GetField("_creationOptions", PrivateFields)!.GetValue(cloneRewards.Card);
+            Assert.NotNull(cloneOptions?.RngOverride);
+            object? boundPlayerSet = GetDrawObserverOwner(cloneOptions!.RngOverride!);
+
+            KeyedRngDraw[] cloneDrawsBefore = clone.Players[0].PlayerRng.GetKeyedDraws().ToArray();
+
+            await new RunDriver(clone, new RerollOnceRewardDecisionSource()).ContinueAsync(1);
+
+            KeyedRngDraw[] sourceDrawsAfter = sourcePlayer.PlayerRng.GetKeyedDraws().ToArray();
+            KeyedRngDraw[] cloneDrawsAfter = clone.Players[0].PlayerRng.GetKeyedDraws().ToArray();
+
+            Assert.Multiple(
+                () => Assert.Same(clone.Players[0].PlayerRng, boundPlayerSet),
+                () => Assert.NotSame(sourcePlayer.PlayerRng, boundPlayerSet),
+                () => Assert.Equal(sourceSnapshotBefore, cloneBeforeSnapshot),
+                () => Assert.Equal(sourceDrawsBefore, sourceDrawsAfter),
+                () => Assert.Equal(sourceSnapshotBefore, RunCloneGraphSnapshot.Capture(source)),
+                () => Assert.True(cloneDrawsAfter.Length > cloneDrawsBefore.Length,
+                    $"Expected clone PlayerRng trace to grow after rerolling/finishing card reward, before={cloneDrawsBefore.Length}, after={cloneDrawsAfter.Length}."),
+                () => Assert.Empty(clone.ActiveRewardOffers),
+                () => Assert.True(clone.Players[0].Deck.Cards.Count > sourcePlayer.Deck.Cards.Count));
+        });
+
+        await new RunDriver(source, captureSource).ContinueAsync(1);
+        Assert.True(captured, "Expected to reach a keyed card-reward decision frame.");
+
+        RunState runKeyed = RunState.CreateKeyedForLabels("keyed-run-rng-observer", [new Overgrowth(), new Hive(), new Glory()], 10);
+        Player runPlayer = Player.CreateForNewRun(ModelDb.Character<Silent>(), runKeyed);
+        runKeyed.AddPlayer(runPlayer);
+        Rng runOverride = runKeyed.Rng.ForSemanticKey(
+            Sts2Sim.Core.Entities.Rngs.RunRngType.Niche, "clone-test/run-observer");
+        var runReward = new CardReward(
+            runPlayer,
+            new CardCreationOptions([runPlayer.Character.CardPool], CardCreationSource.Other, CardRarityOddsType.Uniform)
+                .WithRngOverride(runOverride));
+        runKeyed.BeginActiveRewardOffer(RewardsSet.CreateCustom(runPlayer, card: runReward));
+
+        RunState runClone = runKeyed.CloneExact();
+        CardReward cloneRunCard = runClone.ActiveRewardOffers[^1].Card;
+        var cloneRunOptions = (CardCreationOptions?)typeof(CardReward)
+            .GetField("_creationOptions", PrivateFields)!.GetValue(cloneRunCard);
+        Assert.NotNull(cloneRunOptions?.RngOverride);
+        object? boundRunSet = GetDrawObserverOwner(cloneRunOptions!.RngOverride!);
+
+        KeyedRngDraw[] runDrawsBefore = runKeyed.Rng.GetKeyedDraws().ToArray();
+        KeyedRngDraw[] cloneRunDrawsBefore = runClone.Rng.GetKeyedDraws().ToArray();
+        string runSourceBefore = RunCloneGraphSnapshot.Capture(runKeyed);
+        cloneRunCard.Populate(runClone);
+        KeyedRngDraw[] runDrawsAfter = runKeyed.Rng.GetKeyedDraws().ToArray();
+        KeyedRngDraw[] cloneRunDrawsAfter = runClone.Rng.GetKeyedDraws().ToArray();
+
+        Assert.Multiple(
+            () => Assert.Same(runClone.Rng, boundRunSet),
+            () => Assert.NotSame(runKeyed.Rng, boundRunSet),
+            () => Assert.Equal(runDrawsBefore, runDrawsAfter),
+            () => Assert.Equal(runSourceBefore, RunCloneGraphSnapshot.Capture(runKeyed)),
+            () => Assert.True(cloneRunDrawsAfter.Length > cloneRunDrawsBefore.Length,
+                $"Expected clone RunRng trace to grow after populating card reward, before={cloneRunDrawsBefore.Length}, after={cloneRunDrawsAfter.Length}."));
+    }
+
+    private static object? GetDrawObserverOwner(Rng rng)
+    {
+        var observer = (Action<int, string, string>?)typeof(Rng)
+            .GetField("_drawObserver", PrivateFields)!.GetValue(rng);
+        Assert.NotNull(observer);
+        object? closure = observer!.Target;
+        Assert.NotNull(closure);
+        FieldInfo ownerField = closure!.GetType().GetField("<>4__this", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Closure {closure.GetType().FullName} has no <>4__this field.");
+        return ownerField.GetValue(closure);
+    }
+
+    private sealed class KeyedRewardCaptureDecisionSource(Func<RewardsSet, Task> onRewardFrame) : IRunDecisionSource
+    {
+        private readonly IRunDecisionSource _inner = new FirstChoiceDecisionSource();
+
+        public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options) => _inner.ChooseMapPointAsync(options);
+        public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) => _inner.ChooseCombatActionAsync(state);
+        public Task<ShopDecision> ChooseShopActionAsync(MerchantInventory inventory, Player player) => _inner.ChooseShopActionAsync(inventory, player);
+
+        public async Task<RewardDecision> ChooseRewardActionAsync(RewardsSet rewards)
+        {
+            await onRewardFrame(rewards);
+            return await _inner.ChooseRewardActionAsync(rewards);
+        }
+    }
+
+    private sealed class RerollOnceRewardDecisionSource : IRunDecisionSource
+    {
+        private readonly IRunDecisionSource _inner = new FirstChoiceDecisionSource();
+        private bool _rerolled;
+
+        public Task<MapPoint> ChooseMapPointAsync(IReadOnlyList<MapPoint> options) => _inner.ChooseMapPointAsync(options);
+        public Task<CombatDecision> ChooseCombatActionAsync(CombatState state) => _inner.ChooseCombatActionAsync(state);
+        public Task<ShopDecision> ChooseShopActionAsync(MerchantInventory inventory, Player player) => _inner.ChooseShopActionAsync(inventory, player);
+
+        public Task<RewardDecision> ChooseRewardActionAsync(RewardsSet rewards)
+        {
+            if (!_rerolled && !rewards.Card.IsResolved && rewards.Card.CanReroll)
+            {
+                CardRewardAlternative? reroll = rewards.Card.Alternatives.FirstOrDefault(a => a.OptionId == "REROLL" && a.IsAvailable);
+                if (reroll is not null)
+                {
+                    _rerolled = true;
+                    return Task.FromResult<RewardDecision>(new RewardDecision.SelectCardAlternative(rewards.Card, reroll));
+                }
+            }
+            return _inner.ChooseRewardActionAsync(rewards);
+        }
+    }
+
     private static async Task AssertStableBoundaryRejectionsAsync()
     {
         var active = NewVisibleRun("clone-active-reject");

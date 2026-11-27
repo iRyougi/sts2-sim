@@ -90,13 +90,16 @@ public class Rng
     /// 用于"分支必须看到与真实流一致的未来"的场景——战斗搜索的所有分支都属于这一类。
     /// 偏离 #21 的延续。
     /// </summary>
-    public Rng CloneExact()
-    {
-        return new Rng(_random.Clone(), Counter, _semanticKeyRequired, _drawObserver)
+    public Rng CloneExact() => CloneExactWithObserver(_drawObserver);
+
+    internal Rng CloneExact(Func<Action<int, string, string>, Action<int, string, string>> rebindDrawObserver) =>
+        CloneExactWithObserver(_drawObserver is null ? null : rebindDrawObserver(_drawObserver));
+
+    private Rng CloneExactWithObserver(Action<int, string, string>? observer) =>
+        new(_random.Clone(), Counter, _semanticKeyRequired, observer)
         {
             DiagnosticStreamName = DiagnosticStreamName
         };
-    }
 
     private void RequireSequentialDrawAllowed()
     {
