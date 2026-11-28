@@ -19,6 +19,18 @@ public class CardRarityOdds : AbstractOdds
 
     public const float shopUncommonOdds = 0.37f;
 
+    public const float blitzShopCommonOdds = 0.4f;
+
+    public const float blitzShopUncommonOdds = 0.5f;
+
+    public const float blitzShopRareOdds = 0.1f;
+
+    public const float blitzNeowCommonOdds = 0.55f;
+
+    public const float blitzNeowUncommonOdds = 0.4f;
+
+    public const float blitzNeowRareOdds = 0.05f;
+
     private const float _baseRarityOffset = -0.05f;
 
     private const float _maxRarityOffset = 0.4f;
@@ -151,6 +163,20 @@ public class CardRarityOdds : AbstractOdds
                 CardRarity.Common => 0.33f,
                 CardRarity.Uncommon => 0.33f,
                 CardRarity.Rare => 0.33f,
+                _ => throw new ArgumentOutOfRangeException(nameof(rarity)),
+            },
+            CardRarityOddsType.Blitz => rarity switch
+            {
+                CardRarity.Common => blitzShopCommonOdds,
+                CardRarity.Uncommon => blitzShopUncommonOdds,
+                CardRarity.Rare => blitzShopRareOdds,
+                _ => throw new ArgumentOutOfRangeException(nameof(rarity)),
+            },
+            CardRarityOddsType.BlitzNeow => rarity switch
+            {
+                CardRarity.Common => blitzNeowCommonOdds,
+                CardRarity.Uncommon => blitzNeowUncommonOdds,
+                CardRarity.Rare => blitzNeowRareOdds,
                 _ => throw new ArgumentOutOfRangeException(nameof(rarity)),
             },
             _ => throw new ArgumentOutOfRangeException(nameof(type)),

@@ -94,6 +94,14 @@ public sealed class CardReward : Reward
         return new CardReward(player);
     }
 
+    internal void ConfigureRngOverrideIfMissing(Random.Rng rng)
+    {
+        if (_creationOptions is not null && _creationOptions.RngOverride is null)
+        {
+            _creationOptions.WithRngOverride(rng);
+        }
+    }
+
     public override void Populate(IRunState runState)
     {
         if ((_explicitOptions is not null || _creationOptions is not null) && _isPopulated)

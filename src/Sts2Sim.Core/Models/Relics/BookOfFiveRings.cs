@@ -12,8 +12,6 @@ public sealed class BookOfFiveRings : RelicModel
 
     public int DisplayAmount => _cardsAdded % 5;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override async Task AfterCardChangedPiles(
         CardModel card,
         PileType oldPileType,

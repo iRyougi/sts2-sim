@@ -24,6 +24,7 @@ public sealed class MyShinies : CardModel, ICardChoiceBaseValueProvider, ICardDa
     public override CardRarity Rarity => CardRarity.Rare;
     public override TargetType TargetType => TargetType.AnyEnemy;
     public override bool IsColorless => true;
+    public override bool IsAllowedInBlitz => false;
     protected override int CanonicalEnergyCost => 1;
 
     public decimal GoldPerHit => _goldPerHit;

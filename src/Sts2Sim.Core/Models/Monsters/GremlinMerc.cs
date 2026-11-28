@@ -10,11 +10,25 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class GremlinMerc : MonsterModel
 {
+    private bool _hasSpoken;
+
     public override int MinInitialHp => Value(AscensionLevel.ToughEnemies, 51, 47);
     public override int MaxInitialHp => Value(AscensionLevel.ToughEnemies, 53, 49);
     private int GimmeDamage => Value(AscensionLevel.ToughEnemies, 8, 7);
     private int DoubleSmashDamage => Value(AscensionLevel.ToughEnemies, 7, 6);
     private int HeheDamage => Value(AscensionLevel.ToughEnemies, 9, 8);
+
+    public bool HasSpoken
+    {
+        get => _hasSpoken;
+        private set
+        {
+            AssertMutable();
+            _hasSpoken = value;
+        }
+    }
+
+    internal string? SpokenBanterKey { get; private set; }
 
     public override async Task AfterAddedToRoom()
     {
@@ -49,8 +63,19 @@ public sealed class GremlinMerc : MonsterModel
 
     private async Task Gimme(IReadOnlyList<Creature> _)
     {
+        if (!HasSpoken && Creature.CombatState!.RunState.GameMode != Runs.GameMode.Blitz)
+        {
+            HasSpoken = true;
+            SpokenBanterKey = "GREMLIN_MERC.moves.GIMME.banter";
+        }
+
         await DamageCmd.Attack(GimmeDamage).WithHitCount(2).FromMonster(this).Execute();
         await Steal();
+        if (!HasSpoken && Creature.CombatState!.RunState.GameMode == Runs.GameMode.Blitz)
+        {
+            HasSpoken = true;
+            SpokenBanterKey = "GREMLIN_MERC.moves.GIMME_BLITZ.banter";
+        }
     }
 
     private async Task DoubleSmash(IReadOnlyList<Creature> targets)
@@ -71,6 +96,11 @@ public sealed class GremlinMerc : MonsterModel
     }
     private async Task Steal()
     {
+        if (Creature.CombatState!.RunState.GameMode == Runs.GameMode.Blitz)
+        {
+            return;
+        }
+
         foreach (ThieveryPower thievery in Creature.Powers.OfType<ThieveryPower>())
         {
             await thievery.Steal();

@@ -97,18 +97,46 @@ public abstract class RelicModel : AbstractModel, ICombatStateDescriptionContrib
     /// <summary>是否允许出现在商店角色遗物槽位。</summary>
     public virtual bool IsAllowedInShops => true;
 
-    /// <summary>偏离 #108 已销案（Plan 08b-3c）：真实门控为 总楼层数小于 41
-    /// （多人 38），不是按当前幕数判定。</summary>
-    public virtual bool IsAllowed(Runs.IRunState runState) => true;
+    /// <summary>偏离 #108 已销案（Plan 08b-3c）：标准局门控为总楼层数小于 41（多人 38），
+    /// 极速模式按第 3 幕精英门控并在非虚方法中统一检查 Blitz 禁遗物。</summary>
+    public bool IsAllowed(Runs.IRunState runState)
+    {
+        ArgumentNullException.ThrowIfNull(runState);
+        if (runState.GameMode == Runs.GameMode.Blitz && Helpers.RelicLists.notAllowedInBlitz.Contains(Id))
+        {
+            return false;
+        }
 
-    /// <summary>逐字移植 <c>RelicModel.IsBeforeAct3TreasureChest</c>：
-    /// 这些“投资型”遗物的收益取决于这局还剩多少路要走，过了第三幕宝箱再发等于发空气。</summary>
-    protected static bool IsBeforeAct3TreasureChest(Runs.IRunState runState)
+        if (IsLateInAct3(runState) && Helpers.RelicLists.notAllowedLateInAct3.Contains(Id))
+        {
+            return false;
+        }
+
+        return IsAllowedInternal(runState);
+    }
+
+    protected virtual bool IsAllowedInternal(Runs.IRunState runState) => true;
+
+    /// <summary>
+    /// 逐字移植 <c>RelicModel.IsLateInAct3</c>：标准局门槛为第 3 幕宝箱起（单人 41 层 / 多人 38 层），
+    /// 极速模式门槛为第 3 幕精英起（第 21 层）。
+    /// </summary>
+    protected static bool IsLateInAct3(Runs.IRunState runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
         int threshold = runState.Players.Count > 1 ? 38 : 41;
-        return runState.TotalFloor < threshold;
+        if (runState.GameMode == Runs.GameMode.Blitz)
+        {
+            int actLength = Map.BlitzActMap.pointTypes.Length + 2;
+            threshold = actLength * 2 + Array.IndexOf(Map.BlitzActMap.pointTypes, Map.MapPointType.Elite) + 2;
+        }
+
+        return runState.TotalFloor >= threshold;
     }
+
+    /// <summary>逐字移植 <c>RelicModel.IsBeforeAct3TreasureChest</c>：
+    /// 这些“投资型”遗物的收益取决于这局还剩多少路要走，过了第三幕宝箱再发等于发空气。</summary>
+    protected static bool IsBeforeAct3TreasureChest(Runs.IRunState runState) => !IsLateInAct3(runState);
 
     public virtual bool IsAllowedAtNeow(Runs.IRunState runState) => IsAllowed(runState);
 

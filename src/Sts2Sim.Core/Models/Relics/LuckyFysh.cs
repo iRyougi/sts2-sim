@@ -8,8 +8,6 @@ public sealed class LuckyFysh : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override bool IsAllowedInShops => false;
 
     public override Task AfterCardChangedPiles(

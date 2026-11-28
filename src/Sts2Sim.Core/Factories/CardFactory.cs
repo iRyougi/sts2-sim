@@ -52,7 +52,10 @@ public static class CardFactory
         {
             CardCreationOptions selectionOptions = Hook.ModifyCardRewardCreationOptions(player.RunState, player, options);
             Random.Rng selectionRng = selectionOptions.RngOverride ?? player.PlayerRng.Rewards;
-            var remaining = selectionOptions.GetPossibleCards(player).Where(card => !selected.Contains(card.Id)).Distinct().ToList();
+            var remaining = selectionOptions.GetPossibleCards(player)
+                .Where(card => !selected.Contains(card.Id) && card.IsAllowedInRun(player.RunState))
+                .Distinct()
+                .ToList();
             IEnumerable<CardModel> candidates;
             if (selectionOptions.RarityOdds == CardRarityOddsType.Uniform)
                 candidates = remaining.Where(c => c.Rarity is not (CardRarity.Basic or CardRarity.Ancient));
@@ -124,7 +127,7 @@ public static class CardFactory
     {
         List<CardModel> remaining = pool.GetUnlockedCards(
                 player.UnlockState, player.RunState.Players.Count > 1)
-            .Where(card => card.Rarity == rarity).ToList();
+            .Where(card => card.Rarity == rarity && card.IsAllowedInRun(player.RunState)).ToList();
         var options = new List<CardModel>();
         for (int i = 0; i < optionCount && remaining.Count > 0; i++)
         {
@@ -146,6 +149,7 @@ public static class CardFactory
         {
             List<CardModel> allCandidates = pool.GetUnlockedCards(
                     player.UnlockState, player.RunState.Players.Count > 1)
+                .Where(card => card.IsAllowedInRun(player.RunState))
                 .Where(card => card.Rarity is CardRarity.Common or CardRarity.Uncommon or CardRarity.Rare)
                 .Where(card => filter(card) && !selected.Contains(card))
                 .ToList();
@@ -237,6 +241,7 @@ public static class CardFactory
             CardRarity rarity = player.Odds.CardRarity.Roll(modifiedCreation.RarityOdds, rng);
             List<CardModel> candidates = modifiedCreation.GetPossibleCards(player)
                 .Where(card =>
+                    card.IsAllowedInRun(player.RunState) &&
                     card.Rarity == rarity &&
                     !selectedCanonicals.Contains(card))
                 .ToList();
@@ -299,7 +304,8 @@ public static class CardFactory
     private static IEnumerable<CardModel> GetRewardCandidates(Player player) =>
         player.Character.CardPool.GetUnlockedCards(
             player.UnlockState,
-            isMultiplayer: player.RunState.Players.Count > 1);
+            isMultiplayer: player.RunState.Players.Count > 1)
+            .Where(card => card.IsAllowedInRun(player.RunState));
 
     /// <summary>
     /// Creates combat cards from one supplied unlocked pool. Repeats are allowed, matching effects such as Calamity.

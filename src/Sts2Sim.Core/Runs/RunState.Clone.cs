@@ -28,6 +28,7 @@ public sealed partial class RunState
     private RunState(RunState source, RunRngSet rng, bool imagination = false)
     {
         Rng = rng;
+        GameMode = source.GameMode;
         _acts = source._acts.Select(act => imagination
             ? act.CloneForVisibleHistory() : act.CloneForRun()).ToArray();
         _readOnlyActs = Array.AsReadOnly(_acts);
@@ -89,6 +90,12 @@ public sealed partial class RunState
             playerMap.Add(player, copied);
         }
         var modelMap = new Dictionary<AbstractModel, AbstractModel>(cardMap.Count + 16, ReferenceEqualityComparer.Instance);
+        foreach (RunModel original in source._runModels)
+        {
+            RunModel copied = original.CloneForRun(this);
+            _runModels.Add(copied);
+            modelMap.Add(original, copied);
+        }
         foreach ((CardModel original, CardModel copied) in cardMap) modelMap.Add(original, copied);
         foreach ((Player original, Player copied) in playerMap)
         {
@@ -200,13 +207,15 @@ public sealed partial class RunState
             return;
         }
 
+        bool isBlitz = GameMode == GameMode.Blitz;
         ActDefinition current = Act;
-        current.RebuildEncounterBagsFromHistory(visitedNormal, visitedElite);
+        current.RebuildEncounterBagsFromHistory(visitedNormal, visitedElite, isBlitz);
         List<EncounterDefinition> normals = visitedNormal.ToList();
         for (int slot = normals.Count; slot < current.BaseNumberOfRooms; slot++)
             normals.Add(current.PickEncounter(RoomType.Monster,
                 newRng.ForSemanticKey(Entities.Rngs.RunRngType.UpFront,
-                    $"imagination/act={CurrentActIndex}/normal/slot={slot}")));
+                    $"imagination/act={CurrentActIndex}/normal/slot={slot}"),
+                isBlitz));
         List<EncounterDefinition> elites = visitedElite.ToList();
         for (int slot = elites.Count; slot < EliteEncounterPoolSize; slot++)
             elites.Add(current.PickEncounter(RoomType.Elite,
@@ -1178,6 +1187,7 @@ public sealed partial class RunState
             [source.Odds] = Odds,
             [source.Map] = Map,
             [source._players] = _players,
+            [source._runModels] = _runModels,
             [source._acts] = _acts,
             [source._readOnlyActs] = _readOnlyActs,
             [source._currentRooms] = _currentRooms,

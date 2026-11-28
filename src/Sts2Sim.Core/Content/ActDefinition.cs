@@ -60,17 +60,19 @@ public abstract class ActDefinition
 
     internal void RebuildEncounterBagsFromHistory(
         IReadOnlyList<EncounterDefinition> visitedMonsterEncounters,
-        IReadOnlyList<EncounterDefinition> visitedEliteEncounters)
+        IReadOnlyList<EncounterDefinition> visitedEliteEncounters,
+        bool isBlitz = false)
     {
         _weakMonsterEncounterState = null;
         _regularMonsterEncounterState = null;
         _eliteEncounterState = null;
         _lastMonsterEncounter = null;
         _monsterEncountersPicked = 0;
+        int weakCount = isBlitz ? 1 : NumberOfWeakEncounters;
         (EncounterDefinition[] weakPool, EncounterDefinition[] regularPool) = GetFilteredMonsterPools();
         foreach (EncounterDefinition encounter in visitedMonsterEncounters)
         {
-            bool weak = _monsterEncountersPicked < NumberOfWeakEncounters;
+            bool weak = _monsterEncountersPicked < weakCount;
             EncounterDefinition[] pool = weak ? weakPool : regularPool;
             ref EncounterBagState? state = ref (weak
                 ? ref _weakMonsterEncounterState : ref _regularMonsterEncounterState);
@@ -180,12 +182,15 @@ public abstract class ActDefinition
     public virtual MapPointTypeCounts GetMapPointTypes(Rng mapRng, AscensionManager ascension) =>
         GetMapPointTypes(mapRng);
 
-    public EncounterDefinition PickEncounter(RoomType roomType, Rng rng)
+    public EncounterDefinition PickEncounter(RoomType roomType, Rng rng) =>
+        PickEncounter(roomType, rng, isBlitz: false);
+
+    public EncounterDefinition PickEncounter(RoomType roomType, Rng rng, bool isBlitz)
     {
         ArgumentNullException.ThrowIfNull(rng);
         return roomType switch
         {
-            RoomType.Monster => PickMonsterEncounter(rng),
+            RoomType.Monster => PickMonsterEncounter(rng, isBlitz),
             RoomType.Elite => PickEliteEncounter(rng),
             RoomType.Boss => PickBossEncounter(rng),
             _ => throw new ArgumentOutOfRangeException(nameof(roomType), roomType, null),
@@ -211,9 +216,10 @@ public abstract class ActDefinition
         return rng.NextItem(candidates)!;
     }
 
-    private EncounterDefinition PickMonsterEncounter(Rng rng)
+    private EncounterDefinition PickMonsterEncounter(Rng rng, bool isBlitz)
     {
-        bool useWeakPool = _monsterEncountersPicked < NumberOfWeakEncounters;
+        int weakCount = isBlitz ? 1 : NumberOfWeakEncounters;
+        bool useWeakPool = _monsterEncountersPicked < weakCount;
         (EncounterDefinition[] weakPool, EncounterDefinition[] regularPool) = GetFilteredMonsterPools();
         EncounterDefinition[] encounters = useWeakPool ? weakPool : regularPool;
         EnsurePoolNotEmpty(RoomType.Monster, encounters, useWeakPool ? "weak" : "regular");

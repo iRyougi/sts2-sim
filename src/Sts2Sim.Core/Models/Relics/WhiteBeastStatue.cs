@@ -7,8 +7,6 @@ public sealed class WhiteBeastStatue : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override bool ShouldForcePotionReward(RoomType roomType) =>
         roomType is RoomType.Monster or RoomType.Elite or RoomType.Boss;
 }

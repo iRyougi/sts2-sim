@@ -560,7 +560,10 @@ public sealed class RunEngine
         Player player = _runState.Players[0];
         TreasureRoomResolution resolution = treasureRoom.Resolutions
             .Single(candidate => ReferenceEquals(candidate.Player, player));
-        return new TreasureFloorDetail(resolution.GoldGained, resolution.RelicGained);
+        return new TreasureFloorDetail(
+            resolution.GoldGained,
+            resolution.RelicGained,
+            resolution.ExtraRelicsGained);
     }
 
     private async Task<RestSiteFloorDetail?> DriveRestSiteToCompletion(RestSiteRoom restSiteRoom)     {         RestSiteFloorDetail? floorDetail = null;         foreach (Player player in _runState.Players)         {             restSiteRoom.GetAvailableDecisions(_runState, player);             while (restSiteRoom.HasRemainingDecisions(player))             {                 IReadOnlyList<RestSiteDecision> candidates =                     restSiteRoom.GetAvailableDecisions(_runState, player);                 if (candidates.Count == 0) break;                 RestSiteDecision decision = RestSiteDecisionPolicy.ChooseDefault(candidates);

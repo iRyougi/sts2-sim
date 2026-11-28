@@ -31,6 +31,8 @@ public static class RunTransplantExporter
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(target);
+        if (run.GameMode is not (GameMode.Standard or GameMode.Blitz))
+            throw new TransplantMappingException("GameMode", $"Unsupported game mode '{run.GameMode}'.");
         if (run.CurrentRoom is not null || run.Players.Count != 1)
             throw new TransplantMappingException("RunState", "Export requires one player between rooms.");
         if (!run.HasGeneratedRoomsForTransplant)
@@ -90,6 +92,9 @@ public static class RunTransplantExporter
             run.Rng.ToSerializable(), run.Odds.ToSerializable(),
             run.ExportRoomProgressForTransplant(roomType),
             run.SharedRelicGrabBag.ExportForTransplant(),
-            new Dictionary<string, JsonElement>(StringComparer.Ordinal));
+            new Dictionary<string, JsonElement>(StringComparer.Ordinal))
+        {
+            GameMode = run.GameMode.ToString(),
+        };
     }
 }

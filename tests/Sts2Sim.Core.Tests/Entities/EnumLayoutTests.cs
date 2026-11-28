@@ -55,7 +55,7 @@ public class EnumLayoutTests
     {
         Assert.Equal(new[]
         {
-            "None", "RegularEncounter", "EliteEncounter", "BossEncounter", "Shop", "Uniform",
+            "None", "RegularEncounter", "EliteEncounter", "BossEncounter", "Shop", "Uniform", "Blitz", "BlitzNeow",
         }, Enum.GetNames<CardRarityOddsType>());
     }
 

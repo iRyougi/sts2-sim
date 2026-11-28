@@ -21,6 +21,7 @@ public static class ContentRegistry
         typeof(PotionModel),
         typeof(PowerModel),
         typeof(RelicModel),
+        typeof(RunModel),
     };
 
     public static IReadOnlyList<Type> AllTypes { get; } = typeof(ContentRegistry).Assembly

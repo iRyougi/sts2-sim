@@ -16,9 +16,7 @@ public sealed class LastingCandy : RelicModel
 
     // The source excludes the first Ironclad run when NumberOfRuns == 0. Our all-unlocked
     // perfect-save assumption implies prior runs, and we do not track cross-run counts.
-    // The remaining in-run acquisition gate is exact for the supported save state.
-    public override bool IsAllowed(IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
+    // Act 3 late-run gating is enforced centrally by RelicLists.notAllowedLateInAct3.
     public int CombatRewardsSeen
     {
         get => _combatRewardsSeen;

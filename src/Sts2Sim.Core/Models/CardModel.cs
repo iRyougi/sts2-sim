@@ -30,6 +30,9 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
     /// <summary>Whether the real card has <c>MultiplayerConstraint.MultiplayerOnly</c>.</summary>
     public virtual bool IsMultiplayerOnly => false;
 
+    /// <summary>Whether this card can be generated or offered in Blitz mode.</summary>
+    public virtual bool IsAllowedInBlitz => true;
+
     /// <summary>Whether this card is eligible for random generation by modifiers and rewards.</summary>
     public virtual bool CanBeGeneratedByModifiers => true;
 
@@ -1141,12 +1144,21 @@ public abstract class CardModel : AbstractModel, ICombatStateDescriptionContribu
         ExhaustOnNextPlay = false;
     }
 
-    /// <summary>原版 v0.113.1 <c>IsAllowedInRun</c>：单人局排除仅多人卡（模拟器只有单人；Blitz 模式不在范围，
-    /// SingleplayerOnly 在单人局恒允许）。</summary>
+    /// <summary>原版 v0.113.1 <c>IsAllowedInRun</c>：单人局排除仅多人卡，极速模式排除禁卡。</summary>
     public bool IsAllowedInRun(Runs.IRunState runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
-        return runState.Players.Count > 1 || !IsMultiplayerOnly;
+        if (runState.Players.Count <= 1 && IsMultiplayerOnly)
+        {
+            return false;
+        }
+
+        if (runState.GameMode == Runs.GameMode.Blitz && !IsAllowedInBlitz)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>

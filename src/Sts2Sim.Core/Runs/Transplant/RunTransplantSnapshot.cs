@@ -71,4 +71,5 @@ public sealed record RunTransplantSnapshot(
 {
     public const int CurrentSchemaVersion = 1;
     public bool IsInjected { get; init; }
+    public string? GameMode { get; init; }
 }

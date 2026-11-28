@@ -12,8 +12,6 @@ public sealed class AmethystAubergine : RelicModel
 
     public override RelicRarity Rarity => RelicRarity.Common;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override bool IsAllowedInShops => false;
 
     public override void ModifyRewards(Player player, List<Reward> rewards, RoomType roomType)

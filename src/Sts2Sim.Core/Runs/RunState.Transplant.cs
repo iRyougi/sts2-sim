@@ -10,8 +10,7 @@ namespace Sts2Sim.Core.Runs;
 public sealed partial class RunState
 {
     internal bool HasGeneratedRoomsForTransplant => _generatedRooms is not null;
-    internal int GetAscensionLevelForTransplant() =>
-        Enumerable.Range(0, 11).Last(level => Ascension.HasLevel((Sts2Sim.Core.Entities.Ascension.AscensionLevel)level));
+    internal int GetAscensionLevelForTransplant() => Ascension.Level;
 
     internal void RestoreSharedRelicBagForTransplant(RelicBagSnapshot bag) =>
         SharedRelicGrabBag = RelicGrabBag.ImportForTransplant(bag, "SharedRelicBag");

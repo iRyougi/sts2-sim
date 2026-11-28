@@ -25,6 +25,8 @@ public sealed class HandOfGreed : CardModel, ICardDamageVariableProvider
 
     public override bool IsColorless => true;
 
+    public override bool IsAllowedInBlitz => false;
+
     public override bool CanBeGeneratedInCombat => false;
 
     protected override int CanonicalEnergyCost => 2;

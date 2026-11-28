@@ -166,7 +166,12 @@ public sealed partial class CombatState
             Player player = players[i];
             if (player is null || !scan.Reference(player)) return false;
         }
-        return ScanCreatureSources(_allies, ref scan) && ScanCreatureSources(_enemies, ref scan);
+        if (!ScanCreatureSources(_allies, ref scan) || !ScanCreatureSources(_enemies, ref scan))
+            return false;
+        if (!scan.Count(RunModels.Count)) return false;
+        for (int i = 0; i < RunModels.Count; i++)
+            if (!scan.Reference(RunModels[i])) return false;
+        return true;
     }
 
     private static bool ScanCreatureSources(IReadOnlyList<Creature> creatures, ref ListenerWitnessScan scan)

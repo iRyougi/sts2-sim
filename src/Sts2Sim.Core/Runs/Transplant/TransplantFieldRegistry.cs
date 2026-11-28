@@ -163,7 +163,7 @@ public static class TransplantFieldRegistry
         "_players", "_visitedMapCoords", "_completedActFloors", "_currentMapPointHasShop",
         "<PreviousMapPointHasShop>k__BackingField", "_visitedEventIds",
         "_bossEncountersVisited", "_eventsVisited", "_normalEncountersVisited",
-        "_eliteEncountersVisited", "_nextRoomId", "<Rng>k__BackingField",
+        "_eliteEncountersVisited", "_nextRoomId", "<GameMode>k__BackingField", "<Rng>k__BackingField",
         "<Odds>k__BackingField", "<Progress>k__BackingField",
         "<WongoPointsEarned>k__BackingField", "<FreedRepy>k__BackingField",
         "_completedQuests", "<SharedRelicGrabBag>k__BackingField",
@@ -174,7 +174,8 @@ public static class TransplantFieldRegistry
     [
         "_acts", "_readOnlyActs", "_generatedRooms", "_eventSequence",
         "_normalEncounterSequence", "_eliteEncounterSequence", "_bossEncounter",
-        "_secondBossEncounter", "<Ascension>k__BackingField", "_currentAncientEventType",
+        "_secondBossEncounter", "_runModels",
+        "<Ascension>k__BackingField", "_currentAncientEventType",
         "<Map>k__BackingField", "<CardSelectionSource>k__BackingField",
     ];
 

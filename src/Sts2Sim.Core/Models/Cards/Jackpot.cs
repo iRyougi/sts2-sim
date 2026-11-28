@@ -41,7 +41,7 @@ public sealed class Jackpot : CardModel, ICardDamageVariableProvider
             .ForCombatGeneration(Owner.Character.CardPool.GetUnlockedCards(
                 Owner.UnlockState,
                 isMultiplayer: combatState.RunState.Players.Count > 1))
-            .Where(card => !card.IsColorless && card.EnergyCost == 0 && !card.CostsXEnergy)
+            .Where(card => card.IsAllowedInRun(combatState.RunState) && !card.IsColorless && card.EnergyCost == 0 && !card.CostsXEnergy)
             .ToList();
         if (candidates.Count == 0)
         {

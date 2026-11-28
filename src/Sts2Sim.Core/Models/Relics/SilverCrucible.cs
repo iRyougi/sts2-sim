@@ -16,7 +16,7 @@ public sealed class SilverCrucible : RelicModel
 
     public override bool IsUsedUp => TimesUsed >= 3 && TreasureRoomsEntered > 0;
 
-    public override bool IsAllowed(IRunState runState) => runState.Players.Count == 1;
+    protected override bool IsAllowedInternal(IRunState runState) => runState.Players.Count == 1;
 
     public override CardModel? TryModifyCardRewardOptionLate(
         IRunState runState, Player player, CardModel option, CardCreationOptions creationOptions) =>

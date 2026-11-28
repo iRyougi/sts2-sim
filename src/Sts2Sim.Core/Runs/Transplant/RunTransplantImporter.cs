@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
+using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
 using Sts2Sim.Core.Map;
@@ -44,10 +45,11 @@ public static class RunTransplantImporter
             throw new TransplantMappingException("RunOdds", "Missing run odds.");
         if (snapshot.SharedRelicBag is null)
             throw new TransplantMappingException("SharedRelicBag", "Missing shared relic bag.");
-        if (snapshot.Ascension is < 0 or > 10)
+        GameMode gameMode = RunState.ResolveTransplantGameMode(snapshot.GameMode, "GameMode");
+        if (snapshot.Ascension < 0 || snapshot.Ascension > AscensionManager.GetMaxAllowed(gameMode))
             throw new TransplantMappingException("Ascension", "Unsupported ascension level.");
         IReadOnlyList<ActDefinition> acts = ResolveActs(snapshot.ActIds);
-        RunState run = new(snapshot.Seed, acts, snapshot.Ascension);
+        RunState run = new(snapshot.Seed, acts, snapshot.Ascension, gameMode);
         if (snapshot.Player.PlayerRng.Seed != run.Rng.Seed)
             throw new TransplantMappingException("Player.PlayerRng.Seed", "Player RNG seed differs from run seed.");
         if (string.IsNullOrWhiteSpace(snapshot.CharacterId))

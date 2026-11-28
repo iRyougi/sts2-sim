@@ -154,7 +154,7 @@ internal static class ImaginationHiddenStateRegistry
         Room("TreasureRoom", V, reward, "_goldAmount _resolutions");
         Room("TreasureRoom", N, runtime, "_chooseRelic");
         Room("TreasureRoomResolution", V, reward,
-            "<Player>k__BackingField <GoldGained>k__BackingField <RelicGained>k__BackingField");
+            "<Player>k__BackingField <GoldGained>k__BackingField <RelicGained>k__BackingField <ExtraRelicsGained>k__BackingField");
 
         Add(typeof(RestSiteDecision).FullName! + "+Smith", V, "Card target was chosen by the player.", "<Card>k__BackingField");
         Add(typeof(Entities.RestSite.RestoreRestSiteOption).FullName!, V, "Displayed enabled state of RESTORE (Wuppy below max HP).", "<Enabled>k__BackingField");

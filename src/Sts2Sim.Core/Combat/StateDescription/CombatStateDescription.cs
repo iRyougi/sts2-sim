@@ -47,6 +47,16 @@ public static class CombatStateDescription
         builder.Append(state.Engine?.Won ?? false);
         builder.Append(state.RunState.Rng.Seed);
         AppendRunRng(ref builder, state.RunState.Rng);
+        if (state.RunState.GameMode != Runs.GameMode.Standard)
+        {
+            builder.Append((int)state.RunState.GameMode);
+            IReadOnlyList<RunModel> runModels = state.RunModels;
+            builder.Append(runModels.Count);
+            for (int i = 0; i < runModels.Count; i++)
+            {
+                builder.Append(runModels[i].Id);
+            }
+        }
         IReadOnlyList<Player> players = state.Players;
         builder.Append(players.Count);
         for (int i = 0; i < players.Count; i++)

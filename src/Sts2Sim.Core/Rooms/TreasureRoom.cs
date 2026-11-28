@@ -56,6 +56,12 @@ public sealed class TreasureRoom : AbstractRoom
     {
         ArgumentNullException.ThrowIfNull(runState);
         _resolutions = Array.Empty<TreasureRoomResolution>();
+        if (runState.GameMode == GameMode.Blitz)
+        {
+            await EnterBlitzAsync(runState);
+            return;
+        }
+
         var relics = new List<(Player Player, RelicModel? Relic)>();
         foreach (Player player in runState.Players)
         {
@@ -138,6 +144,75 @@ public sealed class TreasureRoom : AbstractRoom
         }
 
         _resolutions = Array.AsReadOnly(resolutions.ToArray());
+    }
+
+    /// <summary>
+    /// v0.114.0 <c>TreasureRoomRelicSynchronizer.BeginRelicPicking</c> in Blitz: the usual chest relic (when
+    /// <c>ShouldGenerateTreasure</c>) plus one extra relic per player, picked over two rounds; <c>OneOffSynchronizer</c>
+    /// grants no chest gold in Blitz. Singleplayer only: a skip sets <c>_singleplayerSkipped</c> and returns before
+    /// <c>AwardRelics</c>, ending the picking. Each <c>AwardRelics</c> StableShuffles the unvoted indices on
+    /// TreasureRoomRelics (draws once even when empty, #1102) and obtains the pick before the next round.
+    /// Multiplayer voting (buffered per-round votes, consolation prizes) is not ported and fails closed.
+    /// </summary>
+    private async Task EnterBlitzAsync(RunState runState)
+    {
+        if (runState.Players.Count > 1)
+            throw new NotSupportedException("Multiplayer Blitz chest voting is unsupported.");
+        const int rounds = 2;
+        Player player = runState.Players[0];
+        var playerRelics = new List<RelicModel>();
+        if (Hooks.Hook.ShouldGenerateTreasure(runState, player))
+            playerRelics.Add(PullRelic("relic"));
+        playerRelics.Add(PullRelic("relic_blitz_extra"));
+
+        int goldGained = 0;
+        if (_goldAmount is { } goldOverride)
+        {
+            int goldBefore = player.Gold;
+            // Controlled-scenario override only (native Blitz grants no chest gold); kept as in the Standard path.
+            await PlayerCmd.GainGold(goldOverride, player);
+            if (runState.CurrentMapPoint?.Quests.Any(q => q is Models.Cards.SpoilsMap) == true)
+            {
+                foreach (var quest in player.Deck.Cards.OfType<Models.Cards.SpoilsMap>().ToArray())
+                    await quest.OnQuestComplete();
+            }
+            goldGained = player.Gold - goldBefore;
+        }
+
+        var obtained = new List<string>();
+        for (int round = 0; round < rounds && playerRelics.Count > 0; round++)
+        {
+            int? pick = _chooseRelic is null ? 0 : await _chooseRelic(player, playerRelics.ToArray());
+            if (pick is null) break;
+            if (pick < 0 || pick >= playerRelics.Count)
+                throw new InvalidOperationException($"Treasure relic choice {pick} is outside the offered relics.");
+            List<int> unvoted = Enumerable.Range(0, playerRelics.Count).Where(index => index != pick.Value).ToList();
+            unvoted.StableShuffle(runState.Rng.ForSemanticKey(
+                RunRngType.TreasureRoomRelics,
+                round == 0
+                    ? $"{runState.SemanticLocationKey}/treasure/award"
+                    : $"{runState.SemanticLocationKey}/treasure/award/round={round}"));
+            RelicModel selected = playerRelics[pick.Value];
+            playerRelics.RemoveAt(pick.Value);
+            await RelicCmd.Obtain(selected, player);
+            obtained.Add(selected.Id.ToString());
+        }
+
+        _resolutions = Array.AsReadOnly(new[]
+        {
+            new TreasureRoomResolution(player, goldGained, obtained.FirstOrDefault(),
+                obtained.Count > 1 ? Array.AsReadOnly(obtained.Skip(1).ToArray()) : null),
+        });
+
+        RelicModel PullRelic(string slot)
+        {
+            RelicRarity rarity = RelicFactory.RollRarity(runState.Rng.ForSemanticKey(
+                RunRngType.TreasureRoomRelics,
+                $"{runState.SemanticLocationKey}/treasure/slot={slot}"));
+            RelicGrabBag bag = runState.SharedRelicGrabBag
+                ?? throw new InvalidOperationException("Shared relic bag must be initialized before entering treasure.");
+            return bag.PullFromFront(rarity, runState) ?? ModelDb.Relic<Models.Relics.Circlet>();
+        }
     }
 
     public override Task Exit(RunState? runState) => Task.CompletedTask;

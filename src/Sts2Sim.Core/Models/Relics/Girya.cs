@@ -18,7 +18,6 @@ public sealed class Girya : RelicModel
     }
 
     public override RelicRarity Rarity => RelicRarity.Rare;
-    public override bool IsAllowed(IRunState runState) => IsBeforeAct3TreasureChest(runState);
 
     public override void ModifyAvailableRestSiteDecisions(IRunState runState, Player player, List<RestSiteDecision> decisions)
     {

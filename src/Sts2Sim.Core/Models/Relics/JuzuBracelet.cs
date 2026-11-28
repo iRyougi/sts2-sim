@@ -7,8 +7,6 @@ public sealed class JuzuBracelet : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Common;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override IReadOnlySet<RoomType> ModifyUnknownMapPointRoomTypes(
         IReadOnlySet<RoomType> roomTypes)
     {

@@ -34,11 +34,14 @@ public sealed partial class CombatState : ICombatState
     internal CombatState(IRunState runState, IReadOnlyList<string> encounterSlots)
     {
         RunState = runState;
+        RunModels = runState.RunModels;
         _encounterSlots = encounterSlots.ToArray();
         _semanticCombatKey = runState is Runs.RunState concreteRun
             ? concreteRun.SemanticLocationKey
             : $"floor={runState.TotalFloor}/room_kind={runState.CurrentRoom?.RoomType.ToString() ?? "none"}/room_id={runState.CurrentRoom?.Id ?? 0}";
     }
+
+    public IReadOnlyList<RunModel> RunModels { get; private set; }
 
     private readonly string[] _encounterSlots;
 
@@ -578,7 +581,7 @@ public sealed partial class CombatState : ICombatState
     // are not counted; if capacity is insufficient, the list grows normally.
     private int EstimateHookListenerCount()
     {
-        int count = 0;
+        int count = RunModels.Count;
         for (int i = 0; i < _allies.Count; i++)
         {
             count += EstimateCreatureHookListenerCount(_allies[i]);
@@ -620,6 +623,8 @@ public sealed partial class CombatState : ICombatState
         {
             WalkCreatureHookListeners(ref sink, _enemies[i]);
         }
+        for (int i = 0; i < RunModels.Count; i++)
+            sink.Put(RunModels[i]);
     }
 
     private static void WalkCreatureHookListeners<TSink>(ref TSink sink, Creature creature)

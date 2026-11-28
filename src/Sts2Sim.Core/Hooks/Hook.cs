@@ -247,6 +247,29 @@ public static class Hook
         }
     }
 
+    public static bool TryReplaceDefaultRoomRewards(
+        IRunState runState,
+        Player player,
+        List<Reward> rewards,
+        AbstractRoom room)
+    {
+        AbstractModel? replacer = null;
+        foreach (AbstractModel model in runState.IterateHookListeners(null))
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            var candidate = new List<Reward>();
+            if (model.TryReplaceDefaultRoomRewards(player, candidate, room))
+            {
+                if (replacer is null)
+                {
+                    replacer = model;
+                    rewards.AddRange(candidate);
+                }
+            }
+        }
+        return replacer is not null;
+    }
+
     public static CardCreationOptions ModifyCardRewardCreationOptions(IRunState runState, Player player, CardCreationOptions options)
     {
         foreach (AbstractModel listener in runState.IterateHookListeners(null))
@@ -960,7 +983,7 @@ public static class Hook
     // unknown neutral types survive projection until the actual dispatch guard.
     internal static bool IsKnownHookModelType(AbstractModel model) =>
         model is PowerModel or MonsterModel or OrbModel or CardModel or RelicModel
-            or PotionModel or AfflictionModel or EnchantmentModel;
+            or PotionModel or AfflictionModel or EnchantmentModel or RunModel;
 
     private static AbstractModel[] GetCostHookListeners(ICombatState combatState, HookOverrideIndex.CostSlot slot)
     {

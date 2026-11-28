@@ -138,7 +138,7 @@ internal static class HookOverrideIndex
         : typeof(OrbModel).IsAssignableFrom(type) ? ListenerKind.Orb
         : typeof(CardModel).IsAssignableFrom(type) || typeof(RelicModel).IsAssignableFrom(type)
             || typeof(PotionModel).IsAssignableFrom(type) || typeof(AfflictionModel).IsAssignableFrom(type)
-            || typeof(EnchantmentModel).IsAssignableFrom(type) ? ListenerKind.Passive
+            || typeof(EnchantmentModel).IsAssignableFrom(type) || typeof(RunModel).IsAssignableFrom(type) ? ListenerKind.Passive
         : ListenerKind.Unknown;
 
     // Read-mostly table keyed by runtime type (reference identity), replaced whole under a lock when a new type appears.

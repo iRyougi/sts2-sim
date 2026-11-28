@@ -19,7 +19,8 @@ public static class ActEntrySnapshotCodec
             {
                 if (info.Kind == JsonTypeInfoKind.Object)
                     foreach (JsonPropertyInfo property in info.Properties)
-                        property.IsRequired = true;
+                        if (info.Type != typeof(ActEntrySnapshot) || property.Name != nameof(ActEntrySnapshot.GameMode))
+                            property.IsRequired = true;
             } }
         }
     };
@@ -37,9 +38,12 @@ public static class ActEntrySnapshotCodec
     public static RunState ImportActEntry(string json)
     {
         ActEntrySnapshot? snapshot = JsonSerializer.Deserialize<ActEntrySnapshot>(json, Json);
-        if (snapshot is null || snapshot.SchemaVersion != ActEntrySnapshot.CurrentSchemaVersion ||
+        if (snapshot is null ||
+            snapshot.SchemaVersion is not (ActEntrySnapshot.LegacySchemaVersion or ActEntrySnapshot.CurrentSchemaVersion) ||
             snapshot.CoreHash != CoreHash)
             throw new TransplantMappingException("ActEntrySnapshot", "Schema or Core build mismatch.");
+        if (snapshot.SchemaVersion == ActEntrySnapshot.CurrentSchemaVersion && snapshot.GameMode is null)
+            throw new JsonException("JSON deserialization for type 'ActEntrySnapshot' was missing required property 'GameMode'.");
         return RunState.ImportActEntryState(snapshot);
     }
 }

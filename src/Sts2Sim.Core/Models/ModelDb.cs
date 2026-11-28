@@ -258,6 +258,8 @@ public static class ModelDb
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T Event<T>() where T : EventModel => Get<T>();
 
+    public static T RunModel<T>() where T : RunModel => Get<T>();
+
     /// <summary>Returns all registered models of the requested type. 偏离 #68：直接对已注册模型做
     /// 扁平类型过滤，不像真实游戏按 <c>RelicPoolModel</c>/<c>CardPoolModel</c> 分池维护索引——本计划
     /// 内容规模小（个位数到几十个），扁平查询足够快；Plan06b 批量铺开后如证明是性能热点再引入分池索引。</summary>

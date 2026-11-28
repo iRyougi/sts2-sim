@@ -436,6 +436,6 @@ public static class ItemEffectProbe
         public Rooms.AbstractRoom? CurrentRoom => null;
         public void AddPlayer(Player player) => _players.Add(player);
         public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
-            RunState.IterateRunHookListeners(_players, childCombatState);
+            RunState.IterateRunHookListeners(this, childCombatState);
     }
 }

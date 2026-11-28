@@ -65,17 +65,42 @@ public sealed class RewardsSet
             throw new ArgumentOutOfRangeException(nameof(roomType), roomType, "Only combat room types yield rewards.");
         }
 
-        // #310: retain the existing non-null gold slot at proportion zero; its payout is zero.
-        var gold = fixedGoldAmount is { } amount
-            ? new GoldReward(amount, player)
-            : new GoldReward(roomType, player, goldProportion, encounter?.MinGoldReward, encounter?.MaxGoldReward);
-
-
         string rewardKey = runState is RunState concreteRun
             ? $"{concreteRun.SemanticLocationKey}/reward_kind={roomType}"
             : $"floor={runState.TotalFloor}/room_kind={runState.CurrentRoom?.RoomType.ToString() ?? "none"}" +
               $"/room_id={runState.CurrentRoom?.Id ?? 0}/reward_kind={roomType}";
         bool keyed = player.PlayerRng.UsesSemanticKeys;
+
+        var replaced = new List<Reward>();
+        bool isReplaced = runState.CurrentRoom is CombatRoom currentCombat && currentCombat.RoomType == roomType
+            ? Hooks.Hook.TryReplaceDefaultRoomRewards(runState, player, replaced, currentCombat)
+            : runState.RunModels.OfType<Models.Blitz.BlitzRunModel>().Any() &&
+              Models.Blitz.BlitzRunModel.TryBuildDefaultRoomRewards(
+                  player,
+                  replaced,
+                  roomType,
+                  encounter?.IsWeak ?? false,
+                  (runState as RunState)?.CurrentActIndex ?? 0);
+
+        if (isReplaced)
+        {
+            return GenerateReplacedRewards(
+                player,
+                roomType,
+                runState,
+                rewardKey,
+                keyed,
+                replaced,
+                pendingExtraRewards,
+                fixedGoldAmount,
+                encounter);
+        }
+
+        // #310: retain the existing non-null gold slot at proportion zero; its payout is zero.
+        var gold = fixedGoldAmount is { } amount
+            ? new GoldReward(amount, player)
+            : new GoldReward(roomType, player, goldProportion, encounter?.MinGoldReward, encounter?.MaxGoldReward);
+
         Random.Rng potionOddsRng = player.PlayerRng.ForSemanticKey(
             PlayerRngType.Rewards,
             $"{rewardKey}/slot=potion_presence");
@@ -126,6 +151,92 @@ public sealed class RewardsSet
         var extraRewards = pendingExtraRewards?.ToList() ?? new List<Reward>();
         Hooks.Hook.ModifyRewards(runState, player, extraRewards, roomType);
 
+        return new RewardsSet(gold, potion, card, relic, extraRewards);
+    }
+
+    private static RewardsSet GenerateReplacedRewards(
+        Player player,
+        RoomType roomType,
+        IRunState runState,
+        string rewardKey,
+        bool keyed,
+        List<Reward> replaced,
+        IEnumerable<Reward>? pendingExtraRewards,
+        int? fixedGoldAmount,
+        EncounterDefinition? encounter)
+    {
+        GoldReward? gold = null;
+        PotionReward? potion = null;
+        CardReward? card = null;
+        RelicReward? relic = null;
+        var extraRewards = new List<Reward>();
+        int potionIndex = 0;
+        int relicIndex = 0;
+
+        foreach (Reward item in replaced)
+        {
+            switch (item)
+            {
+                case GoldReward g:
+                    g.Populate(
+                        runState,
+                        player.PlayerRng.ForSemanticKey(PlayerRngType.Rewards, $"{rewardKey}/slot=gold"));
+                    if (gold is null) gold = g;
+                    else extraRewards.Add(g);
+                    break;
+
+                case CardReward c:
+                    if (keyed)
+                    {
+                        c.ConfigureRngOverrideIfMissing(
+                            player.PlayerRng.ForSemanticKey(PlayerRngType.Rewards, $"{rewardKey}/slot=card"));
+                    }
+                    c.Populate(runState);
+                    if (card is null) card = c;
+                    else extraRewards.Add(c);
+                    break;
+
+                case PotionReward p:
+                    string potionSlot = potionIndex == 0 ? "slot=potion" : $"slot=potion_{potionIndex + 1}";
+                    potionIndex++;
+                    p.Populate(
+                        runState,
+                        player.PlayerRng.ForSemanticKey(PlayerRngType.Rewards, $"{rewardKey}/{potionSlot}"));
+                    if (potion is null) potion = p;
+                    else extraRewards.Add(p);
+                    break;
+
+                case RelicReward r:
+                    string relicSlot = relicIndex == 0 ? "slot=relic" : $"slot=relic_{relicIndex + 1}";
+                    relicIndex++;
+                    r.Populate(
+                        runState,
+                        player.PlayerRng.ForSemanticKey(PlayerRngType.Rewards, $"{rewardKey}/{relicSlot}"));
+                    if (relic is null) relic = r;
+                    else extraRewards.Add(r);
+                    break;
+
+                default:
+                    item.Populate(runState);
+                    extraRewards.Add(item);
+                    break;
+            }
+        }
+
+        if (gold is null)
+        {
+            gold = new GoldReward(fixedGoldAmount ?? 0, player);
+            if (fixedGoldAmount is null)
+                gold.Skip().GetAwaiter().GetResult();
+        }
+        card ??= CardReward.CreateResolvedEmpty(player);
+
+        if (pendingExtraRewards is not null)
+        {
+            extraRewards.AddRange(pendingExtraRewards);
+        }
+
+        Hooks.Hook.ModifyRewards(runState, player, extraRewards, roomType);
         return new RewardsSet(gold, potion, card, relic, extraRewards);
     }
 

@@ -10,8 +10,6 @@ public sealed class Planisphere : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Uncommon;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override Task AfterRoomEntered(AbstractRoom room)
     {
         // 原版：每进入一个未知地图点、且是该点房间栈的第一层（CurrentRoomCount <= 1）就回血。

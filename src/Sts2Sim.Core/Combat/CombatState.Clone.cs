@@ -345,6 +345,21 @@ public sealed partial class CombatState
             }
         foreach ((CombatState source, CombatState target) in states)
         {
+            if (projection)
+            {
+                IReadOnlyList<RunModel> clonedRunModels = source.RunModels.Count == 0 ? [] :
+                    Array.AsReadOnly(source.RunModels.Select(model => model.CloneForRun(runState)).ToArray());
+                target.RunModels = clonedRunModels;
+                if (runState is CombatRunStateSnapshot snapshot)
+                {
+                    snapshot.SetRunModels(clonedRunModels);
+                }
+            }
+            else
+            {
+                target.RunModels = runState.RunModels;
+            }
+
             target.DamageHistory = source.DamageHistory.Clone(creatureMap, cardMap);
             target.SemanticHistory = source.SemanticHistory.Clone();
             source._engine?.CloneFor(target);
@@ -477,6 +492,13 @@ public sealed partial class CombatState
     {
         private readonly List<Player> _players = new();
         private readonly int _totalFloor = source.TotalFloor;
+        private IReadOnlyList<RunModel> _runModels = Array.Empty<RunModel>();
+
+        public GameMode GameMode { get; } = source.GameMode;
+
+        public IReadOnlyList<RunModel> RunModels => _runModels;
+
+        internal void SetRunModels(IReadOnlyList<RunModel> runModels) => _runModels = runModels;
 
         public MapLocation MapLocation { get; } = source switch
         {
@@ -503,6 +525,6 @@ public sealed partial class CombatState
 
         // Same order and capture points as RunState (#1072): one shared implementation, no second source walk.
         public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
-            Runs.RunState.IterateRunHookListeners(_players, childCombatState);
+            Runs.RunState.IterateRunHookListeners(this, childCombatState);
     }
 }

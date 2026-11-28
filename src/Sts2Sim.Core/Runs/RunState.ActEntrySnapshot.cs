@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Content.Acts;
+using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
@@ -23,6 +24,8 @@ public sealed partial class RunState
     {
         AssertStableCloneBoundary();
         RequireActEntryBoundary();
+        if (GameMode is not (GameMode.Standard or GameMode.Blitz))
+            throw new TransplantMappingException("GameMode", $"Unsupported game mode '{GameMode}'.");
         Player player = _players[0];
         if (Rng.UsesSemanticKeys || !player.IsActiveForHooks || player.PlayerCombatState is not null ||
             player.Creature.Powers.Count != 0 || player.Creature.CurrentHp != decimal.Truncate(player.Creature.CurrentHp) ||
@@ -64,7 +67,8 @@ public sealed partial class RunState
         string mapKind = Map switch
         {
             StandardActMap => nameof(StandardActMap), SpoilsActMap => nameof(SpoilsActMap),
-            GoldenPathActMap => nameof(GoldenPathActMap), ActEntryMapState saved => saved.Kind,
+            GoldenPathActMap => nameof(GoldenPathActMap), BlitzActMap => nameof(BlitzActMap),
+            ActEntryMapState saved => saved.Kind,
             _ => throw new TransplantMappingException("ActEntry.Map", "Unsupported map implementation.")
         };
         var map = new ActEntryMap(mapKind, Map.GetColumnCount(), Map.GetRowCount(), Coord(Map.StartingMapPoint),
@@ -87,7 +91,10 @@ public sealed partial class RunState
             _visitedEventIds.Select(id => id.ToString()).ToArray(), _eventsVisited, _normalEncountersVisited,
             _eliteEncountersVisited, _bossEncountersVisited, _nextRoomId, _currentMapPointHasShop,
             PreviousMapPointHasShop, Progress.WongoPoints, WongoPointsEarned, FreedRepy,
-            _completedQuests.Select(id => id.ToString()).ToArray(), IsImaginationClone);
+            _completedQuests.Select(id => id.ToString()).ToArray(), IsImaginationClone)
+        {
+            GameMode = GameMode.ToString(),
+        };
     }
 
     private void RequireActEntryBoundary()
@@ -105,9 +112,24 @@ public sealed partial class RunState
     private static MapCoordDto Coord(MapPoint p) => new(p.coord.col, p.coord.row);
     private static string TypeId(Type type) => type.FullName ?? throw new InvalidOperationException("Content type has no full name.");
 
+    internal static GameMode ResolveTransplantGameMode(string? rawGameMode, string fieldPath) => rawGameMode switch
+    {
+        null => GameMode.Standard,
+        nameof(GameMode.Standard) => GameMode.Standard,
+        nameof(GameMode.Blitz) => GameMode.Blitz,
+        _ => throw new TransplantMappingException(fieldPath, $"Unsupported game mode '{rawGameMode}'."),
+    };
+
     internal static RunState ImportActEntryState(ActEntrySnapshot s)
     {
-        if (s.Phase != RunEntryPhase.InitializedBeforeAncient || s.ActIndex is not (1 or 2) || s.Ascension is < 0 or > 10 ||
+        if (s.SchemaVersion is not (ActEntrySnapshot.LegacySchemaVersion or ActEntrySnapshot.CurrentSchemaVersion))
+            throw new TransplantMappingException("ActEntrySnapshot", "Unsupported schema version.");
+        if (s.SchemaVersion == ActEntrySnapshot.CurrentSchemaVersion && s.GameMode is null)
+            throw new TransplantMappingException("GameMode", "Missing game mode.");
+        GameMode gameMode = ResolveTransplantGameMode(s.GameMode, "GameMode");
+        if (s.Ascension < 0 || s.Ascension > AscensionManager.GetMaxAllowed(gameMode))
+            throw new TransplantMappingException("Ascension", "Unsupported ascension level.");
+        if (s.Phase != RunEntryPhase.InitializedBeforeAncient || s.ActIndex is not (1 or 2) ||
             string.IsNullOrEmpty(s.Seed) || s.RunRng is null || s.RunRng.Seed != s.Seed || s.Acts is null ||
             s.Rooms is null || s.Rooms.Count != s.Acts.Count || s.Player is null || s.Map is null ||
             s.Visited is null || s.AncientHistory is null || !s.CompleteAncientHistory || s.VisitedEvents is null ||
@@ -119,7 +141,7 @@ public sealed partial class RunState
             nameof(Hive) => new Hive(), nameof(Glory) => new Glory(),
             _ => throw new TransplantMappingException("ActEntry.Acts", "Unknown act ID.")
         }).ToArray();
-        var run = new RunState(s.Seed, acts, s.Ascension, new HeadlessProgress(s.ProgressWongo));
+        var run = new RunState(s.Seed, acts, s.Ascension, gameMode, new HeadlessProgress(s.ProgressWongo));
         var player = Player.CreateForNewRun(ModelDb.GetById<CharacterModel>(ModelId.Deserialize(s.CharacterId)), run);
         run.AddPlayer(player);
         player.RestoreForTransplant(s.Player);
@@ -140,9 +162,20 @@ public sealed partial class RunState
             room.Elite.Select(id => Encounter(i, id, RoomType.Elite)).ToList(), Encounter(i, room.Boss, RoomType.Boss),
             room.SecondBoss is { } second ? Encounter(i, second, RoomType.Boss) : null, ContentType(room.Ancient))).ToArray();
         for (int i = 0; i < acts.Length; i++)
-            acts[i].RebuildEncounterBagsFromHistory(run._generatedRooms[i].NormalEncounters, run._generatedRooms[i].EliteEncounters);
+            acts[i].RebuildEncounterBagsFromHistory(
+                run._generatedRooms[i].NormalEncounters,
+                run._generatedRooms[i].EliteEncounters,
+                run.GameMode == GameMode.Blitz);
         run.InitializeCurrentAct();
-        run.Map = new ActEntryMapState(s.Map, player);
+        // Native Blitz always plays a BlitzActMap (RunManager loads saved Blitz maps as BlitzActMap).
+        if (gameMode == GameMode.Blitz && s.Map.Kind != nameof(BlitzActMap))
+            throw new TransplantMappingException("ActEntry.Map", $"{s.Map.Kind} is not supported in Blitz mode.");
+        if (gameMode != GameMode.Blitz && s.Map.Kind == nameof(BlitzActMap))
+            throw new TransplantMappingException("ActEntry.Map", "BlitzActMap requires Blitz game mode.");
+        var mapState = new ActEntryMapState(s.Map, player);
+        run.Map = s.Map.Kind == nameof(BlitzActMap)
+            ? mapState.ToBlitzActMap()
+            : mapState;
         foreach (MapCoordDto coord in s.Visited)
         {
             var value = new MapCoord(coord.Col, coord.Row);
@@ -191,7 +224,7 @@ public sealed partial class RunState
         protected override MapPoint?[,] Grid { get; }
         internal ActEntryMapState(ActEntryMap data, Player player)
         {
-            if (data.Kind is not (nameof(StandardActMap) or nameof(SpoilsActMap) or nameof(GoldenPathActMap)) ||
+            if (data.Kind is not (nameof(StandardActMap) or nameof(SpoilsActMap) or nameof(GoldenPathActMap) or nameof(BlitzActMap)) ||
                 data.Columns < 1 || data.Rows < 1 || data.Columns > 100 || data.Rows > 100 ||
                 data.Points is null || data.Starts is null)
                 throw new TransplantMappingException("ActEntry.Map", "Invalid map layout.");
@@ -234,6 +267,13 @@ public sealed partial class RunState
             foreach (MapPoint point in points.Values)
                 if (point.Children.Any(child => !child.parents.Contains(point)) || point.parents.Any(parent => !parent.Children.Contains(point)))
                     throw new TransplantMappingException("ActEntry.Map", "Asymmetric map edge.");
+            if (Kind == nameof(BlitzActMap))
+                BlitzActMap.ValidateStartToBossChain(
+                    StartingMapPoint,
+                    BossMapPoint,
+                    SecondBossMapPoint,
+                    points.Count,
+                    message => new TransplantMappingException("ActEntry.Map", message));
         }
         private ActEntryMapState(ActEntryMapState source, IReadOnlyDictionary<AbstractModel, AbstractModel> models)
         {
@@ -247,5 +287,6 @@ public sealed partial class RunState
         }
         internal override ActMap CloneForRun(IReadOnlyDictionary<AbstractModel, AbstractModel> models,
             Random.Rng? replacementRng = null) => new ActEntryMapState(this, models);
+        internal BlitzActMap ToBlitzActMap() => new(Grid, StartingMapPoint, BossMapPoint, SecondBossMapPoint, startMapPoints);
     }
 }

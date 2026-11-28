@@ -4,6 +4,7 @@ using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
+using Sts2Sim.Core.Models.Blitz;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Helpers;
@@ -34,6 +35,7 @@ public sealed partial class RunState : IRunState
     private const int EliteEncounterPoolSize = 15;
 
     private readonly List<Player> _players = new();
+    private readonly List<RunModel> _runModels = new();
     private readonly ActDefinition[] _acts;
     private readonly ReadOnlyCollection<ActDefinition> _readOnlyActs;
     private GeneratedActRooms[]? _generatedRooms;
@@ -79,6 +81,10 @@ public sealed partial class RunState : IRunState
     public RunOddsSet Odds { get; }
 
     public AscensionManager Ascension { get; }
+
+    public GameMode GameMode { get; }
+
+    public IReadOnlyList<RunModel> RunModels => _runModels;
 
     public IReadOnlyList<Player> Players => _players;
 
@@ -160,13 +166,33 @@ public sealed partial class RunState : IRunState
     {
     }
 
+    public RunState(string seed, int ascensionLevel, GameMode gameMode, HeadlessProgress? progress = null)
+        : this(seed, ActDefinition.GetRandomList(seed), ascensionLevel, gameMode, progress)
+    {
+    }
+
     public RunState(string seed, ActDefinition act, int ascensionLevel = 0, HeadlessProgress? progress = null)
         : this(seed, [act], ascensionLevel, progress)
     {
     }
 
+    public RunState(string seed, ActDefinition act, int ascensionLevel, GameMode gameMode, HeadlessProgress? progress = null)
+        : this(seed, [act], ascensionLevel, gameMode, progress)
+    {
+    }
+
     public RunState(string seed, IReadOnlyList<ActDefinition> acts, int ascensionLevel = 0, HeadlessProgress? progress = null)
-        : this(new RunRngSet(seed), acts, ascensionLevel, progress)
+        : this(new RunRngSet(seed), acts, ascensionLevel, progress, GameMode.Standard)
+    {
+    }
+
+    public RunState(
+        string seed,
+        IReadOnlyList<ActDefinition> acts,
+        int ascensionLevel,
+        GameMode gameMode,
+        HeadlessProgress? progress = null)
+        : this(new RunRngSet(seed), acts, ascensionLevel, progress, gameMode)
     {
     }
 
@@ -181,13 +207,22 @@ public sealed partial class RunState : IRunState
         IReadOnlyList<ActDefinition> acts,
         int ascensionLevel = 0,
         HeadlessProgress? progress = null) =>
-        new(RunRngSet.CreateKeyed(seed), acts, ascensionLevel, progress);
+        new(RunRngSet.CreateKeyed(seed), acts, ascensionLevel, progress, GameMode.Standard);
+
+    public static RunState CreateKeyedForLabels(
+        string seed,
+        IReadOnlyList<ActDefinition> acts,
+        int ascensionLevel,
+        GameMode gameMode,
+        HeadlessProgress? progress = null) =>
+        new(RunRngSet.CreateKeyed(seed), acts, ascensionLevel, progress, gameMode);
 
     private RunState(
         RunRngSet rng,
         IReadOnlyList<ActDefinition> acts,
         int ascensionLevel,
-        HeadlessProgress? progress)
+        HeadlessProgress? progress,
+        GameMode gameMode = GameMode.Standard)
     {
         ArgumentNullException.ThrowIfNull(rng);
         ArgumentNullException.ThrowIfNull(acts);
@@ -196,10 +231,22 @@ public sealed partial class RunState : IRunState
 
         Rng = rng;
         Progress = progress ?? new HeadlessProgress();
+        if (gameMode is not (GameMode.Standard or GameMode.Blitz))
+            throw new NotSupportedException($"Unsupported run mode '{gameMode}'.");
+        GameMode = gameMode;
         _acts = materializedActs;
         _readOnlyActs = Array.AsReadOnly(_acts);
         CurrentActIndex = 0;
-        Ascension = new AscensionManager(ascensionLevel);
+        Ascension = new AscensionManager(ascensionLevel, gameMode);
+        if (gameMode == GameMode.Blitz)
+        {
+            RunModel canonicalBlitz = ModelDb.Contains(typeof(BlitzRunModel))
+                ? ModelDb.RunModel<BlitzRunModel>()
+                : new BlitzRunModel();
+            var blitz = (BlitzRunModel)canonicalBlitz.MutableClone();
+            blitz.RunState = this;
+            _runModels.Add(blitz);
+        }
         GenerateCurrentMap();
 
         Odds = new RunOddsSet(Rng.UnknownMapPoint, new HookOddsAdapter(this));
@@ -326,6 +373,7 @@ public sealed partial class RunState : IRunState
         // 遭遇战一次性抽完，按顺序存起来，房间真正被访问时只是按序取用，不再消耗随机数。
         // 偏离 #46/#179 之前遗留的实现（已修复）曾经用错了 RNG 流（CombatCardGeneration）且延迟到
         // 房间实际被访问时才抽——两个问题叠加导致抽到的遭遇战和真实游戏对不上。
+        bool isBlitz = GameMode == GameMode.Blitz;
         var normalEncounters = new List<EncounterDefinition>(act.BaseNumberOfRooms);
         for (int i = 0; i < act.BaseNumberOfRooms; i++)
         {
@@ -333,7 +381,8 @@ public sealed partial class RunState : IRunState
                 RoomType.Monster,
                 Rng.ForSemanticKey(
                     RunRngType.UpFront,
-                    $"run_setup/act={actIndex}/encounter/normal/slot={i}")));
+                    $"run_setup/act={actIndex}/encounter/normal/slot={i}"),
+                isBlitz));
         }
 
         var eliteEncounters = new List<EncounterDefinition>(EliteEncounterPoolSize);
@@ -392,14 +441,22 @@ public sealed partial class RunState : IRunState
 
     private void GenerateCurrentMap()
     {
-        ActDefinition act = Act;
-        var mapRng = new Rng(Rng.Seed, $"act_{CurrentActIndex + 1}_map");
-        MapPointTypeCounts pointTypeCounts = act.GetMapPointTypes(mapRng, Ascension);
-        Map = new StandardActMap(
-            mapRng,
-            act.BaseNumberOfRooms,
-            pointTypeCounts,
-            hasSecondBoss: Ascension.HasLevel(AscensionLevel.DoubleBoss) && CurrentActIndex == _acts.Length - 1);
+        bool hasSecondBoss = Ascension.HasLevel(AscensionLevel.DoubleBoss) && CurrentActIndex == _acts.Length - 1;
+        if (GameMode == GameMode.Blitz)
+        {
+            Map = new BlitzActMap(hasSecondBoss);
+        }
+        else
+        {
+            ActDefinition act = Act;
+            var mapRng = new Rng(Rng.Seed, $"act_{CurrentActIndex + 1}_map");
+            MapPointTypeCounts pointTypeCounts = act.GetMapPointTypes(mapRng, Ascension);
+            Map = new StandardActMap(
+                mapRng,
+                act.BaseNumberOfRooms,
+                pointTypeCounts,
+                hasSecondBoss: hasSecondBoss);
+        }
         Map = Hooks.Hook.ModifyGeneratedMap(this, Map, CurrentActIndex);
         // Run setup is synchronous; map-generated listeners contain no player-choice suspension.
         Hooks.Hook.AfterMapGenerated(this, Map, CurrentActIndex).GetAwaiter().GetResult();
@@ -586,10 +643,9 @@ public sealed partial class RunState : IRunState
         return id;
     }
 
-    /// <summary>偏离 #69：不链真实游戏还有的 <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c>/<c>RunModels</c>/
-    /// <c>Dominion</c> 与 ModHelper 订阅者（均未移植）。顺序见 <see cref="IterateRunHookListeners"/>。</summary>
+    /// <summary>偏离 #69：不链真实游戏还有的 <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c>/<c>Dominion</c> 与 ModHelper 订阅者（均未移植）。顺序见 <see cref="IterateRunHookListeners"/>。</summary>
     public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
-        IterateRunHookListeners(_players, childCombatState);
+        IterateRunHookListeners(this, childCombatState);
 
     /// <summary>
     /// 游戏 v0.113.1 <c>MegaCrit.Sts2.Core.Runs.RunState.IterateHookListeners</c> 的顺序（#1072）：首次 MoveNext 时
@@ -598,9 +654,9 @@ public sealed partial class RunState : IRunState
     /// 战斗部分在 run 部分全部给完后才捕获（游戏 child 迭代器的首次 MoveNext）。<see cref="CombatRunStateSnapshot"/>
     /// 与本类共用此实现。
     /// </summary>
-    internal static IEnumerable<AbstractModel> IterateRunHookListeners(IReadOnlyList<Player> players,
-        ICombatState? childCombatState)
+    internal static IEnumerable<AbstractModel> IterateRunHookListeners(IRunState runState, ICombatState? childCombatState)
     {
+        IReadOnlyList<Player> players = runState.Players;
         if (childCombatState is CombatState concrete)
         {
             foreach (AbstractModel listener in concrete.DeckHookListenerList(players))
@@ -639,6 +695,7 @@ public sealed partial class RunState : IRunState
                         run.Add(potion);
                 }
             }
+            run.AddRange(runState.RunModels);
         }
 
         foreach (AbstractModel listener in run)

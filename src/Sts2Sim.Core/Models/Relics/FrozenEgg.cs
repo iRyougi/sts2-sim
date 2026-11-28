@@ -10,8 +10,6 @@ public sealed class FrozenEgg : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
 
-    public override bool IsAllowed(IRunState runState) => RelicModel.IsBeforeAct3TreasureChest(runState);
-
     public override CardModel? TryModifyCardRewardOptionLate(
         IRunState runState,
         Player player,

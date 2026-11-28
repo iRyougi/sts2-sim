@@ -5,4 +5,5 @@ namespace Sts2Sim.Core.Rooms;
 internal sealed record TreasureRoomResolution(
     Player Player,
     int GoldGained,
-    string? RelicGained);
+    string? RelicGained,
+    IReadOnlyList<string>? ExtraRelicsGained = null);

@@ -8,6 +8,7 @@ public sealed class Debt : CardModel
     public override CardType Type => CardType.Curse;
     public override CardRarity Rarity => CardRarity.Curse;
     public override TargetType TargetType => TargetType.None;
+    public override bool IsAllowedInBlitz => false;
     public override int MaxUpgradeLevel => 0;
     protected override int CanonicalEnergyCost => -1;
     protected override IReadOnlyCollection<CardKeyword> CanonicalKeywords =>

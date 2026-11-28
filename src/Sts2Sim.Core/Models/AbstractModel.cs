@@ -796,6 +796,8 @@ public abstract class AbstractModel : IComparable<AbstractModel>
     {
     }
 
+    public virtual bool TryReplaceDefaultRoomRewards(Player player, List<Rewards.Reward> rewards, AbstractRoom room) => false;
+
     public virtual CardCreationOptions ModifyCardRewardCreationOptions(Player player, CardCreationOptions options) => options;
 
     public virtual CardCreationOptions ModifyCardRewardCreationOptionsLate(Player player, CardCreationOptions options) => options;

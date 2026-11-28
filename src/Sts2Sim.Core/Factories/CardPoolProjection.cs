@@ -20,8 +20,13 @@ public static class CardPoolProjection
     {
         ArgumentNullException.ThrowIfNull(player);
         ArgumentNullException.ThrowIfNull(cards);
-        return FilterCombatCandidates(cards, player.RunState.Players.Count > 1).ToArray();
+        return FilterCombatCandidates(cards, player.RunState).ToArray();
     }
+
+    internal static IEnumerable<CardModel> FilterCombatCandidates(
+        IEnumerable<CardModel> cards, Runs.IRunState runState) =>
+        FilterCombatCandidates(cards, runState.Players.Count > 1)
+            .Where(card => card.IsAllowedInRun(runState));
 
     internal static IEnumerable<CardModel> FilterCombatCandidates(
         IEnumerable<CardModel> cards, bool isMultiplayer) =>
@@ -50,7 +55,7 @@ public static class CardPoolProjection
             source = source.Where(card => card.Rarity is CardRarity.Common or CardRarity.Uncommon or CardRarity.Rare);
         if (isInCombat) source = source.Where(card => card.CanBeGeneratedInCombat);
         CardModel[] result = source.Where(card => card.Id != original.Id)
-            .Where(card => original.Owner.RunState.Players.Count > 1 || !card.IsMultiplayerOnly).ToArray();
+            .Where(card => card.IsAllowedInRun(original.Owner.RunState)).ToArray();
         if (result.Length == 0) throw new InvalidOperationException("All transformation options provided are invalid.");
         return result;
     }

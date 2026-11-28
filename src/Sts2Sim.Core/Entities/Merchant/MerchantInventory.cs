@@ -112,7 +112,8 @@ public sealed class MerchantInventory
                 .Where(card =>
                     card.IsColorless &&
                     card.Rarity == rarity &&
-                    !used.Contains(card.Id))
+                    !used.Contains(card.Id) &&
+                    card.IsAllowedInRun(player.RunState))
                 .ToList();
             CardModel? picked = shopRng.NextItem(candidates);
             if (picked is null)
@@ -150,7 +151,8 @@ public sealed class MerchantInventory
                     !card.IsColorless &&
                     card.Type == type &&
                     card.Rarity == rarity &&
-                    !used.Contains(card.Id))
+                    !used.Contains(card.Id) &&
+                    card.IsAllowedInRun(player.RunState))
                 .ToList();
             if (candidates.Count > 0)
             {
@@ -262,12 +264,12 @@ public sealed class MerchantInventory
         {
             CardRarity rarity = purchased.Card.Rarity;
             List<CardModel> candidates = ColorlessCardPool.Instance.GetUnlockedCards(_player.UnlockState, _player.RunState.Players.Count > 1)
-                .Where(card => card.IsColorless && card.Rarity == rarity && !used.Contains(card.Id))
+                .Where(card => card.IsColorless && card.Rarity == rarity && !used.Contains(card.Id) && card.IsAllowedInRun(_player.RunState))
                 .ToList();
             if (candidates.Count == 0)
             {
                 candidates = ColorlessCardPool.Instance.GetUnlockedCards(_player.UnlockState, _player.RunState.Players.Count > 1)
-                    .Where(card => card.IsColorless && card.Rarity == rarity)
+                    .Where(card => card.IsColorless && card.Rarity == rarity && card.IsAllowedInRun(_player.RunState))
                     .ToList();
             }
             picked = shopRng.NextItem(candidates);

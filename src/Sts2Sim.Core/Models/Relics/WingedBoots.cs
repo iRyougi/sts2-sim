@@ -13,7 +13,7 @@ public sealed class WingedBoots : RelicModel
 
     public override bool IsUsedUp => TimesUsed >= 3;
 
-    public override bool IsAllowed(IRunState runState) => runState.Players.Count == 1;
+    protected override bool IsAllowedInternal(IRunState runState) => runState.Players.Count == 1;
 
     public override bool ShouldAllowFreeTravel() => !IsUsedUp;
 

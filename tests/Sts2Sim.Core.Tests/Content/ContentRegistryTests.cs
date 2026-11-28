@@ -3,6 +3,7 @@ using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Potions;
 using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Blitz;
 using Sts2Sim.Core.Models.Cards;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
@@ -194,6 +195,7 @@ public sealed class ContentRegistryTests : IDisposable
         ModelDb.Init(ContentRegistry.AllTypes);
 
         Assert.IsType<Wriggler>(ModelDb.Monster<Wriggler>());
+        Assert.IsType<BlitzRunModel>(ModelDb.RunModel<BlitzRunModel>());
     }
 
     [Fact]
@@ -224,5 +226,6 @@ public sealed class ContentRegistryTests : IDisposable
             Assert.False(type.IsAbstract);
             Assert.True(typeof(AbstractModel).IsAssignableFrom(type));
         });
+        Assert.Contains(typeof(BlitzRunModel), ContentRegistry.AllTypes);
     }
 }

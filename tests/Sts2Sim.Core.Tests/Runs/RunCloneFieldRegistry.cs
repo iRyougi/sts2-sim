@@ -17,8 +17,8 @@ internal static class RunCloneFieldRegistry
     {
         var fields = new Dictionary<string, (RunCloneFieldClass, string)>();
         Register<RunState>(fields,
-            cloned: "_players _acts _readOnlyActs _generatedRooms _visitedMapCoords _completedActFloors _selectingMapEventBeforeHistoryAppend _currentMapPointHasShop <PreviousMapPointHasShop>k__BackingField _currentRooms _visibleMapVisits _unknownMapPointEntriesThisAct _activeRewardOffers <ForcedCombatResumeOutcome>k__BackingField _eventSequence _visitedEventIds _visitedAncientTypes _hasVisibleAncientHistory _normalEncounterSequence _eliteEncounterSequence _bossEncounter _secondBossEncounter _bossEncountersVisited _eventsVisited _normalEncountersVisited _eliteEncountersVisited _nextRoomId <Rng>k__BackingField <Odds>k__BackingField <WongoPointsEarned>k__BackingField <FreedRepy>k__BackingField _completedQuests _currentAncientEventType <SharedRelicGrabBag>k__BackingField <Map>k__BackingField <CurrentActIndex>k__BackingField <EntryPhase>k__BackingField <IsImaginationClone>k__BackingField",
-            shared: "<Ascension>k__BackingField <Progress>k__BackingField",
+            cloned: "_players _runModels _acts _readOnlyActs _generatedRooms _visitedMapCoords _completedActFloors _selectingMapEventBeforeHistoryAppend _currentMapPointHasShop <PreviousMapPointHasShop>k__BackingField _currentRooms _visibleMapVisits _unknownMapPointEntriesThisAct _activeRewardOffers <ForcedCombatResumeOutcome>k__BackingField _eventSequence _visitedEventIds _visitedAncientTypes _hasVisibleAncientHistory _normalEncounterSequence _eliteEncounterSequence _bossEncounter _secondBossEncounter _bossEncountersVisited _eventsVisited _normalEncountersVisited _eliteEncountersVisited _nextRoomId <Rng>k__BackingField <Odds>k__BackingField <WongoPointsEarned>k__BackingField <FreedRepy>k__BackingField _completedQuests _currentAncientEventType <SharedRelicGrabBag>k__BackingField <Map>k__BackingField <CurrentActIndex>k__BackingField <EntryPhase>k__BackingField <IsImaginationClone>k__BackingField",
+            shared: "<GameMode>k__BackingField <Ascension>k__BackingField <Progress>k__BackingField",
             rejected: "<CardSelectionSource>k__BackingField _nextEncounterForTransplant");
         Register<Player>(fields,
             cloned: "<Creature>k__BackingField <RunState>k__BackingField <IsActiveForHooks>k__BackingField <PlayerCombatState>k__BackingField <Gold>k__BackingField <CanUseOrRemovePotions>k__BackingField <BaseOrbSlotCount>k__BackingField <CardRemovalsUsed>k__BackingField <Deck>k__BackingField _relics _potionSlots <RelicGrabBag>k__BackingField <PlayerRng>k__BackingField <Odds>k__BackingField RelicObtained",
@@ -34,6 +34,8 @@ internal static class RunCloneFieldRegistry
             cloned: "_mapLength _rng _treasureRow _pointTypeCounts <BossMapPoint>k__BackingField <StartingMapPoint>k__BackingField <Grid>k__BackingField");
         Register<GoldenPathActMap>(fields,
             cloned: "<BossMapPoint>k__BackingField <StartingMapPoint>k__BackingField <Grid>k__BackingField");
+        Register<BlitzActMap>(fields,
+            cloned: "<BossMapPoint>k__BackingField <StartingMapPoint>k__BackingField <SecondBossMapPoint>k__BackingField <Grid>k__BackingField");
         Register<MapPoint>(fields,
             cloned: "_quests parents coord <CanBeModified>k__BackingField <PointType>k__BackingField <Children>k__BackingField");
         Register<AbstractOdds>(fields, cloned: "_rng <CurrentValue>k__BackingField");

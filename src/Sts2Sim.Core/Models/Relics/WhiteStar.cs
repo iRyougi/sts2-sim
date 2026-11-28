@@ -11,8 +11,6 @@ public sealed class WhiteStar : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
 
-    public override bool IsAllowed(Runs.IRunState runState) => IsBeforeAct3TreasureChest(runState);
-
     public override void ModifyRewards(Player player, List<Reward> rewards, RoomType roomType)
     {
         if (player != Owner || roomType != RoomType.Elite)

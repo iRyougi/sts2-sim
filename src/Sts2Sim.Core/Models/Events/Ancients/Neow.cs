@@ -65,6 +65,9 @@ public sealed class Neow : AncientEventModel
 
     protected override IReadOnlyList<EventOption> GenerateInitialOptions()
     {
+        if (RunState.GameMode == Runs.GameMode.Blitz)
+            return [new EventOption("BLITZ", ChooseBlitzCards)];
+
         // 偏离 #178：模拟器没有 modifier 集合与管线，省略权威实现的 modifier 专属选项分支。
         List<Type> allowedCurses = CurseTypes.Where(IsAllowedAtNeow).ToList();
         Type chosenCurse = Rng.NextItem(allowedCurses)
@@ -92,6 +95,17 @@ public sealed class Neow : AncientEventModel
             .Select(type => RelicOption(type, type.Name))
             .Append(RelicOption(chosenCurse, chosenCurse.Name))
             .ToArray();
+    }
+
+    private async Task ChooseBlitzCards()
+    {
+        var options = new Runs.CardCreationOptions([Owner.Character.CardPool],
+            Runs.CardCreationSource.Other, Runs.CardRarityOddsType.BlitzNeow).WithFlags(Runs.CardCreationFlags.NoUpgrades);
+        var cards = Factories.CardFactory.CreateForReward(Owner, 10, options).OrderBy(card => card.Rarity);
+        var selected = await Commands.CardSelectCmd.FromSimpleGridForRewards(Owner, cards, 3, 3, this);
+        foreach (CardModel card in selected)
+            await Commands.CardPileCmd.AddToDeck(card);
+        Finish();
     }
 
     private static void RemoveMutuallyExclusivePositives(List<Type> positives, Type chosenCurse)

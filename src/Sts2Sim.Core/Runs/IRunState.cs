@@ -20,6 +20,10 @@ public interface IRunState
 
     AscensionManager Ascension { get; }
 
+    GameMode GameMode => Ascension.GameMode;
+
+    IReadOnlyList<RunModel> RunModels => Array.Empty<RunModel>();
+
     IReadOnlyList<Player> Players { get; }
 
     /// <summary>跨幕累计的已访问房间数。</summary>

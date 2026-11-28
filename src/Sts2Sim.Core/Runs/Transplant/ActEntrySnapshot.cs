@@ -24,5 +24,7 @@ public sealed record ActEntrySnapshot(int SchemaVersion, string CoreHash, string
     int ProgressWongo, int WongoEarned, bool FreedRepy, IReadOnlyList<string> CompletedQuests,
     bool Imagination)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int LegacySchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public string? GameMode { get; init; }
 }

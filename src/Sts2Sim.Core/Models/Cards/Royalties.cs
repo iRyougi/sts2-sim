@@ -5,6 +5,7 @@ namespace Sts2Sim.Core.Models.Cards;
 public sealed class Royalties : GeneratedCardModel
 {
 
+    public override bool IsAllowedInBlitz => false;
     public override bool CanBeGeneratedInCombat => false;
     protected override GeneratedCardSpec Spec { get; } = new(
         1, 0, CardType.Power, CardRarity.Rare, TargetType.Self,

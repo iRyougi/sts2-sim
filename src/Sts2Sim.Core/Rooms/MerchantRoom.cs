@@ -153,6 +153,8 @@ public sealed class MerchantRoom : AbstractRoom
     public override async Task EnterInternal(RunState? runState)
     {
         ArgumentNullException.ThrowIfNull(runState);
+        if (runState.GameMode == GameMode.Blitz)
+            throw new NotSupportedException("Blitz merchant choices are unsupported.");
         ThrowIfResolvingEntryRewards();
         await _purchaseGate.WaitAsync();
         try

@@ -25,22 +25,22 @@ file sealed class LadderShopRelic : RelicModel { public override RelicRarity Rar
 file sealed class DisallowedCommonRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Common;
-    public override bool IsAllowed(IRunState runState) => false;
+    protected override bool IsAllowedInternal(IRunState runState) => false;
 }
 file sealed class DisallowedUncommonRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Uncommon;
-    public override bool IsAllowed(IRunState runState) => false;
+    protected override bool IsAllowedInternal(IRunState runState) => false;
 }
 file sealed class DisallowedRareRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Rare;
-    public override bool IsAllowed(IRunState runState) => false;
+    protected override bool IsAllowedInternal(IRunState runState) => false;
 }
 file sealed class DisallowedShopRelic : RelicModel
 {
     public override RelicRarity Rarity => RelicRarity.Shop;
-    public override bool IsAllowed(IRunState runState) => false;
+    protected override bool IsAllowedInternal(IRunState runState) => false;
 }
 
 public class RelicGrabBagTests : IDisposable

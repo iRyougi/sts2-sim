@@ -687,7 +687,10 @@ public sealed class RunRecorder : IRunRecorder
                 purchase.Kind,
                 purchase.Id,
                 purchase.Price)).ToArray()),
-        TreasureFloorDetail treasure => new TreasureFloorDetail(treasure.GoldGained, treasure.RelicGained),
+        TreasureFloorDetail treasure => new TreasureFloorDetail(
+            treasure.GoldGained,
+            treasure.RelicGained,
+            treasure.ExtraRelicsGained?.ToArray()),
         EventFloorDetail @event => new EventFloorDetail(
             @event.EventName,
             @event.OptionChosen,

@@ -171,6 +171,10 @@ internal static class CombatPrivateStateRegistry
                 "Stable reference to TERROR_MOVE in the fingerprinted move-state machine.",
             ["WaterfallGiant._aboutToBlowState"] =
                 "Stable reference to ABOUT_TO_BLOW_MOVE in the fingerprinted move-state machine.",
+            ["GremlinMerc._hasSpoken"] =
+                "Presentation-only banter gate; GremlinMerc moves and ThieveryPower capture all combat behavior.",
+            ["GremlinMerc.<SpokenBanterKey>k__BackingField"] =
+                "Presentation-only banter localization key; no simulator combat logic reads it.",
         };
 
     private static readonly HashSet<string> TransientFields =

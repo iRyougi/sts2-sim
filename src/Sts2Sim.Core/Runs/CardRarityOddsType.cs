@@ -8,4 +8,6 @@ public enum CardRarityOddsType
     BossEncounter,
     Shop,
     Uniform,
+    Blitz,
+    BlitzNeow,
 }
