@@ -36,12 +36,14 @@ public sealed class KnowledgeDemon : MonsterModel
         return new MonsterMoveStateMachine([curse, slap, overwhelming, ponder, branch], curse);
     }
 
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
     private async Task Curse(IReadOnlyList<Creature> targets)
     {
         foreach (Creature target in targets.Where(target => target.Player is not null))
         {
             CardModel disintegration = MutableCard<Disintegration>(target);
-            ((Disintegration)disintegration).PowerAmount = 6 + _curseCounter;
+            ((Disintegration)disintegration).PowerAmount = (IsDread ? 8 : 6) + _curseCounter;
             CardModel alternative = _curseCounter switch
             {
                 0 => MutableCard<MindRot>(target),

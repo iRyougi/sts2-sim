@@ -9,6 +9,7 @@ using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Models.RelicPools;
 using Sts2Sim.Core.Odds;
 using Sts2Sim.Core.Random;
@@ -68,6 +69,7 @@ public sealed partial class RunState : IRunState
     /// <summary>A10 终幕的第二个 Boss；非双 Boss 幕为 null。</summary>
     public EncounterDefinition? CurrentActSecondBossEncounter => _secondBossEncounter;
     private int _bossEncountersVisited;
+    internal int BossEncountersVisited => _bossEncountersVisited;
     private int _eventsVisited;
     private int _normalEncountersVisited;
     private int _eliteEncountersVisited;
@@ -85,6 +87,36 @@ public sealed partial class RunState : IRunState
     public GameMode GameMode { get; }
 
     public IReadOnlyList<RunModel> RunModels => _runModels;
+
+    public DominionModel? Dominion { get; private set; }
+
+    internal void SetSecondBossEncounterOnCurrentAct(EncounterDefinition encounter)
+    {
+        ArgumentNullException.ThrowIfNull(encounter);
+        EnsureRoomsGenerated();
+        _secondBossEncounter = encounter;
+        GeneratedActRooms current = _generatedRooms![CurrentActIndex];
+        _generatedRooms[CurrentActIndex] = current with { SecondBoss = encounter };
+        if (_runModels.OfType<DreadRunModel>().FirstOrDefault() is { } dread)
+        {
+            dread.ApplyCurrentDominion();
+        }
+    }
+
+    public void SetDominion(DominionModel? dominion)
+    {
+        if (dominion is null)
+        {
+            Dominion = null;
+        }
+        else
+        {
+            Dominion = (DominionModel)dominion.MutableClone();
+            Dominion.RunState = this;
+        }
+    }
+
+    internal void RestoreClonedDominion(DominionModel? dominion) => Dominion = dominion;
 
     public IReadOnlyList<Player> Players => _players;
 
@@ -231,13 +263,22 @@ public sealed partial class RunState : IRunState
 
         Rng = rng;
         Progress = progress ?? new HeadlessProgress();
-        if (gameMode is not (GameMode.Standard or GameMode.Blitz))
+        if (gameMode is not (GameMode.Standard or GameMode.Blitz or GameMode.Dread))
             throw new NotSupportedException($"Unsupported run mode '{gameMode}'.");
         GameMode = gameMode;
         _acts = materializedActs;
         _readOnlyActs = Array.AsReadOnly(_acts);
         CurrentActIndex = 0;
         Ascension = new AscensionManager(ascensionLevel, gameMode);
+        if (gameMode == GameMode.Dread)
+        {
+            RunModel canonicalDread = ModelDb.Contains(typeof(DreadRunModel))
+                ? ModelDb.RunModel<DreadRunModel>()
+                : new DreadRunModel();
+            var dread = (DreadRunModel)canonicalDread.MutableClone();
+            dread.RunState = this;
+            _runModels.Add(dread);
+        }
         if (gameMode == GameMode.Blitz)
         {
             RunModel canonicalBlitz = ModelDb.Contains(typeof(BlitzRunModel))
@@ -255,7 +296,11 @@ public sealed partial class RunState : IRunState
     /// <summary>
     /// Advances to the following configured act using rooms pre-generated at run creation.
     /// </summary>
-    public void AdvanceToNextAct()
+    public void AdvanceToNextAct() => AdvanceToNextActCore(invokeAfterActEntered: true);
+
+    internal void AdvanceToNextActForTransplant() => AdvanceToNextActCore(invokeAfterActEntered: false);
+
+    private void AdvanceToNextActCore(bool invokeAfterActEntered)
     {
         EnsureRoomsGenerated();
         if (CurrentActIndex >= _acts.Length - 1)
@@ -278,6 +323,13 @@ public sealed partial class RunState : IRunState
         InitializeCurrentAct();
         GenerateCurrentMap();
         EntryPhase = RunEntryPhase.Legacy; // Existing direct callers retain their room-based continuation contract.
+        if (invokeAfterActEntered)
+        {
+            // v0.114.0 RunManager.EnterAct: SetActInternal (map) → Hook.BeforeActEntered → first room → AfterActEntered.
+            // The simulator enters no room here; the next room is entered by the caller.
+            Hooks.Hook.BeforeActEntered(this).GetAwaiter().GetResult();
+            Hooks.Hook.AfterActEntered(this).GetAwaiter().GetResult();
+        }
     }
 
     private static void ValidateActs(ActDefinition[] acts, string parameterName)
@@ -437,6 +489,10 @@ public sealed partial class RunState : IRunState
         _secondBossEncounter = rooms.SecondBoss;
         _currentAncientEventType = rooms.Ancient;
         _bossEncountersVisited = 0;
+        if (_runModels.OfType<DreadRunModel>().FirstOrDefault() is { } dread)
+        {
+            dread.ApplyCurrentDominion();
+        }
     }
 
     private void GenerateCurrentMap()
@@ -643,7 +699,7 @@ public sealed partial class RunState : IRunState
         return id;
     }
 
-    /// <summary>偏离 #69：不链真实游戏还有的 <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c>/<c>Dominion</c> 与 ModHelper 订阅者（均未移植）。顺序见 <see cref="IterateRunHookListeners"/>。</summary>
+    /// <summary>偏离 #69：不链真实游戏还有的 <c>Ancients</c>/<c>Modifiers</c>/<c>BadgeModels</c> 与 ModHelper 订阅者（均未移植）。顺序见 <see cref="IterateRunHookListeners"/>。</summary>
     public IEnumerable<AbstractModel> IterateHookListeners(ICombatState? childCombatState) =>
         IterateRunHookListeners(this, childCombatState);
 
@@ -696,6 +752,7 @@ public sealed partial class RunState : IRunState
                 }
             }
             run.AddRange(runState.RunModels);
+            if (runState.Dominion is { } dominion) run.Add(dominion);
         }
 
         foreach (AbstractModel listener in run)

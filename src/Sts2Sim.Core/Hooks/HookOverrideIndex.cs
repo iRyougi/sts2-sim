@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Afflictions;
+using Sts2Sim.Core.Models.Dread;
 
 namespace Sts2Sim.Core.Hooks;
 
@@ -138,7 +139,9 @@ internal static class HookOverrideIndex
         : typeof(OrbModel).IsAssignableFrom(type) ? ListenerKind.Orb
         : typeof(CardModel).IsAssignableFrom(type) || typeof(RelicModel).IsAssignableFrom(type)
             || typeof(PotionModel).IsAssignableFrom(type) || typeof(AfflictionModel).IsAssignableFrom(type)
-            || typeof(EnchantmentModel).IsAssignableFrom(type) || typeof(RunModel).IsAssignableFrom(type) ? ListenerKind.Passive
+            || typeof(EnchantmentModel).IsAssignableFrom(type)
+            || typeof(RunModel).IsAssignableFrom(type)
+            || typeof(DominionModel).IsAssignableFrom(type) ? ListenerKind.Passive
         : ListenerKind.Unknown;
 
     // Read-mostly table keyed by runtime type (reference identity), replaced whole under a lock when a new type appears.

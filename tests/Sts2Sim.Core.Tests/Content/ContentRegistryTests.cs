@@ -5,6 +5,8 @@ using Sts2Sim.Core.Entities.Relics;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Blitz;
 using Sts2Sim.Core.Models.Cards;
+using Sts2Sim.Core.Models.Dread;
+using Sts2Sim.Core.Models.Dread.Dominions;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Models.Potions;
@@ -26,13 +28,25 @@ public sealed class ContentRegistryTests : IDisposable
 
         CardModel[] cards = ModelDb.All<CardModel>().ToArray();
         // Defect adds 91 pool cards and Fuel, a generated token; Necrobinder adds 91 pool cards plus the
-        // Soul and SweepingGaze tokens; Fool G1-G5 add 115 cards total (+1 ShowOff in G5).
-        Assert.Equal(716, cards.Length); // v0.114.0 #1109: +Optimism +TwinShot -RapidShot
+        // Soul and SweepingGaze tokens; Fool G1-G5 add 115 cards total (+1 ShowOff in G5); Dread adds Amnesia.
+        Assert.Equal(717, cards.Length); // v0.114.0 #1109: +Optimism +TwinShot -RapidShot; Dread +Amnesia
         Assert.Equal(665, cards.Count(card => card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(599, cards.Count(card => !card.IsColorless && card.Rarity is not CardRarity.Token and not CardRarity.Status));
         Assert.Equal(66, cards.Count(card => card.IsColorless));
         Assert.Equal(34, cards.Count(card => card.Rarity == CardRarity.Token));
-        Assert.Equal(17, cards.Count(card => card.Rarity == CardRarity.Status));
+        Assert.Equal(18, cards.Count(card => card.Rarity == CardRarity.Status));
+        Assert.IsType<Amnesia>(ModelDb.Card<Amnesia>());
+        Assert.IsType<DreadRunModel>(ModelDb.RunModel<DreadRunModel>());
+        DominionModel[] dominions = ModelDb.All<DominionModel>().ToArray();
+        Assert.Equal(12, dominions.Length);
+        Type[] expectedDominions =
+        [
+            typeof(CeremonialBeastDominion), typeof(KinDominion), typeof(VantomDominion),
+            typeof(LagavulinMatriarchDominion), typeof(SoulFyshDominion), typeof(WaterfallGiantDominion),
+            typeof(KaiserCrabDominion), typeof(KnowledgeDemonDominion), typeof(InsatiableDominion),
+            typeof(AeonglassDominion), typeof(QueenDominion), typeof(TestSubjectDominion),
+        ];
+        Assert.All(expectedDominions, type => Assert.IsAssignableFrom<DominionModel>(ModelDb.Get(type)));
         Assert.IsType<Infection>(ModelDb.Card<Infection>());
         Assert.IsType<AscendersBane>(ModelDb.Card<AscendersBane>());
         Assert.IsType<Doubt>(ModelDb.Card<Doubt>());

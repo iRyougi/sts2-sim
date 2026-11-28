@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread.Dominions;
 using Sts2Sim.Core.Models.Events;
 using Sts2Sim.Core.Models.Monsters;
 using Sts2Sim.Core.Random;
@@ -62,9 +63,26 @@ public sealed class Overgrowth : ActDefinition
 
     private static readonly IReadOnlyList<EncounterDefinition> StaticBossEncounters = new List<EncounterDefinition>
     {
-        new(CreateMonster<CeremonialBeast>, tags: null, isWeak: false, name: "CeremonialBeast") { IdEntry = "CEREMONIAL_BEAST_BOSS" },
-        new(CreateTheKin, tags: null, isWeak: false, name: "TheKin") { Slots = ["slot1", "slot2", "leaderSlot"], IdEntry = "THE_KIN_BOSS" },
-        new(CreateMonster<Vantom>, tags: null, isWeak: false, name: "Vantom") { IdEntry = "VANTOM_BOSS" },
+        new(CreateMonster<CeremonialBeast>, tags: null, isWeak: false, name: "CeremonialBeast")
+        {
+            IdEntry = "CEREMONIAL_BEAST_BOSS",
+            DominionFactory = () => ModelDb.Dominion<CeremonialBeastDominion>(),
+        },
+        EncounterDefinition.CreateDreadAware(
+            CreateTheKin,
+            tags: null,
+            isWeak: false,
+            name: "TheKin",
+            idEntry: "THE_KIN_BOSS",
+            slotsFactory: isDread => isDread
+                ? ["slot1", "slot2", "slot3", "leaderSlot"]
+                : ["slot1", "slot2", "leaderSlot"],
+            dominionFactory: () => ModelDb.Dominion<KinDominion>()),
+        new(CreateMonster<Vantom>, tags: null, isWeak: false, name: "Vantom")
+        {
+            IdEntry = "VANTOM_BOSS",
+            DominionFactory = () => ModelDb.Dominion<VantomDominion>(),
+        },
     };
 
     protected override IReadOnlyList<EncounterDefinition> MonsterEncounters => StaticMonsterEncounters;
@@ -186,14 +204,29 @@ public sealed class Overgrowth : ActDefinition
         return secondaries.Select(monster => (monster, (string?)null)).ToArray();
     }
 
-    private static IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateTheKin()
+    private static IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateTheKin(bool isDread)
     {
-        var dancingFollower = CreateMutableMonster<KinFollower>();
-        dancingFollower.StartsWithDance = true;
+        var firstFollower = CreateMutableMonster<KinFollower>();
+        firstFollower.Index = 0;
+        var secondFollower = CreateMutableMonster<KinFollower>();
+        secondFollower.Index = 1;
+        if (!isDread)
+        {
+            return
+            [
+                (firstFollower, "slot1"),
+                (secondFollower, "slot2"),
+                (CreateMonster<KinPriest>(), "leaderSlot"),
+            ];
+        }
+
+        var thirdFollower = CreateMutableMonster<KinFollower>();
+        thirdFollower.Index = 2;
         return
         [
-            (dancingFollower, "slot1"),
-            (CreateMonster<KinFollower>(), "slot2"),
+            (firstFollower, "slot1"),
+            (secondFollower, "slot2"),
+            (thirdFollower, "slot3"),
             (CreateMonster<KinPriest>(), "leaderSlot"),
         ];
     }

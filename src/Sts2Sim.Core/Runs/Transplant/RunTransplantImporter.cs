@@ -88,6 +88,9 @@ public static class RunTransplantImporter
                     throw new TransplantMappingException($"Player.Deck[{index}].Props.spoils_coord",
                         "Regenerated target-act map changed the native SpoilsMap coordinate.");
         }
+        Hooks.Hook.AfterRunLoaded(run).GetAwaiter().GetResult();
+        if (run.GameMode == GameMode.Dread && run.BossEncountersVisited > 0)
+            run.SetDominion(null);
         return run;
     }
 

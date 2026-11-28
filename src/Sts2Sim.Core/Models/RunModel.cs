@@ -22,6 +22,9 @@ public abstract class RunModel : AbstractModel
         }
     }
 
+    /// <summary>Native <c>RunModel.AfterRunLoaded</c> (invoked by <c>OnRunLoaded</c>).</summary>
+    public virtual Task AfterRunLoaded() => Task.CompletedTask;
+
     protected override void AfterCloned()
     {
         base.AfterCloned();

@@ -7,6 +7,7 @@ using Sts2Sim.Core.Entities.Merchant;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Afflictions;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Models.Powers;
 using Sts2Sim.Core.Rewards;
 using Sts2Sim.Core.Rooms;
@@ -111,14 +112,33 @@ public static class Hook
         }
     }
 
+    /// <summary>v0.114.0 <c>Hook.BeforeActEntered</c>; see <see cref="AbstractModel.BeforeActEntered"/>.</summary>
+    public static async Task BeforeActEntered(IRunState runState)
+    {
+        foreach (AbstractModel model in runState.IterateHookListeners(null).ToArray())
+        {
+            if (!IsEligibleHookListener(model)) continue;
+            await model.BeforeActEntered();
+            model.InvokeExecutionFinished();
+        }
+    }
+
     public static async Task AfterActEntered(IRunState runState)
     {
-        foreach (AbstractModel model in runState.IterateHookListeners(null))
+        foreach (AbstractModel model in runState.IterateHookListeners(null).ToArray())
         {
             if (!IsEligibleHookListener(model)) continue;
             await model.AfterActEntered();
             model.InvokeExecutionFinished();
         }
+    }
+
+    /// <summary>Native <c>RunModel.OnRunLoaded</c> → <c>AfterRunLoaded</c>: called on each run model of the loaded
+    /// run, not broadcast to every hook listener.</summary>
+    public static async Task AfterRunLoaded(IRunState runState)
+    {
+        foreach (RunModel model in runState.RunModels.ToArray())
+            await model.AfterRunLoaded();
     }
 
     /// <summary>Dispatches before room setup, while persistent deck cards can still transform.</summary>
@@ -983,7 +1003,7 @@ public static class Hook
     // unknown neutral types survive projection until the actual dispatch guard.
     internal static bool IsKnownHookModelType(AbstractModel model) =>
         model is PowerModel or MonsterModel or OrbModel or CardModel or RelicModel
-            or PotionModel or AfflictionModel or EnchantmentModel or RunModel;
+            or PotionModel or AfflictionModel or EnchantmentModel or RunModel or DominionModel;
 
     private static AbstractModel[] GetCostHookListeners(ICombatState combatState, HookOverrideIndex.CostSlot slot)
     {

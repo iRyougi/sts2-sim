@@ -40,7 +40,9 @@ public sealed class TorchHeadAmalgam : MonsterModel
         await PowerCmd.Apply<MinionPower>(Creature.CombatState!, Creature, 1m, Creature, null);
     }
 
-    private int StrongTackleDamage => Ascension(AscensionLevel.DeadlyEnemies, 32, 26);
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    private int StrongTackleDamage => Ascension(AscensionLevel.DeadlyEnemies, 32, 26) + (IsDread ? 5 : 0);
     private int TackleDamage => Ascension(AscensionLevel.DeadlyEnemies, 22, 18);
     private const int BeamDamage = 8;
     private int WeakTackleDamage => Ascension(AscensionLevel.DeadlyEnemies, 16, 14);

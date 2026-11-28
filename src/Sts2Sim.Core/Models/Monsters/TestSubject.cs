@@ -59,15 +59,18 @@ public sealed class TestSubject : MonsterModel
     public override int MinInitialHp => FirstFormHp;
     public override int MaxInitialHp => MinInitialHp;
 
-    private int EnrageAmount => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    private int EnrageAmount => Ascension(AscensionLevel.DeadlyEnemies, 3, 2) + (IsDread ? 1 : 0);
     private int BiteDamage => Ascension(AscensionLevel.DeadlyEnemies, 22, 20);
     private int SkullBashDamage => Ascension(AscensionLevel.DeadlyEnemies, 16, 14);
     private int MultiClawDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
-    private int MultiClawTotalCount => 3 + ExtraMultiClawCount;
+    private int BaseMultiClawCount => IsDread ? 4 : 3;
+    private int MultiClawTotalCount => BaseMultiClawCount + ExtraMultiClawCount;
     private int Phase3LacerateDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
     private const int BigPounceDamage = 45;
     private int BurningGrowlBurnCount => Ascension(AscensionLevel.DeadlyEnemies, 5, 3);
-    private int BurningGrowlStrengthGain => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
+    private int BurningGrowlStrengthGain => Ascension(AscensionLevel.DeadlyEnemies, 3, 2) + (IsDread ? 3 : 0);
 
     public override bool ShouldDisappearFromDoom() => Respawns >= 2;
 

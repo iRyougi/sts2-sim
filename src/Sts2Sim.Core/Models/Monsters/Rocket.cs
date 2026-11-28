@@ -9,12 +9,14 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class Rocket : MonsterModel
 {
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
     public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 209, 199);
     public override int MaxInitialHp => MinInitialHp;
     private int CalculatingDamage => Ascension(AscensionLevel.DeadlyEnemies, 4, 3);
     private int PreciseSmashDamage => Ascension(AscensionLevel.DeadlyEnemies, 20, 18);
     private int ChargeStrength => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
-    private int RocketClawDamage => Ascension(AscensionLevel.DeadlyEnemies, 35, 31);
+    private int RocketClawDamage => Ascension(AscensionLevel.DeadlyEnemies, 35, 31) + (IsDread ? 5 : 0);
+    private int PlatingAmount => IsDread ? 14 : 0;
 
     public override async Task AfterAddedToRoom()
     {
@@ -23,6 +25,10 @@ public sealed class Rocket : MonsterModel
             await PowerCmd.Apply<SurroundedPower>(Creature.CombatState!, player, 1m, Creature, null);
         await PowerCmd.Apply<BackAttackRightPower>(Creature.CombatState!, Creature, 1m, Creature, null);
         await PowerCmd.Apply<CrabRagePower>(Creature.CombatState!, Creature, 1m, Creature, null);
+        if (PlatingAmount > 0)
+        {
+            await PowerCmd.Apply<PlatingPower>(Creature.CombatState!, Creature, PlatingAmount, Creature, null);
+        }
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()

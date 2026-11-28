@@ -2,6 +2,7 @@ using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Entities.Ascension;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
@@ -23,6 +24,8 @@ public interface IRunState
     GameMode GameMode => Ascension.GameMode;
 
     IReadOnlyList<RunModel> RunModels => Array.Empty<RunModel>();
+
+    DominionModel? Dominion => null;
 
     IReadOnlyList<Player> Players { get; }
 

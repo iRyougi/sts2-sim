@@ -31,7 +31,7 @@ public static class RunTransplantExporter
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(target);
-        if (run.GameMode is not (GameMode.Standard or GameMode.Blitz))
+        if (run.GameMode is not (GameMode.Standard or GameMode.Blitz or GameMode.Dread))
             throw new TransplantMappingException("GameMode", $"Unsupported game mode '{run.GameMode}'.");
         if (run.CurrentRoom is not null || run.Players.Count != 1)
             throw new TransplantMappingException("RunState", "Export requires one player between rooms.");

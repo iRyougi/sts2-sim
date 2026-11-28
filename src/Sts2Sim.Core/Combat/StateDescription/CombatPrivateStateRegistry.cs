@@ -97,6 +97,7 @@ internal static class CombatPrivateStateRegistry
         "CorpseSlug._isRavenous", "CorpseSlug._starterMoveIdx", "GasBomb._hasExploded",
         "LagavulinMatriarch._isAwake", "LagavulinMatriarch._isShellAwake",
         "LivingFog._bloatAmount", "PhantasmalGardener._enlargeTriggers",
+        "KinFollower._index",
         "SoulFysh._isInvisible", "Toadpole._isFront",
         "TwoTailedRat._starterMoveIndex", "TwoTailedRat._turnsUntilSummonable",
         "TwoTailedRat._callForBackupCount",
@@ -144,8 +145,6 @@ internal static class CombatPrivateStateRegistry
             ["Chomper._screamFirst"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["Inklet._middleInklet"] =
-                "Initial configuration already materialized into the fingerprinted move-state machine.",
-            ["KinFollower._startsWithDance"] =
                 "Initial configuration already materialized into the fingerprinted move-state machine.",
             ["LouseProgenitor._curled"] =
                 "Presentation flag; no simulator behavior reads it after assignment.",

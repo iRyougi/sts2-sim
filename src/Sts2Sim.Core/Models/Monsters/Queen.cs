@@ -65,11 +65,15 @@ public sealed class Queen : MonsterModel
         Amalgam = Creature.CombatState!.Enemies.First(creature => creature.Monster is TorchHeadAmalgam);
     }
 
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
         var states = new List<MonsterState>();
         var puppetStrings = new MoveState("PUPPET_STRINGS_MOVE", PuppetStringsMove, new CardDebuffIntent());
         var youAreMine = new MoveState("YOU_ARE_MINE_MOVE", YoureMineMove, new DebuffIntent());
+        var dreadInitial = new MoveState(
+            "DREAD_INITIAL_MOVE", DreadInitialMove, new CardDebuffIntent(), new DebuffIntent());
         var bodyBranch = new ConditionalBranchState("YOURE_MINE_NOW_BRANCH");
         BurnBrightForMeState = new MoveState(
             "BURN_BRIGHT_FOR_ME_MOVE", BurnBrightForMeMove, new BuffIntent(), new DefendIntent());
@@ -81,6 +85,7 @@ public sealed class Queen : MonsterModel
 
         puppetStrings.FollowUpState = youAreMine;
         youAreMine.FollowUpState = bodyBranch;
+        dreadInitial.FollowUpState = bodyBranch;
         bodyBranch.AddBranch(_ => !HasAmalgamDied, BurnBrightForMeState.Id);
         bodyBranch.AddBranch(_ => HasAmalgamDied, offWithYourHead.Id);
         BurnBrightForMeState.FollowUpState = burnBrightBranch;
@@ -91,13 +96,14 @@ public sealed class Queen : MonsterModel
         EnragedState.FollowUpState = offWithYourHead;
         states.Add(puppetStrings);
         states.Add(youAreMine);
+        states.Add(dreadInitial);
         states.Add(BurnBrightForMeState);
         states.Add(burnBrightBranch);
         states.Add(bodyBranch);
         states.Add(offWithYourHead);
         states.Add(execution);
         states.Add(EnragedState);
-        return new MonsterMoveStateMachine(states, puppetStrings);
+        return new MonsterMoveStateMachine(states, IsDread ? dreadInitial : puppetStrings);
     }
 
     public override Task AfterDeath(Creature target, bool wasRemovalPrevented)
@@ -142,9 +148,15 @@ public sealed class Queen : MonsterModel
         }
     }
 
+    private async Task DreadInitialMove(IReadOnlyList<Creature> targets)
+    {
+        await PuppetStringsMove(targets);
+        await YoureMineMove(targets);
+    }
+
     private async Task BurnBrightForMeMove(IReadOnlyList<Creature> targets)
     {
-        int strengthAmount = Ascension(AscensionLevel.DeadlyEnemies, 1, 1);
+        int strengthAmount = IsDread ? 2 : 1;
         List<Creature> teammates = Creature.CombatState!.Enemies.ToList();
         foreach (Creature ally in teammates.Where(ally => ally != Creature))
         {

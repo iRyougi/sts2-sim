@@ -78,10 +78,12 @@ public sealed class Aeonglass : MonsterModel
         return Task.CompletedTask;
     }
 
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
     private int EbbDamage => Ascension(AscensionLevel.DeadlyEnemies, 26, 22);
     private const int EbbBlock = 33;
     private int EyeLaserDamage => Ascension(AscensionLevel.DeadlyEnemies, 12, 11);
-    private int WitherCount => Ascension(AscensionLevel.DeadlyEnemies, 2, 1);
+    private int WitherCount => Ascension(AscensionLevel.DeadlyEnemies, 2, 1) + (IsDread ? 1 : 0);
     private int BaseStrength => Ascension(AscensionLevel.DeadlyEnemies, 4, 3);
 
     private async Task Ebb(IReadOnlyList<Creature> targets)
@@ -106,6 +108,7 @@ public sealed class Aeonglass : MonsterModel
         }
 
         WitherUpgradeCount++;
+        PileType targetPile = IsDread ? PileType.Draw : PileType.Discard;
         foreach (Creature target in targets.Where(target => target.Player is not null))
         {
             for (int index = 0; index < WitherCount; index++)
@@ -113,7 +116,7 @@ public sealed class Aeonglass : MonsterModel
                 var wither = (Wither)ModelDb.Card<Wither>().MutableClone();
                 wither.AssignOwner(target.Player!);
                 await CardPileCmd.Generate(
-                    Creature.CombatState, wither, PileType.Discard, creator: null, position: CardPilePosition.Random);
+                    Creature.CombatState, wither, targetPile, creator: null, position: CardPilePosition.Random);
             }
         }
 

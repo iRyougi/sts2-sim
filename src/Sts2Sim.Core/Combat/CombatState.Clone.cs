@@ -5,6 +5,7 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
@@ -224,6 +225,9 @@ public sealed partial class CombatState
         RoundNumber = RoundNumber,
         IsPlayerExtraTurn = IsPlayerExtraTurn,
         GoldWasStolen = GoldWasStolen,
+        Encounter = Encounter,
+        EncounterRoomType = EncounterRoomType,
+        InitialEncounterMonsterCount = InitialEncounterMonsterCount,
         _nextCreatureId = _nextCreatureId,
         _shuffleOrdinal = _shuffleOrdinal,
         _potionUseOrdinal = _potionUseOrdinal,
@@ -349,15 +353,23 @@ public sealed partial class CombatState
             {
                 IReadOnlyList<RunModel> clonedRunModels = source.RunModels.Count == 0 ? [] :
                     Array.AsReadOnly(source.RunModels.Select(model => model.CloneForRun(runState)).ToArray());
+                DominionModel? clonedDominion = source.Dominion?.CloneForGraph(runState, playerMap);
                 target.RunModels = clonedRunModels;
+                target.SetDominion(clonedDominion);
                 if (runState is CombatRunStateSnapshot snapshot)
                 {
-                    snapshot.SetRunModels(clonedRunModels);
+                    snapshot.SetRunModelsAndDominion(clonedRunModels, clonedDominion);
                 }
             }
             else
             {
                 target.RunModels = runState.RunModels;
+                DominionModel? targetDominion = source.Dominion is null
+                    ? null
+                    : ReferenceEquals(source.Dominion, source.RunState.Dominion)
+                        ? runState.Dominion
+                        : source.Dominion.CloneForGraph(runState, playerMap);
+                target.SetDominion(targetDominion);
             }
 
             target.DamageHistory = source.DamageHistory.Clone(creatureMap, cardMap);
@@ -493,12 +505,19 @@ public sealed partial class CombatState
         private readonly List<Player> _players = new();
         private readonly int _totalFloor = source.TotalFloor;
         private IReadOnlyList<RunModel> _runModels = Array.Empty<RunModel>();
+        private DominionModel? _dominion;
 
         public GameMode GameMode { get; } = source.GameMode;
 
         public IReadOnlyList<RunModel> RunModels => _runModels;
 
-        internal void SetRunModels(IReadOnlyList<RunModel> runModels) => _runModels = runModels;
+        public DominionModel? Dominion => _dominion;
+
+        internal void SetRunModelsAndDominion(IReadOnlyList<RunModel> runModels, DominionModel? dominion)
+        {
+            _runModels = runModels;
+            _dominion = dominion;
+        }
 
         public MapLocation MapLocation { get; } = source switch
         {

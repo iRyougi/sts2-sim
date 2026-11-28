@@ -6,6 +6,7 @@ using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models.Exceptions;
 using Sts2Sim.Core.Models.Afflictions;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Models.Orbs;
 
 namespace Sts2Sim.Core.Models;
@@ -259,6 +260,8 @@ public static class ModelDb
     public static T Event<T>() where T : EventModel => Get<T>();
 
     public static T RunModel<T>() where T : RunModel => Get<T>();
+
+    public static T Dominion<T>() where T : DominionModel => Get<T>();
 
     /// <summary>Returns all registered models of the requested type. 偏离 #68：直接对已注册模型做
     /// 扁平类型过滤，不像真实游戏按 <c>RelicPoolModel</c>/<c>CardPoolModel</c> 分池维护索引——本计划

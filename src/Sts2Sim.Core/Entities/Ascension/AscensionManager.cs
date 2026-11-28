@@ -75,7 +75,7 @@ public class AscensionManager
             return _blitzAscensions!.Contains(level);
         }
 
-        return _level >= (int)level;
+        return _level >= (int)level && (GameMode == GameMode.Standard || level > AscensionLevel.None);
     }
 
     // 游戏 AscensionHelper.GetValueIfAscension 的实例化版本（全局静态 → 注入，见偏离清单 #6）

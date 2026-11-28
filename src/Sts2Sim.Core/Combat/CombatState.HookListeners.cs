@@ -171,7 +171,7 @@ public sealed partial class CombatState
         if (!scan.Count(RunModels.Count)) return false;
         for (int i = 0; i < RunModels.Count; i++)
             if (!scan.Reference(RunModels[i])) return false;
-        return true;
+        return scan.Reference(Dominion);
     }
 
     private static bool ScanCreatureSources(IReadOnlyList<Creature> creatures, ref ListenerWitnessScan scan)

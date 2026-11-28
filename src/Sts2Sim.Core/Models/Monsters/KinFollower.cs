@@ -9,20 +9,26 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class KinFollower : MonsterModel
 {
-    private bool _startsWithDance;
+    private int _index = 1;
 
     public override int MinInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 62, 58);
 
     public override int MaxInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 63, 59);
 
-    public bool StartsWithDance
+    public int Index
     {
-        get => _startsWithDance;
+        get => _index;
         set
         {
             AssertMutable();
-            _startsWithDance = value;
+            _index = value;
         }
+    }
+
+    public bool StartsWithDance
+    {
+        get => _index == 0;
+        set => Index = value ? 0 : 1;
     }
 
     private int DanceStrength => AscensionValue(AscensionLevel.DeadlyEnemies, 3, 2);
@@ -57,7 +63,21 @@ public sealed class KinFollower : MonsterModel
         powerDance.FollowUpState = quickSlash;
         return new MonsterMoveStateMachine(
             new MonsterState[] { quickSlash, boomerang, powerDance },
-            StartsWithDance ? powerDance : quickSlash);
+            Index switch
+            {
+                0 => powerDance,
+                1 => quickSlash,
+                2 => boomerang,
+                _ => throw new IndexOutOfRangeException(),
+            });
+    }
+
+    internal override void AppendCombatStateDescription(
+        ref global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionBuilder builder,
+        global::Sts2Sim.Core.Combat.StateDescription.CombatStateDescriptionContext context)
+    {
+        if (context.State.RunState.GameMode == Runs.GameMode.Dread)
+            builder.Append(_index);
     }
 
     private async Task QuickSlashMove(IReadOnlyList<Creature> targets)

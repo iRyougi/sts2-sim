@@ -4,6 +4,7 @@ using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Random;
 using Sts2Sim.Core.Runs;
 using Sts2Sim.Core.Saves;
@@ -50,6 +51,12 @@ public static class CombatStateDescription
         if (state.RunState.GameMode != Runs.GameMode.Standard)
         {
             builder.Append((int)state.RunState.GameMode);
+            DominionModel? dominion = state.Dominion;
+            builder.Append(dominion is not null);
+            if (dominion is not null)
+            {
+                builder.Append(dominion.Id);
+            }
             IReadOnlyList<RunModel> runModels = state.RunModels;
             builder.Append(runModels.Count);
             for (int i = 0; i < runModels.Count; i++)

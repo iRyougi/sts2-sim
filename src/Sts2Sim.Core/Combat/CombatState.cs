@@ -1,9 +1,12 @@
+using Sts2Sim.Core.Content;
 using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Creatures;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Entities.Rngs;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Random;
+using Sts2Sim.Core.Rooms;
 using Sts2Sim.Core.Runs;
 
 namespace Sts2Sim.Core.Combat;
@@ -35,6 +38,7 @@ public sealed partial class CombatState : ICombatState
     {
         RunState = runState;
         RunModels = runState.RunModels;
+        Dominion = runState.Dominion;
         _encounterSlots = encounterSlots.ToArray();
         _semanticCombatKey = runState is Runs.RunState concreteRun
             ? concreteRun.SemanticLocationKey
@@ -44,6 +48,21 @@ public sealed partial class CombatState : ICombatState
     public IReadOnlyList<RunModel> RunModels { get; private set; }
 
     private readonly string[] _encounterSlots;
+
+    public DominionModel? Dominion { get; private set; }
+
+    internal EncounterDefinition? Encounter { get; set; }
+
+    internal RoomType EncounterRoomType { get; set; }
+
+    internal int InitialEncounterMonsterCount { get; set; }
+
+    public void SetDominion(DominionModel? dominion)
+    {
+        Dominion = dominion;
+        _hookListenerSnapshotCache = null;
+        _hookListenerLists = null;
+    }
 
     /// <summary>Sorts encounter slots without changing registration IDs or spawn history.</summary>
     internal void SortEnemiesBySlotName()
@@ -581,7 +600,7 @@ public sealed partial class CombatState : ICombatState
     // are not counted; if capacity is insufficient, the list grows normally.
     private int EstimateHookListenerCount()
     {
-        int count = RunModels.Count;
+        int count = RunModels.Count + (Dominion is not null ? 1 : 0);
         for (int i = 0; i < _allies.Count; i++)
         {
             count += EstimateCreatureHookListenerCount(_allies[i]);
@@ -625,6 +644,7 @@ public sealed partial class CombatState : ICombatState
         }
         for (int i = 0; i < RunModels.Count; i++)
             sink.Put(RunModels[i]);
+        if (Dominion is { } dominion) sink.Put(dominion);
     }
 
     private static void WalkCreatureHookListeners<TSink>(ref TSink sink, Creature creature)

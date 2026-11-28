@@ -1,6 +1,7 @@
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Helpers;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Random;
 
 namespace Sts2Sim.Core.Content;
@@ -10,7 +11,7 @@ namespace Sts2Sim.Core.Content;
 /// 怪物和槽位。</summary>
 public sealed class EncounterDefinition
 {
-    private readonly Func<Rng?, IReadOnlyList<(MonsterModel Monster, string? SlotName)>> _monsterBatchFactory;
+    private readonly Func<Rng?, bool, IReadOnlyList<(MonsterModel Monster, string? SlotName)>> _monsterBatchFactory;
 
     public const string DefaultName = "custom-encounter";
 
@@ -44,6 +45,14 @@ public sealed class EncounterDefinition
         init => _slots = Array.AsReadOnly(value.ToArray());
     }
 
+    public Func<bool, IReadOnlyList<string>>? SlotsFactory { get; init; }
+
+    public IReadOnlyList<string> GetSlots(bool isDread) => SlotsFactory?.Invoke(isDread) ?? _slots;
+
+    public Func<DominionModel>? DominionFactory { get; init; }
+
+    public DominionModel? GetDominion() => DominionFactory?.Invoke();
+
     /// <summary>Optional encounter-specific bounds; null retains the room's Poverty-adjusted default.</summary>
     public int? MinGoldReward { get; init; }
 
@@ -72,7 +81,7 @@ public sealed class EncounterDefinition
         string? name)
     {
         ArgumentNullException.ThrowIfNull(monsterFactory);
-        _monsterBatchFactory = _ => new[] { (monsterFactory(), (string?)null) };
+        _monsterBatchFactory = (_, _) => new[] { (monsterFactory(), (string?)null) };
         Name = SnapshotName(name);
         Tags = SnapshotTags(tags);
         IsWeak = isWeak;
@@ -93,7 +102,7 @@ public sealed class EncounterDefinition
         string? name)
     {
         ArgumentNullException.ThrowIfNull(monsterBatchFactory);
-        _monsterBatchFactory = _ => monsterBatchFactory();
+        _monsterBatchFactory = (_, _) => monsterBatchFactory();
         Name = SnapshotName(name);
         Tags = SnapshotTags(tags);
         IsWeak = isWeak;
@@ -114,7 +123,7 @@ public sealed class EncounterDefinition
         string? name)
     {
         ArgumentNullException.ThrowIfNull(monsterBatchFactory);
-        _monsterBatchFactory = rng => monsterBatchFactory(
+        _monsterBatchFactory = (rng, _) => monsterBatchFactory(
             rng ?? throw new InvalidOperationException(
                 "This encounter requires an RNG to generate its monster batch."));
         Name = SnapshotName(name);
@@ -122,18 +131,60 @@ public sealed class EncounterDefinition
         IsWeak = isWeak;
     }
 
-    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters() =>
-        CreateMonstersCore(rng: null);
-
-    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters(Rng rng)
+    private EncounterDefinition(
+        Func<Rng?, bool, IReadOnlyList<(MonsterModel Monster, string? SlotName)>> monsterBatchFactory,
+        IReadOnlyList<EncounterTag>? tags,
+        bool isWeak,
+        string? name,
+        string? idEntry = null)
     {
-        ArgumentNullException.ThrowIfNull(rng);
-        return CreateMonstersCore(rng);
+        _monsterBatchFactory = monsterBatchFactory;
+        Name = SnapshotName(name);
+        Tags = SnapshotTags(tags);
+        IsWeak = isWeak;
+        if (idEntry is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(idEntry);
+            _idEntry = idEntry;
+        }
     }
 
-    private IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonstersCore(Rng? rng)
+    internal static EncounterDefinition CreateDreadAware(
+        Func<bool, IReadOnlyList<(MonsterModel Monster, string? SlotName)>> monsterBatchFactory,
+        IReadOnlyList<EncounterTag>? tags = null,
+        bool isWeak = false,
+        string? name = null,
+        string? idEntry = null,
+        Func<bool, IReadOnlyList<string>>? slotsFactory = null,
+        Func<DominionModel>? dominionFactory = null)
     {
-        IReadOnlyList<(MonsterModel Monster, string? SlotName)> generated = _monsterBatchFactory(rng)
+        ArgumentNullException.ThrowIfNull(monsterBatchFactory);
+        return new EncounterDefinition((_, isDread) => monsterBatchFactory(isDread), tags, isWeak, name, idEntry)
+        {
+            Slots = slotsFactory?.Invoke(false) ?? Array.Empty<string>(),
+            SlotsFactory = slotsFactory,
+            DominionFactory = dominionFactory,
+        };
+    }
+
+    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters() =>
+        CreateMonstersCore(rng: null, isDread: false);
+
+    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters(bool isDread) =>
+        CreateMonstersCore(rng: null, isDread);
+
+    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters(Rng rng) =>
+        CreateMonsters(rng, isDread: false);
+
+    public IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonsters(Rng rng, bool isDread)
+    {
+        ArgumentNullException.ThrowIfNull(rng);
+        return CreateMonstersCore(rng, isDread);
+    }
+
+    private IReadOnlyList<(MonsterModel Monster, string? SlotName)> CreateMonstersCore(Rng? rng, bool isDread)
+    {
+        IReadOnlyList<(MonsterModel Monster, string? SlotName)> generated = _monsterBatchFactory(rng, isDread)
             ?? throw new InvalidOperationException("Monster batch factory returned null.");
         if (generated.Any(entry => entry.Monster is null))
         {

@@ -57,6 +57,8 @@ public sealed class CombatRoom : AbstractRoom
 
     public override ModelId? ModelId { get; }
 
+    public CombatState? CombatState => Engine?.State ?? _preparedCombatState;
+
     public CombatEngine Engine { get; private set; } = null!;
 
     public bool Won { get; private set; }
@@ -238,6 +240,15 @@ public sealed class CombatRoom : AbstractRoom
         _cardSelectionSource = source;
     }
 
+    // Dread only (deviation 09-S-1033): DreadRunModel.BeforeRoomEntered must see the encounter to clear the dominion at
+    // the act boss, and the simulator learns the encounter from the same factory that spawns the monsters. Native
+    // spawns in EnterInternal after BeforeRoomEntered; Standard and Blitz keep that order.
+    protected override void PrepareBeforeRoomEntered(RunState runState)
+    {
+        if (runState.GameMode == GameMode.Dread)
+            Prepare(runState);
+    }
+
     public override Task EnterInternal(RunState? runState) => EnterCombatAsync(runState, afterSetup: null);
 
     protected override Task EnterWithEntryHooksAsync(RunState? runState) =>
@@ -283,7 +294,9 @@ public sealed class CombatRoom : AbstractRoom
             throw new InvalidOperationException("Monster batch factory returned null.");
         }
 
-        var combatState = new CombatState(runState, Encounter?.Slots ?? Array.Empty<string>());
+        var combatState = new CombatState(
+            runState,
+            Encounter?.GetSlots(runState.Ascension.IsDread) ?? Array.Empty<string>());
         List<(MonsterModel Monster, string? SlotName)> monsters = generated.ToList();
         if (monsters.Count == 0)
         {
@@ -302,6 +315,10 @@ public sealed class CombatRoom : AbstractRoom
         {
             throw new InvalidOperationException("Combat monster batches cannot reuse the same model instance.");
         }
+
+        combatState.Encounter = Encounter;
+        combatState.EncounterRoomType = RoomType;
+        combatState.InitialEncounterMonsterCount = monsters.Count;
 
         // Native CombatRoom.EnterInternal registers players before StartCombat creates monsters.
         // Their CombatIds therefore occupy the first slots of this combat's creature ID sequence.

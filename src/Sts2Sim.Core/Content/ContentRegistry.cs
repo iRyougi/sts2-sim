@@ -1,5 +1,6 @@
 using Sts2Sim.Core.Models;
 using Sts2Sim.Core.Models.Afflictions;
+using Sts2Sim.Core.Models.Dread;
 
 namespace Sts2Sim.Core.Content;
 
@@ -14,6 +15,7 @@ public static class ContentRegistry
         typeof(CardModel),
         typeof(AfflictionModel),
         typeof(CharacterModel),
+        typeof(DominionModel),
         typeof(EnchantmentModel),
         typeof(EventModel),
         typeof(MonsterModel),

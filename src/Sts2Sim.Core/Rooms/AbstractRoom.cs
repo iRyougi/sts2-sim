@@ -30,11 +30,14 @@ public abstract class AbstractRoom
 
     protected virtual bool EntryHooksBeforeRewards => false;
 
+    protected virtual void PrepareBeforeRoomEntered(RunState runState) { }
+
     public async Task Enter(RunState? runState)
     {
         Id = runState?.GetAndIncrementNextRoomId();
         if (runState != null)
         {
+            PrepareBeforeRoomEntered(runState);
             await Hook.BeforeRoomEntered(runState, this);
         }
         await EnterWithEntryHooksAsync(runState);

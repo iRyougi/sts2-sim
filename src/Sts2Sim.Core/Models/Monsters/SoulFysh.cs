@@ -26,7 +26,9 @@ public sealed class SoulFysh : MonsterModel
 
     private int GazeDamage => Value(AscensionLevel.DeadlyEnemies, 8, 7);
 
-    private const int BeckonMoveAmount = 2;
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    private int BeckonMoveAmount => IsDread ? 3 : 2;
     private const int GazeMoveAmount = 1;
     private const int ScreamMoveAmount = 3;
 
@@ -82,6 +84,17 @@ public sealed class SoulFysh : MonsterModel
                 PileType.Draw,
                 creator: null,
                 position: CardPilePosition.Random);
+
+            if (IsDread)
+            {
+                Beckon handBeckon = (Beckon)ModelDb.Card<Beckon>().MutableClone();
+                handBeckon.AssignOwner(player);
+                await CardPileCmd.Generate(
+                    combatState,
+                    handBeckon,
+                    PileType.Hand,
+                    creator: null);
+            }
 
             Beckon discardBeckon = (Beckon)ModelDb.Card<Beckon>().MutableClone();
             discardBeckon.AssignOwner(player);

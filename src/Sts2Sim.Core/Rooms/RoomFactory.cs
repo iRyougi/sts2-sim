@@ -84,7 +84,7 @@ public static class RoomFactory
     {
         EncounterDefinition encounter = runState.PullNextEncounterForTransplant(roomType);
         Rng monsterRng = CreateEncounterMonsterRng(runState, encounter);
-        return (encounter, encounter.CreateMonsters(monsterRng));
+        return (encounter, encounter.CreateMonsters(monsterRng, runState.Ascension.IsDread));
     }
 
     /// <summary>真实游戏 <c>EncounterModel.GenerateMonstersWithSlots</c> 用一个独立于12个具名

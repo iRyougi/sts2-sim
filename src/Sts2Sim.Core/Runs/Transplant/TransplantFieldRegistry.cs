@@ -175,7 +175,7 @@ public static class TransplantFieldRegistry
         "_acts", "_readOnlyActs", "_generatedRooms", "_eventSequence",
         "_normalEncounterSequence", "_eliteEncounterSequence", "_bossEncounter",
         "_secondBossEncounter", "_runModels",
-        "<Ascension>k__BackingField", "_currentAncientEventType",
+        "<Dominion>k__BackingField", "<Ascension>k__BackingField", "_currentAncientEventType",
         "<Map>k__BackingField", "<CardSelectionSource>k__BackingField",
     ];
 

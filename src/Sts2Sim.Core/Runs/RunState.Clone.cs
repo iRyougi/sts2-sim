@@ -6,6 +6,7 @@ using Sts2Sim.Core.Entities.Cards;
 using Sts2Sim.Core.Entities.Players;
 using Sts2Sim.Core.Map;
 using Sts2Sim.Core.Models;
+using Sts2Sim.Core.Models.Dread;
 using Sts2Sim.Core.Odds;
 using Sts2Sim.Core.Combat;
 using Sts2Sim.Core.Entities.Creatures;
@@ -153,6 +154,18 @@ public sealed partial class RunState
         {
             IsImaginationClone = true;
             ResampleHiddenFutureForImagination(source);
+        }
+        if (source.Dominion is { } sourceDominion)
+        {
+            DominionModel copiedDominion = sourceDominion.CloneForGraph(this, playerMap);
+            RestoreClonedDominion(copiedDominion);
+            modelMap.Add(sourceDominion, copiedDominion);
+        }
+        else if (!(imagination && source._generatedRooms is null))
+        {
+            // A lazy source has not bound its first dominion yet; an imagination world that just generated its
+            // rooms keeps the dominion InitializeCurrentAct bound for its own boss (native BeforeActEntered).
+            RestoreClonedDominion(null);
         }
         CopyOwnedRunGraphFrom(source, playerMap, cardMap, modelMap, imagination);
         Rng newRngForBag(string owner) => rng.ForSemanticKey(

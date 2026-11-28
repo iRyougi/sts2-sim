@@ -9,13 +9,13 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class CeremonialBeast : MonsterModel
 {
-    private const int PlowStrength = 2;
-
     private bool _isStunnedByPlowRemoval;
     private bool _isInSecondPhase;
     private MoveState _beastCryState = null!;
 
-    public override int MinInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 262, 252);
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    public override int MinInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 262, 252) + (IsDread ? 30 : 0);
 
     public override int MaxInitialHp => MinInitialHp;
 
@@ -53,17 +53,29 @@ public sealed class CeremonialBeast : MonsterModel
 
     private int PlowDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 20, 18);
 
+    private int PlowStrength => IsDread ? 3 : 2;
+
+    private int RitualAmount => IsDread ? 2 : 0;
+
     private int StompDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 17, 15);
 
     private int CrushDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 19, 17);
 
     private int CrushStrength => AscensionValue(AscensionLevel.DeadlyEnemies, 4, 3);
 
-    public Task SetStunned()
+    public async Task SetStunned()
     {
         IsStunnedByPlowRemoval = true;
         IsInSecondPhase = true;
-        return Task.CompletedTask;
+        if (RitualAmount > 0)
+        {
+            await PowerCmd.Apply<RitualPower>(
+                Creature.CombatState!,
+                Creature,
+                RitualAmount,
+                Creature,
+                cardSource: null);
+        }
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()

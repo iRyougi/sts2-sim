@@ -366,13 +366,23 @@ public class RunDriverTests : IDisposable
         var snapshot = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ExportActEntry(run);
         string json = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ExportActEntryJson(run);
         var document = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
-        foreach (string field in document.Select(p => p.Key).ToArray())
+        foreach (string field in document.Select(p => p.Key)
+            .Where(name => name != nameof(Sts2Sim.Core.Runs.Transplant.ActEntrySnapshot.GameMode)).ToArray())
         {
             var incomplete = document.DeepClone().AsObject();
             incomplete.Remove(field);
             Assert.Throws<System.Text.Json.JsonException>(() =>
                 Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(incomplete.ToJsonString()));
         }
+        var legacyDocument = document.DeepClone().AsObject();
+        legacyDocument.Remove(nameof(Sts2Sim.Core.Runs.Transplant.ActEntrySnapshot.GameMode));
+        legacyDocument[nameof(Sts2Sim.Core.Runs.Transplant.ActEntrySnapshot.SchemaVersion)] =
+            Sts2Sim.Core.Runs.Transplant.ActEntrySnapshot.LegacySchemaVersion;
+        RunState legacyRestored = Sts2Sim.Core.Runs.Transplant.ActEntrySnapshotCodec.ImportActEntry(
+            legacyDocument.ToJsonString());
+        Assert.Equal(GameMode.Standard, legacyRestored.GameMode);
+        Assert.Empty(legacyRestored.RunModels);
+        Assert.Null(legacyRestored.Dominion);
         var unknown = document.DeepClone().AsObject();
         unknown["UnknownField"] = 0;
         Assert.Throws<System.Text.Json.JsonException>(() =>

@@ -15,13 +15,16 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 public sealed class Vantom : MonsterModel
 {
     private const int WoundCount = 3;
-    private const int PrepareStrength = 2;
+
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    private int PrepareStrength => IsDread ? 3 : 2;
 
     public override int MinInitialHp => AscensionValue(AscensionLevel.ToughEnemies, 183, 173);
 
     public override int MaxInitialHp => MinInitialHp;
 
-    private int SlipperyAmount => AscensionValue(AscensionLevel.ToughEnemies, 9, 8);
+    private int SlipperyAmount => AscensionValue(AscensionLevel.ToughEnemies, 9, 8) + (IsDread ? 2 : 0);
 
     private int InkBlotDamage => AscensionValue(AscensionLevel.DeadlyEnemies, 8, 7);
 

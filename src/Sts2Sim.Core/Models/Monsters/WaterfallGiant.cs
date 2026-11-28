@@ -19,11 +19,14 @@ public sealed class WaterfallGiant : MonsterModel
     public override int MaxInitialHp => MinInitialHp;
     public int SiphonHeal => Ascension(AscensionLevel.ToughEnemies, 15, 10);
 
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
     private int PressurizeAmount => Ascension(AscensionLevel.DeadlyEnemies, 20, 15);
     private int StompDamage => Ascension(AscensionLevel.DeadlyEnemies, 16, 15);
     private int RamDamage => Ascension(AscensionLevel.DeadlyEnemies, 11, 10);
     private int PressureUpDamage => Ascension(AscensionLevel.DeadlyEnemies, 14, 13);
     private int BasePressureGunDamage => Ascension(AscensionLevel.DeadlyEnemies, 23, 20);
+    private int SteamBoostAmount => IsDread ? 4 : 3;
     private const int PressureGunIncrease = 5;
 
     public override bool ShouldDisappearFromDoom() => !Creature.HasPower<SteamEruptionPower>();
@@ -75,7 +78,7 @@ public sealed class WaterfallGiant : MonsterModel
     private async Task PressureUpMove(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(PressureUpDamage).FromMonster(this).Execute();
-        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, SteamBoostAmount, Creature, null);
     }
 
     private async Task StompMove(IReadOnlyList<Creature> targets)
@@ -85,26 +88,26 @@ public sealed class WaterfallGiant : MonsterModel
         {
             await PowerCmd.Apply<WeakPower>(Creature.CombatState!, target, 1m, Creature, null);
         }
-        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, SteamBoostAmount, Creature, null);
     }
 
     private async Task RamMove(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(RamDamage).FromMonster(this).Execute();
-        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, SteamBoostAmount, Creature, null);
     }
 
     private async Task SiphonMove(IReadOnlyList<Creature> targets)
     {
         await CreatureCmd.Heal(Creature, SiphonHeal * Creature.CombatState!.Players.Count);
-        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, SteamBoostAmount, Creature, null);
     }
 
     private async Task PressureGunMove(IReadOnlyList<Creature> targets)
     {
         await DamageCmd.Attack(_currentPressureGunDamage).FromMonster(this).Execute();
         _currentPressureGunDamage += PressureGunIncrease;
-        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, 3m, Creature, null);
+        await PowerCmd.Apply<SteamEruptionPower>(Creature.CombatState!, Creature, SteamBoostAmount, Creature, null);
     }
 
     private async Task AboutToBlowMove(IReadOnlyList<Creature> targets)

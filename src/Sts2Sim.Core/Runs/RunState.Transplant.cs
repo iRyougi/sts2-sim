@@ -52,7 +52,7 @@ public sealed partial class RunState
         EnsureRoomsGenerated();
         if (snapshot.ActIndex < 0 || snapshot.ActIndex >= _acts.Length)
             throw new TransplantMappingException("ActIndex", "Act index is outside the run.");
-        while (CurrentActIndex < snapshot.ActIndex) AdvanceToNextAct();
+        while (CurrentActIndex < snapshot.ActIndex) AdvanceToNextActForTransplant();
         if (snapshot.CompletedActFloors < 0)
             throw new TransplantMappingException("CompletedActFloors", "Floor count cannot be negative.");
         _completedActFloors = snapshot.CompletedActFloors;

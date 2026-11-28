@@ -18,17 +18,21 @@ public sealed class LagavulinMatriarch : MonsterModel
     private bool _isAwake;
     private bool _isShellAwake;
 
-    public override int MinInitialHp => Value(AscensionLevel.ToughEnemies, 233, 222);
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+
+    public override int MinInitialHp => Value(AscensionLevel.ToughEnemies, 233, 222) + (IsDread ? 22 : 0);
 
     public override int MaxInitialHp => MinInitialHp;
 
     private int SlashDamage => Value(AscensionLevel.DeadlyEnemies, 21, 19);
 
-    private int Slash2Damage => Value(AscensionLevel.DeadlyEnemies, 14, 12);
+    private int Slash2Damage => Value(AscensionLevel.DeadlyEnemies, 14, 12) + (IsDread ? 2 : 0);
 
-    private int Slash2Block => Value(AscensionLevel.ToughEnemies, 14, 12);
+    private int Slash2Block => Value(AscensionLevel.ToughEnemies, 14, 12) + (IsDread ? 2 : 0);
 
     private int DisembowelDamage => Value(AscensionLevel.DeadlyEnemies, 10, 9);
+
+    private int DebuffAmount => IsDread ? -3 : -2;
 
     private const int DisembowelRepeat = 2;
 
@@ -162,13 +166,13 @@ public sealed class LagavulinMatriarch : MonsterModel
             await PowerCmd.Apply<StrengthPower>(
                 Creature.CombatState!,
                 target,
-                -2m,
+                DebuffAmount,
                 Creature,
                 null);
             await PowerCmd.Apply<DexterityPower>(
                 Creature.CombatState!,
                 target,
-                -2m,
+                DebuffAmount,
                 Creature,
                 null);
         }

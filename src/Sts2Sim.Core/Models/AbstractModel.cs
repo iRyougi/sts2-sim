@@ -165,10 +165,15 @@ public abstract class AbstractModel : IComparable<AbstractModel>
 
     // ===== Hook 表面(Plan 02 子集,与 Hooks.Hook 一一对应;默认实现 = 不干预)=====
 
+    /// <summary>v0.114.0 <c>AbstractModel.BeforeActEntered</c>: after the act index changes and the map is generated,
+    /// before the first room of the act is entered (<c>RunManager.EnterAct</c>).</summary>
+    public virtual Task BeforeActEntered() => Task.CompletedTask;
+
     public virtual Task AfterActEntered()
     {
         return Task.CompletedTask;
     }
+
 
     public virtual Task AfterArrowDislodged(
         Powers.ImpaledPower power,

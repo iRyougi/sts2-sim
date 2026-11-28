@@ -11,11 +11,13 @@ using Sts2Sim.Core.MonsterMoves.Intents;
 
 public sealed class TheInsatiable : MonsterModel
 {
-    public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 341, 321);
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+    public override int MinInitialHp => Ascension(AscensionLevel.ToughEnemies, 341, 321) + (IsDread ? 20 : 0);
     public override int MaxInitialHp => MinInitialHp;
     private int ThrashDamage => Ascension(AscensionLevel.DeadlyEnemies, 9, 8);
     private int BiteDamage => Ascension(AscensionLevel.DeadlyEnemies, 31, 28);
     private int SalivateStrength => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
+    private int SandpitAmount => IsDread ? 3 : 4;
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
     {
@@ -36,7 +38,7 @@ public sealed class TheInsatiable : MonsterModel
     {
         foreach (Creature target in targets.Where(target => target.Player is not null))
         {
-            SandpitPower sandpit = await PowerCmd.Apply<SandpitPower>(Creature.CombatState!, Creature, 4m, Creature, null)
+            SandpitPower sandpit = await PowerCmd.Apply<SandpitPower>(Creature.CombatState!, Creature, SandpitAmount, Creature, null)
                 ?? throw new InvalidOperationException("Liquify must create a Sandpit instance.");
             sandpit.Target = target;
             for (int i = 0; i < 6; i++)

@@ -24,7 +24,7 @@ public sealed partial class RunState
     {
         AssertStableCloneBoundary();
         RequireActEntryBoundary();
-        if (GameMode is not (GameMode.Standard or GameMode.Blitz))
+        if (GameMode is not (GameMode.Standard or GameMode.Blitz or GameMode.Dread))
             throw new TransplantMappingException("GameMode", $"Unsupported game mode '{GameMode}'.");
         Player player = _players[0];
         if (Rng.UsesSemanticKeys || !player.IsActiveForHooks || player.PlayerCombatState is not null ||
@@ -112,21 +112,25 @@ public sealed partial class RunState
     private static MapCoordDto Coord(MapPoint p) => new(p.coord.col, p.coord.row);
     private static string TypeId(Type type) => type.FullName ?? throw new InvalidOperationException("Content type has no full name.");
 
-    internal static GameMode ResolveTransplantGameMode(string? rawGameMode, string fieldPath) => rawGameMode switch
+    /// <summary>Snapshot game-mode field: absent (legacy) = Standard; Standard / Blitz / Dread by name, case-insensitive
+    /// (#1033 accepted lower case); anything else is rejected.</summary>
+    internal static GameMode ResolveTransplantGameMode(string? rawGameMode, string fieldPath)
     {
-        null => GameMode.Standard,
-        nameof(GameMode.Standard) => GameMode.Standard,
-        nameof(GameMode.Blitz) => GameMode.Blitz,
-        _ => throw new TransplantMappingException(fieldPath, $"Unsupported game mode '{rawGameMode}'."),
-    };
+        if (rawGameMode is null)
+            return GameMode.Standard;
+        foreach (GameMode supported in new[] { GameMode.Standard, GameMode.Blitz, GameMode.Dread })
+            if (string.Equals(rawGameMode, supported.ToString(), StringComparison.OrdinalIgnoreCase))
+                return supported;
+        throw new TransplantMappingException(fieldPath, $"Unsupported game mode '{rawGameMode}'.");
+    }
 
     internal static RunState ImportActEntryState(ActEntrySnapshot s)
     {
         if (s.SchemaVersion is not (ActEntrySnapshot.LegacySchemaVersion or ActEntrySnapshot.CurrentSchemaVersion))
             throw new TransplantMappingException("ActEntrySnapshot", "Unsupported schema version.");
         if (s.SchemaVersion == ActEntrySnapshot.CurrentSchemaVersion && s.GameMode is null)
-            throw new TransplantMappingException("GameMode", "Missing game mode.");
-        GameMode gameMode = ResolveTransplantGameMode(s.GameMode, "GameMode");
+            throw new TransplantMappingException("ActEntry.GameMode", "Missing game mode.");
+        GameMode gameMode = ResolveTransplantGameMode(s.GameMode, "ActEntry.GameMode");
         if (s.Ascension < 0 || s.Ascension > AscensionManager.GetMaxAllowed(gameMode))
             throw new TransplantMappingException("Ascension", "Unsupported ascension level.");
         if (s.Phase != RunEntryPhase.InitializedBeforeAncient || s.ActIndex is not (1 or 2) ||
@@ -210,6 +214,7 @@ public sealed partial class RunState
             throw new TransplantMappingException("ActEntry.RunRng", "Missing RNG stream.");
         run.RunRngLoad(s.RunRng);
         run.EntryPhase = s.Phase;
+        Hooks.Hook.AfterRunLoaded(run).GetAwaiter().GetResult();
         run.RequireActEntryBoundary();
         return run;
     }

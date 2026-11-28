@@ -17,10 +17,18 @@ public sealed class Crusher : MonsterModel
     private int AdaptStrength => Ascension(AscensionLevel.DeadlyEnemies, 3, 2);
     private int GuardedDamage => Ascension(AscensionLevel.DeadlyEnemies, 14, 12);
 
+    private bool IsDread => Creature?.CombatState?.RunState.Ascension.IsDread ?? false;
+    private int PlatingAmount => IsDread ? 14 : 0;
+
     public override async Task AfterAddedToRoom()
     {
+        await base.AfterAddedToRoom();
         await PowerCmd.Apply<BackAttackLeftPower>(Creature.CombatState!, Creature, 1m, Creature, null);
         await PowerCmd.Apply<CrabRagePower>(Creature.CombatState!, Creature, 1m, Creature, null);
+        if (PlatingAmount > 0)
+        {
+            await PowerCmd.Apply<PlatingPower>(Creature.CombatState!, Creature, PlatingAmount, Creature, null);
+        }
     }
 
     protected override MonsterMoveStateMachine GenerateMoveStateMachine()
